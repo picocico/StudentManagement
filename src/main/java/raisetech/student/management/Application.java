@@ -1,5 +1,6 @@
 package raisetech.student.management;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,6 @@ public class Application {
 
 	@GetMapping("/miracle")
 	public String cause() {
-    return "cause a miracle!!!";
+		return "cause a miracle!!!";
 	}
 }
