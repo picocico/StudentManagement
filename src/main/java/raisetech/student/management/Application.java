@@ -49,9 +49,9 @@ public class Application {
 	}
 
 	// MapにPOSTする
-  @PostMapping("/studentMap")
-  public void addStudentMap(String studentNumber, String studentName){
-		students.put(studentNumber,studentName) ;
+	@PostMapping("/studentMap")
+	public void addStudentMap(String studentNumber, String studentName) {
+		students.put(studentNumber,studentName);
 	}
 
 	// MapからDeleteする

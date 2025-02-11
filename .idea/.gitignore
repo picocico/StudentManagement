@@ -1,3 +1,42 @@
 # デフォルトの無視対象ファイル
 /shelf/
 /workspace.xml
+
+# ビルド生成物
+*.class
+*.o
+*.a
+*.so
+*.exe
+
+# 依存関係
+node_modules/
+vendor/
+
+# 環境設定ファイル
+.env
+config.yml
+
+# 一時ファイル
+*.log
+*.tmp
+*.bak
+
+# IDE固有のファイル
+.idea/
+.vscode/
+.project
+
+# OS固有のファイル
+.DS_Store
+Thumbs.db
+
+# Java関連の一般的な.gitignore設定
+*.jar
+*.war
+*.ear
+
+# ビルドディレクトリ
+/build/
+/out/
+
