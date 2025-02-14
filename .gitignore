@@ -37,6 +37,6 @@ Thumbs.db
 *.ear
 
 # ビルドディレクトリ
-/build/
-/out/
+build/
+out/
 
