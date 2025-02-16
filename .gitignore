@@ -1,5 +1,5 @@
 # デフォルトの無視対象ファイル
-/shelf/
+/.idea/shelf/
 /workspace.xml
 
 # ビルド生成物
@@ -40,3 +40,4 @@ Thumbs.db
 build/
 out/
 
+.gradle/
