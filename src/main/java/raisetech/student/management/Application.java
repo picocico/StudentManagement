@@ -1,64 +1,70 @@
 package raisetech.student.management;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootApplication
 @RestController
+@RequestMapping("/student")
 public class Application {
 
-  private String name = "Pico Cico";
-  private String age = "31";
-
-  // Mapを作成
-  private Map<String, String> students = new HashMap<>();
+  @Autowired
+  private StudentRepository repository;
 
   public static void main(String[] args) {
     SpringApplication.run(Application.class, args);
   }
 
-  // GETは取得する、リクエストの結果を受け取る
-  @GetMapping("/studentInfo")
-  public String getStudentInfo() {
-    return name + " " + age + "歳";
+  // 全学生のリストを取得
+  @GetMapping("/all")
+  public List<Student>getAllStudents() {
+    return repository.findAll();
   }
 
-  // MapをGETする
-  @GetMapping("/studentMap")
-  public Map<String, String> getStudentMap() {
-    return students;
+  // 名前で検索
+  @GetMapping("/searchByName")
+  public Student getStudentByName(@RequestParam String name) {
+    return repository.searchByName(name);
   }
 
-  // POSTは情報を与える、渡す
-  @PostMapping("/studentInfo")
-  public void setStudentInfo(String name, String age) {
-    this.name = name;
-    this.age = age;
+  // IDで検索
+  @GetMapping("/searchById")
+  public Student getStudentById(@RequestParam int id) {
+    return repository.searchById(id);
   }
 
-  // nameだけPOSTする
-  @PostMapping("/studentName")
-  public void updateStudentName(String name) {
-    this.name = name;
+  // 新しい学生を登録
+  @PostMapping("/register")
+  public void registerStudent(@RequestParam String name, @RequestParam int age) {
+    repository.registerStudent(name, age);
   }
 
-  // MapにPOSTする
-  @PostMapping("/studentMap")
-  public void addStudentMap(String studentNumber, String studentName) {
-    students.put(studentNumber, studentName);
+  // IDで学生を更新
+  @PatchMapping("/update")
+  public void updateStudent(@RequestParam int id, @RequestParam String name, @RequestParam int age) {
+    repository.updateStudent(id, name, age);
   }
 
-  // MapからDeleteする
-  @DeleteMapping("/studentMap")
-  public void deleteStudentMap(@RequestParam String studentNumber) {
-    students.remove(studentNumber);
+  // 名前で削除
+  @DeleteMapping("/deleteByName")
+  public void deleteStudentByName(@RequestParam String name) {
+    repository.deleteStudentByName(name);
+  }
+
+  // IDで削除
+  @DeleteMapping("/deleteById")
+  public void deleteStudentById(@RequestParam int id) {
+    repository.deleteStudentById(id);
   }
 }
+
 
