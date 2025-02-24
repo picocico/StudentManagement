@@ -1,32 +1,22 @@
 package raisetech.student.management;
 
+import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class Student {
 
-  private int id; //IDを追加
-  private String name;
+  private String studentId;
+  private String fullName;
+  private String furigana;
+  private String nickname;
+  private String email;
+  private String location;
   private int age;
-
-  public int getId() {
-    return id;
-  }
-
-  public void setId(int id) {
-    this.id = id;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public int getAge() {
-    return age;
-  }
-
-  public void setAge(int age) {
-    this.age = age;
-  }
+  private String gender;
+  private LocalDateTime createdAt;
 }
+
+
