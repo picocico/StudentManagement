@@ -1,6 +1,7 @@
 package raisetech.student.management;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,6 +18,9 @@ public class Student {
   private int age;
   private String gender;
   private LocalDateTime createdAt;
+
+  // student_courses のリレーション（One-to-Many）
+  private List<StudentCourse> courses;
 }
 
 

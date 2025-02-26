@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootApplication
@@ -19,10 +18,16 @@ public class Application {
     SpringApplication.run(Application.class, args);
   }
 
-  // 名前で検索
+  // 生徒リスト取得
   @GetMapping("/studentList")
   public List<Student> getStudentList() {
     return repository.search();
+  }
+
+  // コースリスト取得
+  @GetMapping("/courseList")
+  public List<StudentCourse> getCourseList() {
+    return repository.findAllCourses();
   }
 }
 
