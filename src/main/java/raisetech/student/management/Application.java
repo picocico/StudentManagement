@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootApplication
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class Application {
 
   @Autowired
-  private StudentRepository repository;
+  public StudentRepository repository;
 
   public static void main(String[] args) {
     SpringApplication.run(Application.class, args);
@@ -22,6 +23,12 @@ public class Application {
   @GetMapping("/studentList")
   public List<Student> getStudentList() {
     return repository.search();
+  }
+
+  // 特定の生徒のコースだけを取得する API を追加
+  @GetMapping("/courseListByStudentId")
+  public List<StudentCourse> getCoursesByStudentId(@RequestParam String studentId) {
+    return repository.findCoursesByStudentId(studentId);
   }
 
   // コースリスト取得

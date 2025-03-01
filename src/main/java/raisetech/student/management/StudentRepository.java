@@ -8,43 +8,17 @@ public interface StudentRepository {
 
   @Select("SELECT * FROM students")
   @Results({
+      //  `@Many` を使うために `@Results` を最低限定義
+      //  `courses` に `findCoursesByStudentId()` を関連付け
       @Result(property = "studentId", column = "student_id"),
-      @Result(property = "fullName", column = "full_name"),
-      @Result(property = "furigana", column = "furigana"),
-      @Result(property = "nickname", column = "nickname"),
-      @Result(property = "email", column = "email"),
-      @Result(property = "location", column = "location"),
-      @Result(property = "age", column = "age"),
-      @Result(property = "gender", column = "gender"),
-      @Result(property = "createdAt", column = "created_at"),
       @Result(property = "courses", column = "student_id",
           many = @Many(select = "raisetech.student.management.StudentRepository.findCoursesByStudentId"))
   })
   List<Student> search();
 
   @Select("SELECT * FROM student_courses WHERE student_id = #{studentId}")
-  @Results({
-      @Result(property = "courseId", column = "course_id"),
-      @Result(property = "studentId", column = "student_id"),
-      @Result(property = "courseName", column = "course_name"),
-      @Result(property = "startDate", column = "start_date"),
-      @Result(property = "endDate", column = "end_date"),
-      @Result(property = "createdAt", column = "created_at")
-  })
   List<StudentCourse> findCoursesByStudentId(@Param("studentId") String studentId);
 
-  //  `@Results` を追加
-  @Select("SELECT * FROM student_courses")
-  @Results({
-      @Result(property = "courseId", column = "course_id"),
-      @Result(property = "studentId", column = "student_id"),
-      @Result(property = "courseName", column = "course_name"),
-      @Result(property = "startDate", column = "start_date"),
-      @Result(property = "endDate", column = "end_date"),
-      @Result(property = "createdAt", column = "created_at")
-  })
+@Select("SELECT * FROM student_courses")
   List<StudentCourse> findAllCourses();
 }
-
-
-
