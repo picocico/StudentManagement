@@ -19,6 +19,6 @@ public interface StudentRepository {
   @Select("SELECT * FROM student_courses WHERE student_id = #{studentId}")
   List<StudentCourse> findCoursesByStudentId(@Param("studentId") String studentId);
 
-@Select("SELECT * FROM student_courses")
+  @Select("SELECT * FROM student_courses")
   List<StudentCourse> findAllCourses();
 }
