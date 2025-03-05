@@ -1,4 +1,4 @@
-package raisetech.student.management;
+package raisetech.student.management.data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
