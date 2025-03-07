@@ -17,6 +17,8 @@ public class Student {
   private String location;
   private int age;
   private String gender;
+  private String remark;
+  private boolean isDeleted;
   private LocalDateTime createdAt;
 
   // student_courses のリレーション（One-to-Many）
