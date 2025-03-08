@@ -18,11 +18,16 @@ public class Student {
   private int age;
   private String gender;
   private String remarks;
-  private boolean isDeleted;
   private LocalDateTime createdAt;
+  private LocalDateTime deletedAt;
+
+  public boolean isDeleted() {
+    return deletedAt != null;
+  }
 
   // student_courses のリレーション（One-to-Many）
   private List<StudentCourse> courses;
 }
+
 
 
