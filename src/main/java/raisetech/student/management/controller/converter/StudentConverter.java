@@ -18,6 +18,7 @@ public class StudentConverter {
       StudentDetail studentDetail = new StudentDetail();
       studentDetail.setStudent(student);
 
+      // 学生IDに基づいてコースを紐付け
       List<StudentCourse> convertStudentCourses = studentCourses.stream()
           .filter(studentCourse -> student.getStudentId().equals(studentCourse.getStudentId()))
           .collect(Collectors.toList());
@@ -28,3 +29,4 @@ public class StudentConverter {
     return studentDetails;
   }
 }
+

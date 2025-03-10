@@ -21,11 +21,7 @@ public interface StudentRepository {
 
   @Select("SELECT * FROM students")
   @Results({
-      //  `@Many` を使うために `@Results` を最低限定義
-      //  `courses` に `findCoursesByStudentId()` を関連付け
       @Result(property = "studentId", column = "student_id"),
-      @Result(property = "courses", column = "student_id",
-          many = @Many(select = "raisetech.student.management.repository.StudentRepository.findCoursesByStudentId"))
   })
   List<Student> search();
 

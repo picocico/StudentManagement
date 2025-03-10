@@ -22,11 +22,9 @@ public class Student {
   private LocalDateTime deletedAt;
   private boolean isDeleted; // 明示的な論理削除フラグを追加
 
-  // student_courses のリレーション（One-to-Many）
-  private List<StudentCourse> courses;
-
   /**
    * 学生が論理削除されているかどうかを判定
+   *
    * @return 削除されている場合は true, そうでなければ false
    */
   public boolean isDeleted() {
