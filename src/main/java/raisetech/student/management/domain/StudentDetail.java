@@ -13,4 +13,8 @@ public class StudentDetail {
   private Student student;
   private List<StudentCourse> studentCourse;
 
+  public StudentDetail(Student student, List<StudentCourse> studentCourse) {
+    this.student = student;
+    this.studentCourse = studentCourse;
+  }
 }

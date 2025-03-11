@@ -1,7 +1,7 @@
 package raisetech.student.management.controller.converter;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import raisetech.student.management.data.Student;
@@ -12,21 +12,14 @@ import raisetech.student.management.domain.StudentDetail;
 public class StudentConverter {
 
   public List<StudentDetail> convertStudentDetails(List<Student> students,
-      List<StudentCourse> studentCourses) {
-    List<StudentDetail> studentDetails = new ArrayList<>();
-    students.forEach(student -> {
-      StudentDetail studentDetail = new StudentDetail();
-      studentDetail.setStudent(student);
+      List<StudentCourse> courses) {
+    Map<String, List<StudentCourse>> studentCourseMap = courses.stream()
+        .collect(Collectors.groupingBy(StudentCourse::getStudentId));
 
-      // 学生IDに基づいてコースを紐付け
-      List<StudentCourse> convertStudentCourses = studentCourses.stream()
-          .filter(studentCourse -> student.getStudentId().equals(studentCourse.getStudentId()))
-          .collect(Collectors.toList());
-
-      studentDetail.setStudentCourse(convertStudentCourses);
-      studentDetails.add(studentDetail);
-    });
-    return studentDetails;
+    return students.stream()
+        .map(student -> new StudentDetail(student,
+            studentCourseMap.getOrDefault(student.getStudentId(), List.of())))
+        .collect(Collectors.toList());
   }
 }
 

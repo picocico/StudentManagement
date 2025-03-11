@@ -18,6 +18,7 @@
     <th>年齢</th>
     <th>性別</th>
     <th>備考</th>
+    <th>受講コース</th>
   </tr>
   </thead>
   <tbody>
@@ -31,6 +32,14 @@
     <td th:text="${studentDetail.student.age}">55</td>
     <td th:text="${studentDetail.student.gender}">Male</td>
     <td th:text="${studentDetail.student.remarks}">退会済み</td>
+    <td>
+      <ul>
+        <li th:each="course : ${studentDetail.studentCourse}"
+            th:text="${course.courseName + ' (' + course.startDate + ' - ' + (course.endDate != null ? course.endDate : '未終了') + ')'}">
+          コース名
+        </li>
+      </ul>
+    </td>
   </tr>
   </tbody>
 </table>
