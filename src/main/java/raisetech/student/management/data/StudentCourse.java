@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @Getter
 @Setter
@@ -16,3 +17,4 @@ public class StudentCourse {
   private LocalDate endDate; // 終了日（NULL 可能）
   private LocalDateTime createdAt; // 作成日
 }
+
