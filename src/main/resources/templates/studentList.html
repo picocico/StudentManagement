@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>受講生一覧</title>
+</head>
+<body>
+<h1>受講生一覧</h1>
+<table border="1">
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>名前</th>
+    <th>ふりがな</th>
+    <th>ニックネーム</th>
+    <th>メールアドレス</th>
+    <th>お住まいの地域</th>
+    <th>年齢</th>
+    <th>性別</th>
+    <th>備考</th>
+    <th>受講コース</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:each="studentDetail : ${studentList}">
+    <td th:text="${studentDetail.student.studentId}">1</td>
+    <td th:text="${studentDetail.student.fullName}">Yang Hyun-suk</td>
+    <td th:text="${studentDetail.student.furigana}">ヤン　ヒョンソク</td>
+    <td th:text="${studentDetail.student.nickname}">ヤンサ</td>
+    <td th:text="${studentDetail.student.email}">yang@example.com</td>
+    <td th:text="${studentDetail.student.location}">Chiba</td>
+    <td th:text="${studentDetail.student.age}">55</td>
+    <td th:text="${studentDetail.student.gender}">Male</td>
+    <td th:text="${studentDetail.student.remarks}">退会済み</td>
+    <td>
+      <ul>
+        <li th:each="course : ${studentDetail.studentCourse}"
+            th:text="${course.courseName + ' (' + course.startDate + ' - ' + (course.endDate != null ? course.endDate : '未終了') + ')'}">
+          コース名
+        </li>
+      </ul>
+    </td>
+  </tr>
+  </tbody>
+</table>
+</body>
+</html>
