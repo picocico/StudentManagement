@@ -14,7 +14,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class StudentCourse {
 
-  private String courseId = UUID.randomUUID().toString(); // コースID　デフォルトでUUIDを設定
+  private String courseId; // コースID　
   private String studentId; // 生徒ID（外部キー）
   private String courseName; // コース名
   private LocalDate startDate; // 開始日

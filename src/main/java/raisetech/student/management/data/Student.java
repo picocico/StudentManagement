@@ -13,7 +13,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Student {
 
-  private String studentId = UUID.randomUUID().toString(); // UUIDを自動生成
+  private String studentId;
   private String fullName;
   private String furigana;
   private String nickname;

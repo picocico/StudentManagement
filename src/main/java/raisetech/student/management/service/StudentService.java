@@ -39,6 +39,8 @@ public class StudentService {
   // @Transactional をつけることで、処理がすべて成功しないとデータが保存されないようにする。
   @Transactional
   public void registerStudentWithCourses(StudentRegistrationRequest request) {
+    // student_id を明示的にセット
+    request.getStudent().setStudentId(UUID.randomUUID().toString());
     // 学生情報の登録
     repository.insertStudent(request.getStudent());
 
@@ -47,7 +49,7 @@ public class StudentService {
       for (StudentCourse course : request.getCourses()) {
         // course_idを明示的にセット
         course.setCourseId(UUID.randomUUID().toString());
-        course.setStudentId(request.getStudent().getStudentId()); // student_id もセット
+        course.setStudentId(request.getStudent().getStudentId()); // student_id をセット
         repository.insertCourse(course);
       }
     }
