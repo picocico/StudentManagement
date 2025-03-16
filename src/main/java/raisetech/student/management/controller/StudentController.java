@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.StudentDetail;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.service.StudentService;
 
@@ -64,8 +65,11 @@ public class StudentController {
   }
 
   @PostMapping("/students")
-  public ResponseEntity<String> registerStudent(@RequestBody StudentRegistrationRequest request) {
+  public ResponseEntity<StudentDetail> registerStudent(
+      @RequestBody StudentRegistrationRequest request) {
     service.registerStudentWithCourses(request);
-    return ResponseEntity.ok("Student registered successfully!");
+    return ResponseEntity.ok(new StudentDetail(request.getStudent(), request.getCourses()));
   }
+
 }
+
