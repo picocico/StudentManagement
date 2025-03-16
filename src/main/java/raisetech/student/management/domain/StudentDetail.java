@@ -17,8 +17,4 @@ public class StudentDetail {
     this.student = student;
     this.studentCourse = studentCourse;
   }
-
-  public StudentDetail() {
-
-  }
 }
