@@ -1,14 +1,19 @@
 package raisetech.student.management.data;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Student {
 
-  private String studentId;
+  private String studentId = UUID.randomUUID().toString(); // UUIDを自動生成
   private String fullName;
   private String furigana;
   private String nickname;
@@ -16,7 +21,7 @@ public class Student {
   private String location;
   private int age;
   private String gender;
-  private String remarks;
+  private String remarks = "";
   private LocalDateTime createdAt;
   private LocalDateTime deletedAt;
   private boolean isDeleted; // 明示的な論理削除フラグを追加

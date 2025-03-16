@@ -30,4 +30,25 @@ public interface StudentRepository {
 
   @Select("SELECT * FROM student_courses")
   List<StudentCourse> findAllCourses();
+
+  /**
+   * insertStudent(Student student): 受講生の情報を登録するSQL。
+   */
+
+  @Insert(
+      "INSERT INTO students (student_id, full_name, furigana, nickname, email, location, age, gender, remarks, created_at, is_deleted) "
+          +
+          "VALUES (#{studentId}, #{fullName}, #{furigana}, #{nickname}, #{email}, #{location}, #{age}, #{gender}, #{remarks}, #{createdAt}, false)")
+  void insertStudent(Student student);
+
+  /**
+   * insertCourse(StudentCourse course): 受講コース情報を登録するSQL。
+   */
+
+  @Insert(
+      "INSERT INTO student_courses (course_id, student_id, course_name, start_date, end_date, created_at) "
+          +
+          "VALUES (#{courseId}, #{studentId}, #{courseName}, #{startDate}, #{endDate}, #{createdAt})")
+  void insertCourse(StudentCourse course);
+
 }

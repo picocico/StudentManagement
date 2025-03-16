@@ -2,15 +2,19 @@ package raisetech.student.management.data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.web.bind.annotation.PostMapping;
 
 @Getter
 @Setter
+@NoArgsConstructor(force = true) // 強制的にデフォルト値をセットする
+@AllArgsConstructor
 public class StudentCourse {
 
-  private String courseId; // コースID
+  private String courseId = UUID.randomUUID().toString(); // コースID　デフォルトでUUIDを設定
   private String studentId; // 生徒ID（外部キー）
   private String courseName; // コース名
   private LocalDate startDate; // 開始日
