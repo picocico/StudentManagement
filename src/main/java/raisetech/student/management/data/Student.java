@@ -1,11 +1,16 @@
 package raisetech.student.management.data;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Student {
 
   private String studentId;
@@ -16,7 +21,7 @@ public class Student {
   private String location;
   private int age;
   private String gender;
-  private String remarks;
+  private String remarks = "";
   private LocalDateTime createdAt;
   private LocalDateTime deletedAt;
   private boolean isDeleted; // 明示的な論理削除フラグを追加
