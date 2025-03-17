@@ -6,6 +6,7 @@
   <script>
     function addCourse() {
       let courseList = document.getElementById("courseList");
+      let index = courseList.children.length;
       let newCourse = document.createElement("div");
       newCourse.innerHTML = `
         <div>
@@ -27,7 +28,7 @@
 </head>
 <body>
 <h1>受講生登録</h1>
-<form th:action="@{/registerStudent}" th:object="${studentRegistrationRequest}" method="post">
+<form th:action="@{/students/registerStudent}" th:object="${studentRegistrationRequest}" method="post">
   <div>
     <label for="name">名前</label>
     <input type="text" id="name" th:field="*{student.fullName}" required/>

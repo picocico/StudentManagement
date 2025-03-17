@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentRegistrationRequest;
+import raisetech.student.management.dto.StudentWithCoursesDTO;
 import raisetech.student.management.repository.StudentRepository;
 
 @Service
@@ -22,7 +23,6 @@ public class StudentService {
 
   public List<Student> searchStudentList() {
     // 生徒のリストを取得
-    List<Student> students = repository.search();
     return repository.search();
   }
 
@@ -33,23 +33,44 @@ public class StudentService {
   }
 
   public List<StudentCourse> searchCoursesByStudentId(String studentId) {
+    // 指定されたstudentIdに基づいて、生徒が登録しているコース情報を取得
     return repository.findCoursesByStudentId(studentId);
+  }
+
+  public Student findStudentByStudentId(String studentId) {
+    // 指定されたstudentIdに基づいて、生徒の登録情報を取得
+    Student student = repository.findStudentByStudentId(studentId);
+    if (student == null) {
+      System.out.println("Student not found for ID: " + studentId);
+    }
+    return student;
+  }
+
+  public StudentWithCoursesDTO findStudentWithCourses(String studentId) {
+    // 指定されたstudentIdに基づいて、生徒登録情報およびコース情報を取得
+    Student student = repository.findStudentByStudentId(studentId);
+    if (student == null) {
+      return null;
+    }
+
+    List<StudentCourse> courses = repository.findCoursesByStudentId(studentId);
+    return new StudentWithCoursesDTO(student, courses);
   }
 
   // @Transactional をつけることで、処理がすべて成功しないとデータが保存されないようにする。
   @Transactional
   public void registerStudentWithCourses(StudentRegistrationRequest request) {
-    // student_id を明示的にセット
+    // TODO:student_id を明示的にセット
     request.getStudent().setStudentId(UUID.randomUUID().toString());
-    // 学生情報の登録
+    // TODO:`students` に登録
     repository.insertStudent(request.getStudent());
 
-    // コース情報の登録
-    if (request.getCourses() != null) {
+    // TODO:コース情報の登録 `students` に登録されてから `student_courses` に登録
+    if (request.getCourses() != null && !request.getCourses().isEmpty()) {
       for (StudentCourse course : request.getCourses()) {
         // course_idを明示的にセット
-        course.setCourseId(UUID.randomUUID().toString());
-        course.setStudentId(request.getStudent().getStudentId()); // student_id をセット
+        course.setCourseId(UUID.randomUUID().toString()); // course_id をセット
+        course.setStudentId(request.getStudent().getStudentId()); // MySQLで生成されたstudent_id をセット
         repository.insertCourse(course);
       }
     }

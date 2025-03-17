@@ -25,11 +25,17 @@ public interface StudentRepository {
   })
   List<Student> search();
 
+  @Select("SELECT * FROM students WHERE student_id = #{studentId}")
+  Student findStudentByStudentId(@Param("studentId") String studentId);
+
   @Select("SELECT * FROM student_courses WHERE student_id = #{studentId}")
   List<StudentCourse> findCoursesByStudentId(@Param("studentId") String studentId);
 
   @Select("SELECT * FROM student_courses")
   List<StudentCourse> findAllCourses();
+
+  @Select("SELECT LAST_INSERT_ID()")
+  String getLastInsertedId();
 
   /**
    * insertStudent(Student student): 受講生の情報を登録するSQL。
