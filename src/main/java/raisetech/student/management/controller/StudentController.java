@@ -29,47 +29,72 @@ public class StudentController {
     this.service = service;
     this.converter = converter;
   }
+
   // ServletとJSP
+  // 生徒情報の編集画面を表示
+  @GetMapping("/editStudent")
+  public String editStudent(@RequestParam String studentId, Model model) {
+    Student student = service.findStudentById(studentId);
+    List<StudentCourse> studentCourses = service.searchCoursesByStudentId(studentId);
 
-  // 生徒リストをサービスから取得　
-  @GetMapping("/studentList")
-  public String getStudentList(Model model) {
-    List<Student> students = service.searchStudentList();
-    List<StudentCourse> studentCourses = service.searchCourseList();
+    StudentRegistrationRequest request = new StudentRegistrationRequest();
+    request.setStudent(student);
+    request.setCourses(studentCourses);
 
-    model.addAttribute("studentList", converter.convertStudentDetails(students, studentCourses));
-    return "studentList";
+    model.addAttribute("studentRegistrationRequest", request);
+    return "editStudent";
   }
 
-  // 特定の生徒のコースだけをサービスから取得する API を追加
-  @GetMapping("/courseListByStudentId")
-  public List<StudentCourse> getCoursesByStudentId(@RequestParam String studentId) {
-    return service.searchCoursesByStudentId(studentId);
-  }
+    // 生徒リストをサービスから取得　
+    @GetMapping("/studentList")
+    public String getStudentList (Model model){
+      List<Student> students = service.searchStudentList();
+      List<StudentCourse> studentCourses = service.searchCourseList();
 
-  // Thymeleaf でフォームのデータを StudentRegistrationRequest として受け取るように変更。
-  @GetMapping("/newStudent")
-  public String newStudent(Model model) {
-    model.addAttribute("studentRegistrationRequest", new StudentRegistrationRequest());
-    return "registerStudent";
-  }
+      model.addAttribute("studentList", converter.convertStudentDetails(students, studentCourses));
+      return "studentList";
+    }
 
-  @PostMapping("/registerStudent")
-  public String registerStudent(@ModelAttribute StudentRegistrationRequest request,
-      BindingResult result) {
-    if (result.hasErrors()) {
+    // 特定の生徒のコースだけをサービスから取得する API を追加
+    @GetMapping("/courseListByStudentId")
+    public List<StudentCourse> getCoursesByStudentId (@RequestParam String studentId){
+      return service.searchCoursesByStudentId(studentId);
+    }
+
+    // Thymeleaf でフォームのデータを StudentRegistrationRequest として受け取るように変更。
+    @GetMapping("/newStudent")
+    public String newStudent (Model model){
+      model.addAttribute("studentRegistrationRequest", new StudentRegistrationRequest());
       return "registerStudent";
     }
-    service.registerStudentWithCourses(request);
-    return "redirect:/studentList";
+
+    @PostMapping("/registerStudent")
+    public String registerStudent (@ModelAttribute StudentRegistrationRequest request,
+        BindingResult result){
+      if (result.hasErrors()) {
+        return "registerStudent";
+      }
+      service.registerStudentWithCourses(request);
+      return "redirect:/studentList";
+    }
+
+    @PostMapping("/students")
+    public ResponseEntity<StudentDetail> registerStudent (
+        @RequestBody StudentRegistrationRequest request){
+      service.registerStudentWithCourses(request);
+      return ResponseEntity.ok(new StudentDetail(request.getStudent(), request.getCourses()));
+    }
+
+// 受講生情報の更新処理
+    @PostMapping("/updateStudent")
+    public String updateStudent (@ModelAttribute StudentRegistrationRequest request, BindingResult
+    result){
+      if (result.hasErrors()) {
+        return "editStudent";
+      }
+      service.updateStudentWithCourses(request);
+      return "redirect:/studentList";
+    }
   }
 
-  @PostMapping("/students")
-  public ResponseEntity<StudentDetail> registerStudent(
-      @RequestBody StudentRegistrationRequest request) {
-    service.registerStudentWithCourses(request);
-    return ResponseEntity.ok(new StudentDetail(request.getStudent(), request.getCourses()));
-  }
-
-}
 
