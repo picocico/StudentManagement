@@ -31,10 +31,17 @@ public class StudentService {
   }
 
   public List<StudentCourse> searchCoursesByStudentId(String studentId) {
+    // studentIdに紐付くコースリストを取得
     return repository.findCoursesByStudentId(studentId);
   }
   public Student findStudentById(String studentId) {
+    // studentIdで特定の生徒を探す
     return repository.findStudentById(studentId);
+  }
+
+  public List<Student> findStudentsByFurigana(String furigana) {
+    // student.furiganaで特定の生徒を探す
+    return repository.findStudentsByFurigana(furigana);
   }
 
   // @Transactional をつけることで、処理がすべて成功しないとデータが保存されないようにする。

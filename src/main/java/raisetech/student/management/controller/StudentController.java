@@ -30,7 +30,12 @@ public class StudentController {
     this.converter = converter;
   }
 
-  // ServletとJSP
+  // ふりがな検索フォームの表示
+  @GetMapping("/findStudent")
+  public String findStudentPage() {
+    return "findStudent";
+  }
+
   // 生徒情報の編集画面を表示
   @GetMapping("/editStudent")
   public String editStudent(@RequestParam String studentId, Model model) {
@@ -43,6 +48,14 @@ public class StudentController {
 
     model.addAttribute("studentRegistrationRequest", request);
     return "editStudent";
+  }
+
+  // 名前で受講生を検索
+  @GetMapping("/findStudentsByFurigana")
+  public String findStudentsByFurigana(@RequestParam String furigana, Model model) {
+    List<Student> students = service.findStudentsByFurigana(furigana);
+    model.addAttribute("students", students);
+    return "studentFindResults";
   }
 
     // 生徒リストをサービスから取得　

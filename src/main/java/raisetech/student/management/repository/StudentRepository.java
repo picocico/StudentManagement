@@ -59,6 +59,15 @@ public interface StudentRepository {
   Student findStudentById(@Param("studentId") String studentId);
 
   /**
+   * selectStudent:特定の受講生情報をfuriganaで探し出すSQL
+   * 全角スペースを半角スペースに変換して検索
+   */
+
+  @Select("SELECT * FROM students WHERE REPLACE(furigana, '　', ' ') LIKE CONCAT('%', REPLACE(#{furigana}, '　', ' '), '%')")
+  List<Student> findStudentsByFurigana(@Param("furigana") String furigana);
+
+
+  /**
    * updateStudent:特定の受講生情報を更新するSQL
    */
 
