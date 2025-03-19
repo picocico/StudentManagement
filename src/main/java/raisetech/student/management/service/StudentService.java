@@ -34,6 +34,7 @@ public class StudentService {
     // studentIdに紐付くコースリストを取得
     return repository.findCoursesByStudentId(studentId);
   }
+
   public Student findStudentById(String studentId) {
     // studentIdで特定の生徒を探す
     return repository.findStudentById(studentId);
@@ -48,7 +49,8 @@ public class StudentService {
   @Transactional
   public void registerStudentWithCourses(StudentRegistrationRequest request) {
     // student_id が null または空の場合のみ、新しい UUID を生成
-    if (request.getStudent().getStudentId() == null || request.getStudent().getStudentId().isEmpty()) {
+    if (request.getStudent().getStudentId() == null || request.getStudent().getStudentId()
+        .isEmpty()) {
       request.getStudent().setStudentId(UUID.randomUUID().toString());
     }
 

@@ -59,8 +59,7 @@ public interface StudentRepository {
   Student findStudentById(@Param("studentId") String studentId);
 
   /**
-   * selectStudent:特定の受講生情報をfuriganaで探し出すSQL
-   * 全角スペースを半角スペースに変換して検索
+   * selectStudent:特定の受講生情報をfuriganaで探し出すSQL 全角スペースを半角スペースに変換して検索
    */
 
   @Select("SELECT * FROM students WHERE REPLACE(furigana, '　', ' ') LIKE CONCAT('%', REPLACE(#{furigana}, '　', ' '), '%')")
@@ -71,9 +70,10 @@ public interface StudentRepository {
    * updateStudent:特定の受講生情報を更新するSQL
    */
 
-  @Update("UPDATE students SET full_name = #{fullName}, furigana = #{furigana}, nickname = #{nickname}, "
-      + "email = #{email}, location = #{location}, age = #{age}, gender = #{gender}, remarks = #{remarks} "
-      + "WHERE student_id = #{studentId}")
+  @Update(
+      "UPDATE students SET full_name = #{fullName}, furigana = #{furigana}, nickname = #{nickname}, "
+          + "email = #{email}, location = #{location}, age = #{age}, gender = #{gender}, remarks = #{remarks} "
+          + "WHERE student_id = #{studentId}")
   void updateStudent(Student student);
 
   /**
