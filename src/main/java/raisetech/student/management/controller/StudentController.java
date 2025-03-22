@@ -1,11 +1,13 @@
 package raisetech.student.management.controller;
 
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +20,7 @@ import raisetech.student.management.domain.StudentDetail;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.service.StudentService;
 
+@Validated
 @Controller
 public class StudentController {
 
@@ -100,14 +103,26 @@ public class StudentController {
 
   // 受講生情報の更新処理
   @PostMapping("/updateStudent")
-  public String updateStudent(@ModelAttribute StudentRegistrationRequest request, BindingResult
-      result) {
+  public String updateStudent(
+      @RequestParam(name = "studentId", required = true) String studentId,
+      @Valid @ModelAttribute("studentRegistrationRequest") StudentRegistrationRequest request,
+      BindingResult result, Model model) {
+
+    System.out.println("BindingResult has errors: " + result.hasErrors());
+    System.out.println("Validation errors: " + result.getAllErrors());
+
     if (result.hasErrors()) {
+      model.addAttribute("studentRegistrationRequest", request);
+      model.addAttribute("validationErrors", result.getAllErrors());
       return "editStudent";
     }
+
+    request.getStudent().setStudentId(studentId);
     service.updateStudentWithCourses(request);
     return "redirect:/studentList";
   }
 }
+
+
 
 

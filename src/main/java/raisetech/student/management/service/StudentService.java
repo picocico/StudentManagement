@@ -20,15 +20,18 @@ public class StudentService {
     this.repository = repository;
   }
 
+
   public List<Student> searchStudentList() {
     // 生徒のリストを取得
     return repository.search();
   }
 
+
   public List<StudentCourse> searchCourseList() {
     // 全てのコースリストを取得
     return repository.findAllCourses();
   }
+
 
   public List<StudentCourse> searchCoursesByStudentId(String studentId) {
     // studentIdに紐付くコースリストを取得
@@ -39,6 +42,7 @@ public class StudentService {
     // studentIdで特定の生徒を探す
     return repository.findStudentById(studentId);
   }
+
 
   public List<Student> findStudentsByFurigana(String furigana) {
     // student.furiganaで特定の生徒を探す

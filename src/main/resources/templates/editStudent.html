@@ -31,33 +31,42 @@
 <form th:action="@{/updateStudent}" th:object="${studentRegistrationRequest}" method="post">
   <input type="hidden" th:field="*{student.studentId}" />
 
+  <!-- エラーメッセージ表示部分 -->
+  <div th:if="${validationErrors != null}">
+    <div style="color: red;">
+      <ul>
+        <li th:each="error : ${validationErrors}" th:text="${error.defaultMessage}"></li>
+      </ul>
+    </div>
+  </div>
+
   <div>
-    <label for="name">名前</label>
-    <input type="text" id="name" th:field="*{student.fullName}" required/>
+    <label for="fullName">名前</label>
+    <input type="text" id="fullName" th:field="*{student.fullName}" />
   </div>
   <div>
     <label for="furigana">ふりがな</label>
-    <input type="text" id="furigana" th:field="*{student.furigana}" required/>
+    <input type="text" id="furigana" th:field="*{student.furigana}" />
   </div>
   <div>
     <label for="nickname">ニックネーム</label>
-    <input type="text" id="nickname" th:field="*{student.nickname}" required/>
+    <input type="text" id="nickname" th:field="*{student.nickname}" />
   </div>
   <div>
     <label for="email">メールアドレス</label>
-    <input type="email" id="email" th:field="*{student.email}" required/>
+    <input type="email" id="email" th:field="*{student.email}" />
   </div>
   <div>
     <label for="location">お住まいの地域</label>
-    <input type="text" id="location" th:field="*{student.location}" required/>
+    <input type="text" id="location" th:field="*{student.location}" />
   </div>
   <div>
     <label for="age">年齢</label>
-    <input type="number" id="age" th:field="*{student.age}" required/>
+    <input type="number" id="age" th:field="*{student.age}" />
   </div>
   <div>
     <label for="gender">性別</label>
-    <input type="text" id="gender" th:field="*{student.gender}" required/>
+    <input type="text" id="gender" th:field="*{student.gender}" />
   </div>
   <div>
     <label for="remarks">備考</label>
@@ -70,14 +79,14 @@
       <input type="hidden" th:name="|courses[${stat.index}].courseId|" th:value="${course.courseId}" />
       <div>
         <label>コース名</label>
-        <input type="text" th:name="|courses[${stat.index}].courseName|" th:value="${course.courseName}" required/>
+        <input type="text" th:name="|courses[${stat.index}].courseName|" th:value="${course.courseName}" />
       </div>
       <div>
-        開始日
-        <input type="date" th:name="|courses[${stat.index}].startDate|" th:value="${course.startDate}" required/>
+        <label>開始日</label>
+        <input type="date" th:name="|courses[${stat.index}].startDate|" th:value="${course.startDate}" />
       </div>
       <div>
-        終了日
+        <label>終了日</label>
         <input type="date" th:name="|courses[${stat.index}].endDate|" th:value="${course.endDate}" />
       </div>
     </div>
@@ -90,4 +99,5 @@
 </form>
 </body>
 </html>
+
 
