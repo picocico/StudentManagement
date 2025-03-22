@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>受講生検索結果</title>
+</head>
+<body>
+<h1>検索結果</h1>
+
+<table border="1">
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>名前</th>
+    <th>ふりがな</th>
+    <th>メール</th>
+    <th>編集</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr th:each="student : ${students}">
+    <td th:text="${student.studentId}"></td>
+    <td th:text="${student.fullName}"></td>
+    <td th:text="${student.furigana}"></td>
+    <td th:text="${student.email}"></td>
+    <td>
+      <a th:href="@{/editStudent(studentId=${student.studentId})}">編集</a>
+    </td>
+  </tr>
+  </tbody>
+</table>
+<a th:href="@{/findStudent}">戻る</a>
+</body>
+</html>
+

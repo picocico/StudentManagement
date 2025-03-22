@@ -1,7 +1,9 @@
 package raisetech.student.management.data;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,12 +16,23 @@ import lombok.Setter;
 public class Student {
 
   private String studentId;
+
+  @NotBlank(message = "名前は必須です。")
+  @Size(max = 100, message = "名前は50文字以内で入力してください。")
   private String fullName;
+
+  @NotBlank(message = "ふりがなは必須です。")
   private String furigana;
+
+  @NotBlank(message = "ニックネームは必須です。")
   private String nickname;
+
+  @Email(message = "メールアドレス形式で入力してください。")
   private String email;
   private String location;
   private int age;
+
+  @NotBlank(message = "性別は必須です。")
   private String gender;
   private String remarks = "";
   private LocalDateTime createdAt;
