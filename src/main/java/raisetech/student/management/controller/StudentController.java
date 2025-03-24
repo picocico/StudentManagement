@@ -104,12 +104,15 @@ public class StudentController {
   // 受講生情報の更新処理
   @PostMapping("/updateStudent")
   public String updateStudent(
-      @RequestParam(name = "studentId", required = true) String studentId,
-      @Valid @ModelAttribute("studentRegistrationRequest") StudentRegistrationRequest request,
+      @Validated @ModelAttribute("studentRegistrationRequest") StudentRegistrationRequest request,
       BindingResult result, Model model) {
 
     System.out.println("BindingResult has errors: " + result.hasErrors());
     System.out.println("Validation errors: " + result.getAllErrors());
+
+    // studentId をリクエストから取得する
+    String studentId = request.getStudent().getStudentId();
+    System.out.println("Received studentId (via request): " + studentId);
 
     if (result.hasErrors()) {
       model.addAttribute("studentRegistrationRequest", request);

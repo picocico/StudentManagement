@@ -34,14 +34,12 @@ public class StudentControllerTest {
 
   @Test
   public void testUpdateStudentWithValidationErrors() throws Exception {
-    // サービスのモック設定
-    doNothing().when(service).updateStudentWithCourses(any(StudentRegistrationRequest.class));
 
     String studentId = "dadaf78f-c8c9-4725-a0a6-ed3bf31dd215";
 
     mockMvc.perform(post("/updateStudent")
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-            .param("studentId", studentId)
+            .param("student.studentId", studentId)   // studentIdはstudentオブジェクトのフィールドとして送信
             .param("student.fullName", "")  // エラーを意図的に発生させる
             .param("student.furigana", "")  // エラーを意図的に発生させる
             .param("student.nickname", "")  // エラーを意図的に発生させる
@@ -53,6 +51,14 @@ public class StudentControllerTest {
         .andExpect(view().name("editStudent"));  // エラー時に表示されるページ名
   }
 }
+
+
+
+
+
+
+
+
 
 
 

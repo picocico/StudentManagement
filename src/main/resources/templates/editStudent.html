@@ -29,6 +29,9 @@
 <body>
 <h1>受講生編集</h1>
 <form th:action="@{/updateStudent}" th:object="${studentRegistrationRequest}" method="post">
+  <!-- 既存の form タグ内に追加 -->
+  <!-- studentId を隠しフィールドとして送信 -->
+  <!-- Thymeleaf のフィールドとして指定 -->
   <input type="hidden" th:field="*{student.studentId}" />
 
   <!-- エラーメッセージ表示部分 -->

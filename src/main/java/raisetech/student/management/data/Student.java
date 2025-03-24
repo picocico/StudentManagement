@@ -2,6 +2,8 @@ package raisetech.student.management.data;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
@@ -27,7 +29,13 @@ public class Student {
   @NotBlank(message = "ニックネームは必須です。")
   private String nickname;
 
+  @NotNull(message = "メールアドレスは必須です。")
+  @NotBlank(message = "メールアドレスを入力してください。")
   @Email(message = "メールアドレス形式で入力してください。")
+  @Pattern(
+      regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+      message = "メールアドレス形式が不正です。"
+  )
   private String email;
   private String location;
   private int age;
