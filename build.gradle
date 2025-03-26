@@ -44,7 +44,12 @@ dependencies {
     providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
+
+    // Spring Boot Validation(Jakarta Validation API)
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    }
 
 tasks.named('test') {
     useJUnitPlatform()

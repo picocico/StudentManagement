@@ -51,4 +51,35 @@ public interface StudentRepository {
           "VALUES (#{courseId}, #{studentId}, #{courseName}, #{startDate}, #{endDate}, #{createdAt})")
   void insertCourse(StudentCourse course);
 
+  /**
+   * selectStudent:特定の受講生情報をstudentIdで探し出すSQL
+   */
+
+  @Select("SELECT * FROM students WHERE student_id = #{studentId}")
+  Student findStudentById(@Param("studentId") String studentId);
+
+  /**
+   * selectStudent:特定の受講生情報をfuriganaで探し出すSQL 全角スペースを半角スペースに変換して検索
+   */
+
+  @Select("SELECT * FROM students WHERE REPLACE(furigana, '　', ' ') LIKE CONCAT('%', REPLACE(#{furigana}, '　', ' '), '%')")
+  List<Student> findStudentsByFurigana(@Param("furigana") String furigana);
+
+
+  /**
+   * updateStudent:特定の受講生情報を更新するSQL
+   */
+
+  @Update(
+      "UPDATE students SET full_name = #{fullName}, furigana = #{furigana}, nickname = #{nickname}, "
+          + "email = #{email}, location = #{location}, age = #{age}, gender = #{gender}, remarks = #{remarks} "
+          + "WHERE student_id = #{studentId}")
+  void updateStudent(Student student);
+
+  /**
+   * deleteStudent:受講生情報をstudentIdで特定し削除するSQL
+   */
+
+  @Delete("DELETE FROM student_courses WHERE student_id = #{studentId}")
+  void deleteCoursesByStudentId(@Param("studentId") String studentId);
 }

@@ -1,5 +1,6 @@
 package raisetech.student.management.dto;
 
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,6 +11,11 @@ import raisetech.student.management.data.StudentCourse;
 @Setter
 public class StudentRegistrationRequest {
 
-  private Student student;
+  @Valid
+  private Student student;  // これが重要：バリデーションの対象となるクラスに @Valid を付ける
   private List<StudentCourse> courses;
+  private String studentId;
 }
+
+
+

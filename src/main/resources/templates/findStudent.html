@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>受講生検索</title>
+</head>
+<body>
+<h1>受講生検索</h1>
+<form th:action="@{/findStudentsByFurigana}" method="get">
+  <label for="furigana">ふりがな:</label>
+  <input type="text" id="furigana" name="furigana" required>
+  <button type="submit">検索</button>
+</form>
+</body>
+</html>
+</html>

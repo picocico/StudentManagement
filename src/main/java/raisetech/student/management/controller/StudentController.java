@@ -1,11 +1,13 @@
 package raisetech.student.management.controller;
 
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +20,7 @@ import raisetech.student.management.domain.StudentDetail;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.service.StudentService;
 
+@Validated
 @Controller
 public class StudentController {
 
@@ -29,7 +32,34 @@ public class StudentController {
     this.service = service;
     this.converter = converter;
   }
-  // ServletとJSP
+
+  // ふりがな検索フォームの表示
+  @GetMapping("/findStudent")
+  public String findStudentPage() {
+    return "findStudent";
+  }
+
+  // 生徒情報の編集画面を表示
+  @GetMapping("/editStudent")
+  public String editStudent(@RequestParam String studentId, Model model) {
+    Student student = service.findStudentById(studentId);
+    List<StudentCourse> studentCourses = service.searchCoursesByStudentId(studentId);
+
+    StudentRegistrationRequest request = new StudentRegistrationRequest();
+    request.setStudent(student);
+    request.setCourses(studentCourses);
+
+    model.addAttribute("studentRegistrationRequest", request);
+    return "editStudent";
+  }
+
+  // 名前で受講生を検索
+  @GetMapping("/findStudentsByFurigana")
+  public String findStudentsByFurigana(@RequestParam String furigana, Model model) {
+    List<Student> students = service.findStudentsByFurigana(furigana);
+    model.addAttribute("students", students);
+    return "studentFindResults";
+  }
 
   // 生徒リストをサービスから取得　
   @GetMapping("/studentList")
@@ -71,5 +101,31 @@ public class StudentController {
     return ResponseEntity.ok(new StudentDetail(request.getStudent(), request.getCourses()));
   }
 
+  // 受講生情報の更新処理
+  @PostMapping("/updateStudent")
+  public String updateStudent(
+      @Validated @ModelAttribute("studentRegistrationRequest") StudentRegistrationRequest request,
+      BindingResult result, Model model) {
+
+    System.out.println("BindingResult has errors: " + result.hasErrors());
+    System.out.println("Validation errors: " + result.getAllErrors());
+
+    // studentId をリクエストから取得する
+    String studentId = request.getStudent().getStudentId();
+    System.out.println("Received studentId (via request): " + studentId);
+
+    if (result.hasErrors()) {
+      model.addAttribute("studentRegistrationRequest", request);
+      model.addAttribute("validationErrors", result.getAllErrors());
+      return "editStudent";
+    }
+
+    request.getStudent().setStudentId(studentId);
+    service.updateStudentWithCourses(request);
+    return "redirect:/studentList";
+  }
 }
+
+
+
 
