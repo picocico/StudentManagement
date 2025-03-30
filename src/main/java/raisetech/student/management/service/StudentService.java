@@ -20,18 +20,20 @@ public class StudentService {
     this.repository = repository;
   }
 
-
   public List<Student> searchStudentList() {
     // 生徒のリストを取得
     return repository.search();
   }
 
+  // 論理削除されていない生徒を取得するメソッドを追加
+  public List<Student> searchActiveStudents() {
+    return repository.searchActiveStudents();
+  }
 
   public List<StudentCourse> searchCourseList() {
     // 全てのコースリストを取得
     return repository.findAllCourses();
   }
-
 
   public List<StudentCourse> searchCoursesByStudentId(String studentId) {
     // studentIdに紐付くコースリストを取得
@@ -42,7 +44,6 @@ public class StudentService {
     // studentIdで特定の生徒を探す
     return repository.findStudentById(studentId);
   }
-
 
   public List<Student> findStudentsByFurigana(String furigana) {
     // student.furiganaで特定の生徒を探す
@@ -74,6 +75,10 @@ public class StudentService {
 
   @Transactional
   public void updateStudentWithCourses(StudentRegistrationRequest request) {
+
+    // 論理削除の値を設定
+    request.getStudent().setDeleted(request.isDeleted());
+
     // まず既存のコースを削除
     repository.deleteCoursesByStudentId(request.getStudent().getStudentId());
 

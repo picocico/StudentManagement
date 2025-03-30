@@ -65,6 +65,13 @@ public interface StudentRepository {
   @Select("SELECT * FROM students WHERE REPLACE(furigana, '　', ' ') LIKE CONCAT('%', REPLACE(#{furigana}, '　', ' '), '%')")
   List<Student> findStudentsByFurigana(@Param("furigana") String furigana);
 
+  /**
+   * selectStudent: 論理削除されていない受講生の情報を検索するSQL。
+   */
+
+  @Select("SELECT * FROM students WHERE is_deleted = false")
+  List<Student> searchActiveStudents();
+
 
   /**
    * updateStudent:特定の受講生情報を更新するSQL
@@ -72,9 +79,13 @@ public interface StudentRepository {
 
   @Update(
       "UPDATE students SET full_name = #{fullName}, furigana = #{furigana}, nickname = #{nickname}, "
-          + "email = #{email}, location = #{location}, age = #{age}, gender = #{gender}, remarks = #{remarks} "
-          + "WHERE student_id = #{studentId}")
+          +
+          "email = #{email}, location = #{location}, age = #{age}, gender = #{gender}, remarks = #{remarks}, "
+          +
+          "is_deleted = #{deleted} WHERE student_id = #{studentId}"
+  )
   void updateStudent(Student student);
+
 
   /**
    * deleteStudent:受講生情報をstudentIdで特定し削除するSQL

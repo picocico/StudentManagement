@@ -32,10 +32,7 @@ public class Student {
   @NotNull(message = "メールアドレスは必須です。")
   @NotBlank(message = "メールアドレスを入力してください。")
   @Email(message = "メールアドレス形式で入力してください。")
-  @Pattern(
-      regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
-      message = "メールアドレス形式が不正です。"
-  )
+  @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", message = "メールアドレス形式が不正です。")
   private String email;
   private String location;
   private int age;
@@ -45,16 +42,8 @@ public class Student {
   private String remarks = "";
   private LocalDateTime createdAt;
   private LocalDateTime deletedAt;
+  @Setter
   private boolean isDeleted; // 明示的な論理削除フラグを追加
-
-  /**
-   * 学生が論理削除されているかどうかを判定
-   *
-   * @return 削除されている場合は true, そうでなければ false
-   */
-  public boolean isDeleted() {
-    return isDeleted;
-  }
 
   /**
    * 学生を論理削除するメソッド
