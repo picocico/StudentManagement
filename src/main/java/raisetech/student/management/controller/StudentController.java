@@ -46,6 +46,7 @@ public class StudentController {
 
     StudentRegistrationRequest request = new StudentRegistrationRequest();
     request.setStudent(student);
+    request.setCourses(studentCourses);
     request.setDeleted(student.isDeleted());  // ← サーバーから正しく削除フラグを渡す
 
     // 確認用ログ出力
@@ -110,7 +111,7 @@ public class StudentController {
       BindingResult result, Model model) {
 
     System.out.println("Request deleted flag: " + request.isDeleted());  // 確認用のログ出力
-
+    System.out.println("Student deleted flag before update: " + request.getStudent().isDeleted());
     System.out.println("BindingResult has errors: " + result.hasErrors());
     System.out.println("Validation errors: " + result.getAllErrors());
 
@@ -126,6 +127,14 @@ public class StudentController {
 
     request.getStudent().setStudentId(studentId);
     service.updateStudentWithCourses(request);
+    return "redirect:/studentList";
+  }
+  // 削除フラグだけを更新する
+  @PostMapping("/toggleDeleteFlag")
+  public String toggleDeleteFlag(@RequestParam String studentId, @RequestParam boolean deleted) {
+    Student student = service.findStudentById(studentId);
+    student.setDeleted(deleted);
+    service.updateDeleteFlagOnly(student);
     return "redirect:/studentList";
   }
 }

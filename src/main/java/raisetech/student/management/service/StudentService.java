@@ -73,25 +73,26 @@ public class StudentService {
     }
   }
 
+  // フル更新（フォームから courses を受け取ったときだけ呼ぶ）
   @Transactional
   public void updateStudentWithCourses(StudentRegistrationRequest request) {
 
-    // 論理削除の値を設定
     request.getStudent().setDeleted(request.isDeleted());
 
-    // まず既存のコースを削除
-    repository.deleteCoursesByStudentId(request.getStudent().getStudentId());
-
-    // その後、学生情報を更新
     repository.updateStudent(request.getStudent());
 
-    // コース情報の再登録
-    if (request.getCourses() != null) {
+    if (request.getCourses() != null && !request.getCourses().isEmpty()) {
+      repository.deleteCoursesByStudentId(request.getStudent().getStudentId());
       for (StudentCourse course : request.getCourses()) {
         course.setCourseId(UUID.randomUUID().toString());
         course.setStudentId(request.getStudent().getStudentId());
         repository.insertCourse(course);
       }
     }
+  }
+
+  @Transactional
+  public void updateDeleteFlagOnly(Student student) {
+    repository.updateStudentDeleteFlag(student.getStudentId(), student.isDeleted());
   }
 }
