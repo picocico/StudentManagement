@@ -1,5 +1,7 @@
 package raisetech.student.management.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
 import java.util.List;
@@ -110,10 +112,10 @@ public class StudentController {
       @Validated @ModelAttribute("studentRegistrationRequest") StudentRegistrationRequest request,
       BindingResult result, Model model) {
 
-    System.out.println("Request deleted flag: " + request.isDeleted());  // 確認用のログ出力
-    System.out.println("Student deleted flag before update: " + request.getStudent().isDeleted());
-    System.out.println("BindingResult has errors: " + result.hasErrors());
-    System.out.println("Validation errors: " + result.getAllErrors());
+    Logger logger = LoggerFactory.getLogger(StudentController.class);
+
+    logger.debug("Request deleted flag: {}", request.isDeleted());
+    logger.debug("Student deleted flag before update: {}", request.getStudent().isDeleted());
 
     // studentId をリクエストから取得する
     String studentId = request.getStudent().getStudentId();
@@ -130,11 +132,11 @@ public class StudentController {
     return "redirect:/studentList";
   }
   // 削除フラグだけを更新する
-  @PostMapping("/toggleDeleteFlag")
-  public String toggleDeleteFlag(@RequestParam String studentId, @RequestParam boolean deleted) {
+  @PostMapping("/delete")
+  public String delete(@RequestParam String studentId, @RequestParam boolean deleted) {
     Student student = service.findStudentById(studentId);
     student.setDeleted(deleted);
-    service.updateDeleteFlagOnly(student);
+    service.delete(student);
     return "redirect:/studentList";
   }
 }

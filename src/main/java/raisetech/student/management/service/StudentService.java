@@ -92,7 +92,7 @@ public class StudentService {
   }
 
   @Transactional
-  public void updateDeleteFlagOnly(Student student) {
-    repository.updateStudentDeleteFlag(student.getStudentId(), student.isDeleted());
+  public void delete(Student student) {
+    repository.deleteStudent(student.getStudentId(), student.isDeleted());
   }
 }

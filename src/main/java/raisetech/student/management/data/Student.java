@@ -42,7 +42,7 @@ public class Student {
   private String remarks = "";
   private LocalDateTime createdAt;
   private LocalDateTime deletedAt;
-  @Setter
+
   private boolean isDeleted; // 明示的な論理削除フラグを追加
 
   /**
