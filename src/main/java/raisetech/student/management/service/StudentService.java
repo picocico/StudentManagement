@@ -2,6 +2,8 @@ package raisetech.student.management.service;
 
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,7 +79,20 @@ public class StudentService {
   @Transactional
   public void updateStudentWithCourses(StudentRegistrationRequest request) {
 
+    Logger logger = LoggerFactory.getLogger(StudentService.class);
+
+// ログ①: フォームから受け取った削除フラグ
+    logger.debug("request.isDeleted() = {}", request.isDeleted());
+
+// ログ②: セット前のStudentオブジェクトの削除フラグ
+    logger.debug("Before set: student.isDeleted = {}", request.getStudent().isDeleted());
+
+// 削除フラグを Student オブジェクトに反映
     request.getStudent().setDeleted(request.isDeleted());
+
+// ログ③: セット後のStudentオブジェクトの削除フラグ
+    logger.debug("After set: student.isDeleted = {}", request.getStudent().isDeleted());
+
 
     repository.updateStudent(request.getStudent());
 
@@ -89,10 +104,5 @@ public class StudentService {
         repository.insertCourse(course);
       }
     }
-  }
-
-  @Transactional
-  public void delete(Student student) {
-    repository.deleteStudent(student.getStudentId(), student.isDeleted());
   }
 }

@@ -86,13 +86,6 @@ public interface StudentRepository {
   )
   void updateStudent(Student student);
 
-  /**
-   * updateStudent:削除フラグが立った受講生情報だけを更新するSQL
-   */
-
-  @Update("UPDATE students SET is_deleted = #{deleted} WHERE student_id = #{studentId}")
-  void deleteStudent(@Param("studentId") String studentId, @Param("deleted") boolean deleted);
-
 
   /**
    * deleteStudent:受講生情報をstudentIdで特定し削除するSQL

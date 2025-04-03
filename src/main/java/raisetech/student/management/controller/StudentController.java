@@ -131,14 +131,6 @@ public class StudentController {
     service.updateStudentWithCourses(request);
     return "redirect:/studentList";
   }
-  // 削除フラグだけを更新する
-  @PostMapping("/delete")
-  public String delete(@RequestParam String studentId, @RequestParam boolean deleted) {
-    Student student = service.findStudentById(studentId);
-    student.setDeleted(deleted);
-    service.delete(student);
-    return "redirect:/studentList";
-  }
 }
 
 

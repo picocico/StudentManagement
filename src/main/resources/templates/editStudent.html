@@ -76,9 +76,15 @@
     <input type="text" id="remarks" th:field="*{student.remarks}"/>
   </div>
   <div>
-    <label for="deleted">削除フラグ</label>
-    <input type="checkbox" id="deleted" th:field="*{deleted}"/>
+    <!-- チェックなしのとき false を送信 -->
+    <input type="hidden" th:name="*{deleted}" value="false"/>
+
+    <!-- チェックされたら true を送信 -->
+    <label>
+      <input type="checkbox" th:field="*{deleted}" value="true"/> 削除フラグ
+    </label>
   </div>
+
 
   <h2>コース情報</h2>
   <div id="courseList">
