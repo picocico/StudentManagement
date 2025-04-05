@@ -19,6 +19,7 @@ config.yml
 
 # 一時ファイル
 *.log
+logs/
 *.tmp
 *.bak
 

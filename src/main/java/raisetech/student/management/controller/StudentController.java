@@ -1,6 +1,7 @@
 package raisetech.student.management.controller;
 
-import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
 import java.util.List;
@@ -48,6 +49,10 @@ public class StudentController {
     StudentRegistrationRequest request = new StudentRegistrationRequest();
     request.setStudent(student);
     request.setCourses(studentCourses);
+    request.setDeleted(student.isDeleted());  // ← サーバーから正しく削除フラグを渡す
+
+    // 確認用ログ出力
+    System.out.println("Retrieved deleted flag: " + student.isDeleted());
 
     model.addAttribute("studentRegistrationRequest", request);
     return "editStudent";
@@ -61,10 +66,10 @@ public class StudentController {
     return "studentFindResults";
   }
 
-  // 生徒リストをサービスから取得　
+  // 生徒リストをサービスから取得（論理削除されていないもののみ）
   @GetMapping("/studentList")
   public String getStudentList(Model model) {
-    List<Student> students = service.searchStudentList();
+    List<Student> students = service.searchActiveStudents();
     List<StudentCourse> studentCourses = service.searchCourseList();
 
     model.addAttribute("studentList", converter.convertStudentDetails(students, studentCourses));
@@ -107,8 +112,10 @@ public class StudentController {
       @Validated @ModelAttribute("studentRegistrationRequest") StudentRegistrationRequest request,
       BindingResult result, Model model) {
 
-    System.out.println("BindingResult has errors: " + result.hasErrors());
-    System.out.println("Validation errors: " + result.getAllErrors());
+    Logger logger = LoggerFactory.getLogger(StudentController.class);
+
+    logger.debug("Request deleted flag: {}", request.isDeleted());
+    logger.debug("Student deleted flag before update: {}", request.getStudent().isDeleted());
 
     // studentId をリクエストから取得する
     String studentId = request.getStudent().getStudentId();
