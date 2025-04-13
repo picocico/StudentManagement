@@ -9,27 +9,40 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.StudentDetail;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.repository.StudentRepository;
 
 @Service
 public class StudentService {
 
-  private StudentRepository repository;
+  private final StudentRepository repository;
 
   @Autowired
   public StudentService(StudentRepository repository) {
     this.repository = repository;
   }
 
-  public List<Student> searchStudentList() {
-    // 生徒のリストを取得
-    return repository.search();
+  // 論理削除されていない受講生リストを取得
+  public List<StudentDetail> searchActiveStudentList() {
+    List<Student> students = repository.searchActiveStudents(); // is_deleted = false
+    return students.stream()
+        .map(student -> {
+          List<StudentCourse> courses = repository.findCoursesByStudentId(student.getStudentId());
+          return new StudentDetail(student, courses);
+        })
+        .toList();
   }
 
-  // 論理削除されていない生徒を取得するメソッドを追加
-  public List<Student> searchActiveStudents() {
-    return repository.searchActiveStudents();
+  // 受講生のリストを取得（論理削除も含む）
+  public List<StudentDetail> searchStudentList() {
+    List<Student> students = repository.search();
+    return students.stream()
+        .map(student -> {
+          List<StudentCourse> courses = repository.findCoursesByStudentId(student.getStudentId());
+          return new StudentDetail(student, courses);
+        })
+        .toList();
   }
 
   public List<StudentCourse> searchCourseList() {
@@ -85,14 +98,13 @@ public class StudentService {
     logger.debug("request.isDeleted() = {}", request.isDeleted());
 
 // ログ②: セット前のStudentオブジェクトの削除フラグ
-    logger.debug("Before set: student.isDeleted = {}", request.getStudent().isDeleted());
+    logger.debug("Before set: student.isDeleted = {}", request.getStudent().getDeleted());
 
 // 削除フラグを Student オブジェクトに反映
     request.getStudent().setDeleted(request.isDeleted());
 
 // ログ③: セット後のStudentオブジェクトの削除フラグ
-    logger.debug("After set: student.isDeleted = {}", request.getStudent().isDeleted());
-
+    logger.debug("After set: student.isDeleted = {}", request.getStudent().getDeleted());
 
     repository.updateStudent(request.getStudent());
 
@@ -104,5 +116,86 @@ public class StudentService {
         repository.insertCourse(course);
       }
     }
+  }
+
+  @Transactional
+  public void partialUpdateStudentWithCourses(StudentRegistrationRequest request) {
+
+    Logger logger = LoggerFactory.getLogger(StudentService.class);
+
+    Student existing = repository.findStudentById(request.getStudent().getStudentId());
+    if (existing == null) {
+      throw new RuntimeException("受講生情報が存在しません");
+    }
+
+    logger.debug("PATCH: Before update - isDeleted = {}", existing.getDeleted());
+
+    // 名前の変更
+    if (request.getStudent().getFullName() != null) {
+      existing.setFullName(request.getStudent().getFullName());
+    }
+
+    // ふりがなの変更
+    if (request.getStudent().getFurigana() != null) {
+      existing.setFurigana(request.getStudent().getFurigana());
+    }
+
+    // ニックネームの変更
+    if (request.getStudent().getNickname() != null) {
+      existing.setNickname(request.getStudent().getNickname());
+    }
+
+    // emailの変更
+    if (request.getStudent().getEmail() != null) {
+      existing.setEmail(request.getStudent().getEmail());
+    }
+
+    // 居住地域の変更
+    if (request.getStudent().getLocation() != null) {
+      existing.setLocation(request.getStudent().getLocation());
+    }
+
+    // 年齢の変更
+    if (request.getStudent().getAge() != null) {
+      existing.setAge(request.getStudent().getAge());
+    }
+
+    // 性別の変更
+    if (request.getStudent().getGender() != null) {
+      existing.setGender(request.getStudent().getGender());
+    }
+
+    // 備考欄の変更
+    if (request.getStudent().getRemarks() != null) {
+      existing.setRemarks(request.getStudent().getRemarks());
+    }
+
+    // 論理削除の変更
+    if (request.getStudent().getDeleted() != null) {
+      if (request.getStudent().getDeleted()) {
+        existing.softDelete(); // ← フラグと日時を両方設定
+      } else {
+        existing.restore(); // ← 復元
+      }
+    }
+
+    repository.updateStudent(existing);
+
+    // コースの部分更新もする場合（指定があるときだけ）
+    if (request.getCourses() != null && !request.getCourses().isEmpty()) {
+      repository.deleteCoursesByStudentId(existing.getStudentId());
+
+      for (StudentCourse course : request.getCourses()) {
+        course.setCourseId(UUID.randomUUID().toString());
+        course.setStudentId(existing.getStudentId());
+        repository.insertCourse(course);
+      }
+    }
+  }
+
+  @Transactional
+  public void deleteStudent(String studentId) {
+    repository.deleteCoursesByStudentId(studentId); // まず関連コースを削除
+    repository.deleteStudentById(studentId);        // 次に生徒を削除
   }
 }
