@@ -1,6 +1,7 @@
 package raisetech.student.management.controller;
 
 import jakarta.validation.Valid;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -86,13 +87,18 @@ public class StudentController {
 
   // 受講生情報の更新
   @PutMapping("/{studentId}")
-  public ResponseEntity<List<StudentDetail>> updateStudent(@PathVariable String studentId,
+  public ResponseEntity<StudentDetail> updateStudent(@PathVariable String studentId,
       @Valid @RequestBody StudentRegistrationRequest request) {
+
     logger.debug("PUT - Updating full student: {}", studentId);
     request.getStudent().setStudentId(studentId); // パスパラメータで渡したIDを強制セット
     service.updateStudentWithCourses(request); // 更新処理
-    List<StudentDetail> students = service.searchStudentList(); // 更新後に最新一覧（論理削除含む）を取得して返却
-    return ResponseEntity.ok(students);
+
+    //　更新後の情報をDBから取得
+    Student student = service.findStudentById(studentId);
+    List<StudentCourse> courses = service.searchCoursesByStudentId(studentId);
+    StudentDetail detail = new StudentDetail(student, courses);
+    return ResponseEntity.ok(detail);
   }
 
   // 部分更新（PATCH）
@@ -106,7 +112,7 @@ public class StudentController {
 
     service.partialUpdateStudentWithCourses(request);
 
-    // ✅ 更新後の student を再取得して返す！
+    // 更新後の student を再取得して返す。
     Student updatedStudent = service.findStudentById(studentId);
     List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentId);
 
@@ -116,8 +122,9 @@ public class StudentController {
 
   // 受講生情報の完全削除
   @DeleteMapping("/{studentId}")
-  public ResponseEntity<String> deleteStudent(@PathVariable String studentId) {
+  public ResponseEntity<Map<String, String>> deleteStudent(@PathVariable String studentId) {
     service.deleteStudent(studentId);
-    return ResponseEntity.ok("受講生情報を削除しました");
+    Map<String, String> response = Map.of("message", "受講生情報を削除しました");
+    return ResponseEntity.ok(response);
   }
 }
