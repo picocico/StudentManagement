@@ -1,5 +1,6 @@
 package raisetech.student.management.data;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -35,21 +36,21 @@ public class Student {
   @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", message = "メールアドレス形式が不正です。")
   private String email;
   private String location;
-  private int age;
+  private Integer age;
 
   @NotBlank(message = "性別は必須です。")
   private String gender;
   private String remarks = "";
   private LocalDateTime createdAt;
   private LocalDateTime deletedAt;
-
-  private boolean isDeleted; // 明示的な論理削除フラグを追加
+  @JsonProperty("deleted")
+  private Boolean deleted; // 明示的な論理削除フラグを追加
 
   /**
    * 学生を論理削除するメソッド
    */
   public void softDelete() {
-    this.isDeleted = true;
+    this.deleted = true;
     this.deletedAt = LocalDateTime.now();
   }
 
@@ -57,7 +58,7 @@ public class Student {
    * 学生を復元するメソッド
    */
   public void restore() {
-    this.isDeleted = false;
+    this.deleted = false;
     this.deletedAt = null;
   }
 }

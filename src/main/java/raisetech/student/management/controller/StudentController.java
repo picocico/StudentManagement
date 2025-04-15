@@ -1,19 +1,23 @@
 package raisetech.student.management.controller;
 
+import jakarta.validation.Valid;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.ui.Model;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
-import org.springframework.validation.BindingResult;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -21,12 +25,14 @@ import raisetech.student.management.domain.StudentDetail;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.service.StudentService;
 
+@RequestMapping("/api/students")
 @Validated
-@Controller
+@RestController
 public class StudentController {
 
-  private StudentService service;
-  private StudentConverter converter;
+  private  static final Logger logger = LoggerFactory.getLogger(StudentController.class);
+  private final StudentService service;
+  private final StudentConverter converter;
 
   @Autowired
   public StudentController(StudentService service, StudentConverter converter) {
@@ -34,105 +40,91 @@ public class StudentController {
     this.converter = converter;
   }
 
-  // ふりがな検索フォームの表示
-  @GetMapping("/findStudent")
-  public String findStudentPage() {
-    return "findStudent";
-  }
-
-  // 生徒情報の編集画面を表示
-  @GetMapping("/editStudent")
-  public String editStudent(@RequestParam String studentId, Model model) {
-    Student student = service.findStudentById(studentId);
-    List<StudentCourse> studentCourses = service.searchCoursesByStudentId(studentId);
-
-    StudentRegistrationRequest request = new StudentRegistrationRequest();
-    request.setStudent(student);
-    request.setCourses(studentCourses);
-    request.setDeleted(student.isDeleted());  // ← サーバーから正しく削除フラグを渡す
-
-    // 確認用ログ出力
-    System.out.println("Retrieved deleted flag: " + student.isDeleted());
-
-    model.addAttribute("studentRegistrationRequest", request);
-    return "editStudent";
-  }
-
-  // 名前で受講生を検索
-  @GetMapping("/findStudentsByFurigana")
-  public String findStudentsByFurigana(@RequestParam String furigana, Model model) {
-    List<Student> students = service.findStudentsByFurigana(furigana);
-    model.addAttribute("students", students);
-    return "studentFindResults";
-  }
-
-  // 生徒リストをサービスから取得（論理削除されていないもののみ）
-  @GetMapping("/studentList")
-  public String getStudentList(Model model) {
-    List<Student> students = service.searchActiveStudents();
+  // 受講生一覧（論理削除されていないもの）
+  @GetMapping
+  public ResponseEntity<List<StudentDetail>> getStudentList() {
+    List<StudentDetail> students = service.searchActiveStudentList();
     List<StudentCourse> studentCourses = service.searchCourseList();
-
-    model.addAttribute("studentList", converter.convertStudentDetails(students, studentCourses));
-    return "studentList";
+    return ResponseEntity.ok(service.searchActiveStudentList());
   }
 
-  // 特定の生徒のコースだけをサービスから取得する API を追加
-  @GetMapping("/courseListByStudentId")
-  public List<StudentCourse> getCoursesByStudentId(@RequestParam String studentId) {
-    return service.searchCoursesByStudentId(studentId);
+  // 受講生一覧（論理削除されたものも含む）
+  @GetMapping("/all")
+  public ResponseEntity<List<StudentDetail>> getAllStudentsIncludingDeleted() {
+    List<StudentDetail> students = service.searchStudentList(); // ← ここで全件取得
+    List<StudentCourse> studentCourses = service.searchCourseList();
+    return ResponseEntity.ok(service.searchStudentList());
+
   }
 
-  // Thymeleaf でフォームのデータを StudentRegistrationRequest として受け取るように変更。
-  @GetMapping("/newStudent")
-  public String newStudent(Model model) {
-    model.addAttribute("studentRegistrationRequest", new StudentRegistrationRequest());
-    return "registerStudent";
+  // ふりがな検索
+  @GetMapping("/search")
+  public ResponseEntity<List<Student>> findStudentsByFurigana(@RequestParam String furigana) {
+    return ResponseEntity.ok(service.findStudentsByFurigana(furigana));
   }
 
-  @PostMapping("/registerStudent")
-  public String registerStudent(@ModelAttribute StudentRegistrationRequest request,
-      BindingResult result) {
-    if (result.hasErrors()) {
-      return "registerStudent";
-    }
-    service.registerStudentWithCourses(request);
-    return "redirect:/studentList";
+  // 単一受講生の詳細取得
+  @GetMapping("/{studentId}")
+  public ResponseEntity<StudentRegistrationRequest> getStudentById(@PathVariable String studentId) {
+    Student student = service.findStudentById(studentId);
+    List<StudentCourse> courses = service.searchCoursesByStudentId(studentId);
+    StudentRegistrationRequest request = new StudentRegistrationRequest(student, courses, student.getDeleted());
+    return ResponseEntity.ok(request);
   }
 
-  @PostMapping("/students")
-  public ResponseEntity<StudentDetail> registerStudent(
-      @RequestBody StudentRegistrationRequest request) {
+  // 特定の受講生のコース取得
+  @GetMapping("/{studentId}/courses")
+  public ResponseEntity<List<StudentCourse>> getCoursesByStudentId(@PathVariable String studentId) {
+    return ResponseEntity.ok(service.searchCoursesByStudentId(studentId));
+  }
+
+  // 受講生の新規登録
+  @PostMapping
+  public ResponseEntity<StudentDetail> registerStudent(@Valid @RequestBody StudentRegistrationRequest request) {
     service.registerStudentWithCourses(request);
     return ResponseEntity.ok(new StudentDetail(request.getStudent(), request.getCourses()));
   }
 
-  // 受講生情報の更新処理
-  @PostMapping("/updateStudent")
-  public String updateStudent(
-      @Validated @ModelAttribute("studentRegistrationRequest") StudentRegistrationRequest request,
-      BindingResult result, Model model) {
+  // 受講生情報の更新
+  @PutMapping("/{studentId}")
+  public ResponseEntity<StudentDetail> updateStudent(@PathVariable String studentId,
+      @Valid @RequestBody StudentRegistrationRequest request) {
 
-    Logger logger = LoggerFactory.getLogger(StudentController.class);
+    logger.debug("PUT - Updating full student: {}", studentId);
+    request.getStudent().setStudentId(studentId); // パスパラメータで渡したIDを強制セット
+    service.updateStudentWithCourses(request); // 更新処理
 
-    logger.debug("Request deleted flag: {}", request.isDeleted());
-    logger.debug("Student deleted flag before update: {}", request.getStudent().isDeleted());
+    //　更新後の情報をDBから取得
+    Student student = service.findStudentById(studentId);
+    List<StudentCourse> courses = service.searchCoursesByStudentId(studentId);
+    StudentDetail detail = new StudentDetail(student, courses);
+    return ResponseEntity.ok(detail);
+  }
 
-    // studentId をリクエストから取得する
-    String studentId = request.getStudent().getStudentId();
-    System.out.println("Received studentId (via request): " + studentId);
+  // 部分更新（PATCH）
+  @PatchMapping("/{studentId}")
+  public ResponseEntity<StudentDetail> partialUpdateStudent(
+      @PathVariable String studentId,
+      @RequestBody StudentRegistrationRequest request) {
 
-    if (result.hasErrors()) {
-      model.addAttribute("studentRegistrationRequest", request);
-      model.addAttribute("validationErrors", result.getAllErrors());
-      return "editStudent";
-    }
-
+    logger.debug("PATCH - Partially updating student: {}", studentId);
     request.getStudent().setStudentId(studentId);
-    service.updateStudentWithCourses(request);
-    return "redirect:/studentList";
+
+    service.partialUpdateStudentWithCourses(request);
+
+    // 更新後の student を再取得して返す。
+    Student updatedStudent = service.findStudentById(studentId);
+    List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentId);
+
+    StudentDetail detail = new StudentDetail(updatedStudent, updatedCourses);
+    return ResponseEntity.ok(detail);
+  }
+
+  // 受講生情報の完全削除
+  @DeleteMapping("/{studentId}")
+  public ResponseEntity<Map<String, String>> deleteStudent(@PathVariable String studentId) {
+    service.deleteStudent(studentId);
+    Map<String, String> response = Map.of("message", "受講生情報を削除しました");
+    return ResponseEntity.ok(response);
   }
 }
-
-
-
-
