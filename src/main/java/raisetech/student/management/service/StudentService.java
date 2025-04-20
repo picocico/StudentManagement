@@ -13,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 学生情報のビジネスロジックを管理するサービスクラス。
+ * 受講生情報のビジネスロジックを管理するサービスクラス。
  * 登録・更新・検索・削除などの操作を提供する。
  */
 @Service
@@ -31,10 +31,10 @@ public class StudentService {
   }
 
   /**
-   * 学生とそのコース情報を登録します。
+   * 受講生とそのコース情報を登録します。
    *
-   * @param student 学生エンティティ
-   * @param courses 学生に紐づくコース情報のリスト
+   * @param student 受講生エンティティ
+   * @param courses 受講生に紐づくコース情報のリスト
    */
   @Transactional
   public void registerStudent(Student student, List<StudentCourse> courses) {
@@ -45,9 +45,9 @@ public class StudentService {
   }
 
   /**
-   * 学生情報とコース情報を全体更新します。
+   * 受講生情報とコース情報を全体更新します。
    *
-   * @param student 更新対象の学生エンティティ
+   * @param student 更新対象の受講生エンティティ
    * @param courses 新しいコース情報のリスト
    */
   @Transactional
@@ -60,9 +60,9 @@ public class StudentService {
   }
 
   /**
-   * 学生情報を部分的に更新します。
+   * 受講生情報を部分的に更新します。
    *
-   * @param student 部分更新後の学生データ
+   * @param student 部分更新後の受講生データ
    * @param courses コース情報（省略可能）
    */
   @Transactional
@@ -77,43 +77,72 @@ public class StudentService {
   }
 
   /**
-   * 学生IDで学生情報を取得します。
+   * 受講生IDで受講生情報を取得します。
    *
-   * @param studentId 検索対象の学生ID
-   * @return 該当する学生情報（存在しない場合は null）
+   * @param studentId 検索対象の受講生ID
+   * @return 該当する受講生情報（存在しない場合は null）
    */
   public Student findStudentById(String studentId) {
     Student student = repository.findById(studentId);
     if (student == null) {
-      throw new ResourceNotFoundException("学生ID " + studentId + " が見つかりません。");
+      throw new ResourceNotFoundException("受講生ID " + studentId + " が見つかりません。");
     }
     return student;
   }
 
   /**
-   * 削除されていないすべての学生を取得します。
+   * 論理削除されていないすべての受講生を取得します。
    *
-   * @return アクティブな学生情報のリスト
+   * @return アクティブな受講生情報のリスト
    */
   public List<Student> searchActiveStudents() {
     return repository.searchActiveStudents();
   }
 
   /**
-   * 指定したふりがなに一致する学生を検索します。
+   * 論理削除された受講生のみを取得します。
    *
-   * @param furigana 検索キーワード（部分一致）
-   * @return 一致する学生リスト
+   * @return 削除済み受講生のリスト
+   */
+  public List<Student> searchDeletedStudents() {
+    return repository.findDeletedStudents();
+  }
+
+  /**
+   * 論理削除されていない受講生から、ふりがなで部分一致検索します。
+   *
+   * @param furigana 検索するふりがな（部分一致）
+   * @return 一致する受講生リスト
    */
   public List<Student> findStudentsByFurigana(String furigana) {
     return repository.findByFurigana(furigana);
   }
 
   /**
-   * 学生IDに紐づくコース情報を取得します。
+   * 論理削除された受講生も含めて、ふりがなで部分一致検索します。
    *
-   * @param studentId 学生ID
-   * @return その学生に紐づくコース一覧
+   * @param furigana 検索するふりがな
+   * @return 一致する受講生情報のリスト
+   */
+  public List<Student> findStudentsByFuriganaIncludingDeleted(String furigana) {
+    return repository.findByFuriganaIncludingDeleted(furigana);
+  }
+
+  /**
+   * 指定されたふりがなに一致する削除済み受講生のみを取得します。
+   *
+   * @param furigana ふりがな（部分一致検索）
+   * @return 条件に一致する削除済み受講生のリスト
+   */
+  public List<Student> findDeletedStudentsByFurigana(String furigana) {
+    return repository.findDeletedStudentsByFurigana(furigana);
+  }
+
+  /**
+   * 受講生IDに紐づくコース情報を取得します。
+   *
+   * @param studentId 受講生ID
+   * @return その受講生に紐づくコース一覧
    */
   public List<StudentCourse> searchCoursesByStudentId(String studentId) {
     return courseRepository.findCoursesByStudentId(studentId);
@@ -122,16 +151,16 @@ public class StudentService {
   /**
    * すべてのコース情報を取得します。
    *
-   * @return 全学生分のコース情報一覧
+   * @return 全受講生分のコース情報一覧
    */
   public List<StudentCourse> searchAllCourses() {
     return courseRepository.findAllCourses();
   }
 
   /**
-   * すべての学生（論理削除された学生も含む）を取得します。
+   * すべての受講生（論理削除された受講生も含む）を取得します。
    *
-   * @return 学生エンティティのリスト
+   * @return 受講生エンティティのリスト
    */
   public List<Student> searchAllStudents() {
     return repository.findAllStudents(); // is_deleted 条件なし
@@ -139,9 +168,9 @@ public class StudentService {
 
 
   /**
-   * 指定した学生を論理削除します。
+   * 指定した受講生を論理削除します。
    *
-   * @param studentId 削除対象の学生ID
+   * @param studentId 削除対象の受講生ID
    */
   @Transactional
   public void softDeleteStudent(String studentId) {
@@ -155,13 +184,13 @@ public class StudentService {
   /**
    * 指定した学生を論理削除から復元します。
    *
-   * @param studentId 復元対象の学生ID
+   * @param studentId 復元対象の受講生ID
    */
   @Transactional
   public void restoreStudent(String studentId) {
     Student student = repository.findById(studentId);
     if (student == null) {
-      throw new ResourceNotFoundException("学生ID " + studentId + " が見つかりません。");
+      throw new ResourceNotFoundException("受講生ID " + studentId + " が見つかりません。");
     }
 
     logger.debug("Before restore: deleted = {}, deletedAt = {}", student.getDeleted(), student.getDeletedAt());
@@ -175,22 +204,22 @@ public class StudentService {
   }
 
   /**
-   * 指定された学生IDに基づいて、関連する学生コースと学生情報を物理削除します。
+   * 指定された受講生IDに基づいて、関連する受講生コースと受講生情報を物理削除します。
    * <p>
-   * 削除前に該当する学生が存在するかどうかを確認し、存在しない場合は例外をスローします。
+   * 削除前に該当する受講生が存在するかどうかを確認し、存在しない場合は例外をスローします。
    *
-   * @param studentId 削除対象の学生ID
-   * @throws ResourceNotFoundException 学生が存在しない場合にスローされます。
+   * @param studentId 削除対象の受講生ID
+   * @throws ResourceNotFoundException 受講生が存在しない場合にスローされます。
    */
   public void deleteStudentPhysically(String studentId) {
-    // 学生が存在するか確認（存在しなければ例外スロー）
+    // 受講生が存在するか確認（存在しなければ例外スロー）
     Student existing = repository.findById(studentId);
     if (existing == null) {
-      throw new ResourceNotFoundException("学生ID " + studentId + " が見つかりません。");
+      throw new ResourceNotFoundException("受講生ID " + studentId + " が見つかりません。");
     }
-    // 学生に紐づくコースを削除
+    // 受講生に紐づくコースを削除
     courseRepository.deleteCoursesByStudentId(studentId);
-    // 学生情報を削除
+    // 受講生情報を削除
     repository.deleteById(studentId);
   }
 }

@@ -22,13 +22,14 @@ import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
+import raisetech.student.management.exception.ResourceNotFoundException;
 import raisetech.student.management.service.StudentService;
 
 
 /**
- * 学生に関するREST APIを提供するコントローラークラス。
+ * 受講生に関するREST APIを提供するコントローラークラス。
  * <p>
- * このクラスは、学生の登録、取得、更新、削除、復元、およびふりがなによる検索などの
+ * このクラスは、受講生の登録、取得、更新、削除、復元、およびふりがなによる検索などの
  * 操作をエンドポイントとして提供します。
  */
 @RestController
@@ -40,16 +41,16 @@ public class StudentController {
   /** ロガー */
   private static final Logger logger = LoggerFactory.getLogger(StudentController.class);
 
-  /** 学生サービス */
+  /** 受講生サービス */
   private final StudentService service;
 
-  /** 学生コンバーター */
+  /** 受講生コンバーター */
   private final StudentConverter converter;
 
   /**
-   * 新規の学生情報を登録します。
+   * 新規の受講生情報を登録します。
    *
-   * @param request 登録する学生情報およびコース情報
+   * @param request 登録する受講生情報およびコース情報
    * @return レスポンスステータス
    */
   @PostMapping
@@ -62,38 +63,69 @@ public class StudentController {
   }
 
   /**
-   * 論理削除されていない学生の一覧を取得します。
+   * 受講生情報を検索して返却するエンドポイント。
+   * <p>
+   * 以下の条件に応じて検索動作を切り替えます。
+   * </p>
    *
-   * @return 学生詳細情報リスト
+   * <ul>
+   *   <li><b>ふりがな検索:</b> {@code furigana} パラメータが指定された場合は、ふりがなに部分一致する受講生を検索します。</li>
+   *   <li><b>削除条件:</b> {@code includeDeleted} または {@code deletedOnly} により、論理削除された受講生を含める／のみ取得の切り替えが可能です。</li>
+   * </ul>
+   *
+   * <p>
+   * 結果として、受講生情報とそれに紐づく全コース情報を統合して返却します。
+   * </p>
+   *
+   * @param furigana        ふりがなによる検索条件（任意）。部分一致で検索。
+   * @param includeDeleted  削除済みの受講生も含めて検索するか（デフォルト: false）
+   * @param deletedOnly     論理削除された受講生のみを検索するか（デフォルト: false）
+   * @return 受講生詳細情報のリスト（コース情報付き）
    */
   @GetMapping
-  public ResponseEntity<List<StudentDetailDto>> getStudentList() {
-    logger.debug("GET - Fetching all active students");
-    List<Student> students = service.searchActiveStudents();
-    List<StudentCourse> courses = service.searchAllCourses();
+  public ResponseEntity<List<StudentDetailDto>> getStudentList(
+      @RequestParam(required = false) String furigana,
+      @RequestParam(required = false, defaultValue = "false") boolean includeDeleted,
+      @RequestParam(required = false, defaultValue = "false") boolean deletedOnly) {
+
+    logger.debug("GET - Fetching students list. furigana={}, includeDeleted={}", furigana, includeDeleted);
+
+    List<Student> students;
+
+    if (furigana != null && !furigana.isBlank()) {
+      // ふりがな検索 + 削除条件分岐
+      if (deletedOnly) {
+        students = service.findDeletedStudentsByFurigana(furigana);
+      } else if (includeDeleted) {
+        students = service.findStudentsByFuriganaIncludingDeleted(furigana);
+      } else {
+        students = service.findStudentsByFurigana(furigana);
+      }
+    } else {
+      // 全件検索 + 削除条件分岐
+      if (deletedOnly) {
+        students = service.searchDeletedStudents();
+      } else if (includeDeleted) {
+        students = service.searchAllStudents();
+      } else {
+        students = service.searchActiveStudents();
+      }
+    }
+
+    if (students.isEmpty()) {
+      throw new ResourceNotFoundException("指定された条件に一致する学生が見つかりません。");
+    }
+
+    List<StudentCourse> courses = service.searchAllCourses(); // すべてのコース取得（紐づけ用）
     List<StudentDetailDto> response = converter.convertStudentDetailsDto(students, courses);
     return ResponseEntity.ok(response);
   }
 
   /**
-   * 論理削除済みも含む、すべての学生の一覧を取得します。
+   * 指定された受講生IDに該当する詳細情報を取得します。
    *
-   * @return 学生詳細情報のリスト
-   */
-  @GetMapping("/all")
-  public ResponseEntity<List<StudentDetailDto>> getAllStudentsIncludingDeleted() {
-    logger.debug("GET - Fetching all students including deleted");
-    List<Student> students = service.searchAllStudents(); // is_deleted 見ない
-    List<StudentCourse> courses = service.searchAllCourses();
-    List<StudentDetailDto> response = converter.convertStudentDetailsDto(students, courses);
-    return ResponseEntity.ok(response);
-  }
-
-  /**
-   * 指定された学生IDに該当する詳細情報を取得します。
-   *
-   * @param studentId 学生ID
-   * @return 学生詳細情報
+   * @param studentId 受講生ID
+   * @return 受講生詳細情報
    */
   @GetMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> getStudentDetail(@PathVariable String studentId) {
@@ -104,11 +136,11 @@ public class StudentController {
   }
 
   /**
-   * 学生情報を全体的に更新します。
+   * 受講生情報を全体的に更新します。
    *
-   * @param studentId 学生ID
+   * @param studentId 受講生ID
    * @param request 更新内容
-   * @return 更新後の学生詳細情報
+   * @return 更新後の受講生詳細情報
    */
   @PutMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> updateStudent(
@@ -126,11 +158,11 @@ public class StudentController {
   }
 
   /**
-   * 学生情報を部分的に更新します。
+   * 受講生情報を部分的に更新します。
    *
-   * @param studentId 学生ID
+   * @param studentId 受講生ID
    * @param request 更新対象のフィールド
-   * @return 更新後の学生詳細情報
+   * @return 更新後の受講生詳細情報
    */
   @PatchMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> partialUpdateStudent(
@@ -150,24 +182,9 @@ public class StudentController {
   }
 
   /**
-   * 指定されたふりがなで学生を検索します。
+   * 受講生情報を論理削除します。
    *
-   * @param furigana 検索キーワード
-   * @return 該当する学生詳細情報のリスト
-   */
-  @GetMapping("/search")
-  public ResponseEntity<List<StudentDetailDto>> searchByFurigana(@RequestParam String furigana) {
-    logger.debug("GET - Searching students by furigana: {}", furigana);
-    List<Student> students = service.findStudentsByFurigana(furigana);
-    List<StudentCourse> courses = service.searchAllCourses();
-    List<StudentDetailDto> response = converter.convertStudentDetailsDto(students, courses);
-    return ResponseEntity.ok(response);
-  }
-
-  /**
-   * 学生情報を論理削除します。
-   *
-   * @param studentId 削除対象の学生ID
+   * @param studentId 削除対象の受講生ID
    * @return 204 No Content
    */
   @DeleteMapping("/{studentId}")
@@ -178,9 +195,9 @@ public class StudentController {
   }
 
   /**
-   * 論理削除された学生情報を復元します。
+   * 論理削除された受講生情報を復元します。
    *
-   * @param studentId 復元対象の学生ID
+   * @param studentId 復元対象の受講生ID
    * @return 204 No Content
    */
   @PatchMapping("/{studentId}/restore")
@@ -191,9 +208,9 @@ public class StudentController {
   }
 
   /**
-   * 指定されたIDの学生情報を物理削除します。
+   * 指定されたIDの受講生情報を物理削除します。
    *
-   * @param studentId 削除対象の学生ID
+   * @param studentId 削除対象の受講生ID
    * @return 削除成功時は204 No Content
    */
   @DeleteMapping("/{studentId}/force")

@@ -1,12 +1,14 @@
 package raisetech.student.management.exception;
 
 /**
- * リソースが存在しない場合にスローされる例外。
+ * 指定されたリソースが見つからなかった場合にスローされる例外。
+ * <p>
+ * 例えば、指定した学生IDやふりがなに該当するデータが存在しない場合に使用されます。
  */
 public class ResourceNotFoundException extends RuntimeException {
 
   /**
-   * 指定されたメッセージで新しい例外を生成します。
+   * メッセージを指定して例外を生成します。
    *
    * @param message エラーメッセージ
    */

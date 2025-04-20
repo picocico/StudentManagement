@@ -5,13 +5,13 @@ import org.apache.ibatis.annotations.*;
 import raisetech.student.management.data.StudentCourse;
 
 /**
- * 学生のコース情報に関するデータベース操作を行うMyBatisリポジトリ。
+ * 受講生のコース情報に関するデータベース操作を行うMyBatisリポジトリ。
  */
 @Mapper
 public interface StudentCourseRepository {
 
   /**
-   * 学生のコース情報を登録します。
+   * 受講生のコース情報を登録します。
    *
    * @param course 登録するコース情報
    */
@@ -22,24 +22,24 @@ public interface StudentCourseRepository {
   void insertCourse(StudentCourse course);
 
   /**
-   * 指定された学生IDに紐づくすべてのコース情報を削除します。
+   * 指定された受講生IDに紐づくすべてのコース情報を削除します。
    *
-   * @param studentId 対象の学生ID
+   * @param studentId 対象の受講生ID
    */
   @Delete("DELETE FROM student_courses WHERE student_id = #{studentId}")
   void deleteCoursesByStudentId(String studentId);
 
   /**
-   * 指定された学生IDに紐づくコース情報を取得します。
+   * 指定された受講生IDに紐づくコース情報を取得します。
    *
-   * @param studentId 学生ID
+   * @param studentId 受講生ID
    * @return 該当するコース情報のリスト
    */
   @Select("SELECT * FROM student_courses WHERE student_id = #{studentId}")
   List<StudentCourse> findCoursesByStudentId(String studentId);
 
   /**
-   * すべての学生コース情報を取得します。
+   * すべての受講生コース情報を取得します。
    *
    * @return 全コース情報のリスト
    */
