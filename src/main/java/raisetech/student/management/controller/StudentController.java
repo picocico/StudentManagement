@@ -22,7 +22,6 @@ import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
-import raisetech.student.management.exception.ResourceNotFoundException;
 import raisetech.student.management.service.StudentService;
 
 
@@ -51,36 +50,25 @@ public class StudentController {
    * 新規の受講生情報を登録します。
    *
    * @param request 登録する受講生情報およびコース情報
-   * @return レスポンスステータス
+   * @return 201 Created
    */
   @PostMapping
   public ResponseEntity<Void> registerStudent(@Valid @RequestBody StudentRegistrationRequest request) {
-    logger.debug("POST - Registering new student");
     Student student = converter.toEntity(request.getStudent());
     List<StudentCourse> courses = converter.toEntityList(request.getCourses(), student.getStudentId());
+
+    logger.debug("POST - Registering new student: {}", student.getFullName());
     service.registerStudent(student, courses);
-    return ResponseEntity.ok().build();
+    return ResponseEntity.status(201).build();
   }
 
   /**
-   * 受講生情報を検索して返却するエンドポイント。
-   * <p>
-   * 以下の条件に応じて検索動作を切り替えます。
-   * </p>
+   * 条件付きで受講生一覧を取得します（ふりがな、削除状態）。
    *
-   * <ul>
-   *   <li><b>ふりがな検索:</b> {@code furigana} パラメータが指定された場合は、ふりがなに部分一致する受講生を検索します。</li>
-   *   <li><b>削除条件:</b> {@code includeDeleted} または {@code deletedOnly} により、論理削除された受講生を含める／のみ取得の切り替えが可能です。</li>
-   * </ul>
-   *
-   * <p>
-   * 結果として、受講生情報とそれに紐づく全コース情報を統合して返却します。
-   * </p>
-   *
-   * @param furigana        ふりがなによる検索条件（任意）。部分一致で検索。
-   * @param includeDeleted  削除済みの受講生も含めて検索するか（デフォルト: false）
-   * @param deletedOnly     論理削除された受講生のみを検索するか（デフォルト: false）
-   * @return 受講生詳細情報のリスト（コース情報付き）
+   * @param furigana        ふりがな検索（省略可能）
+   * @param includeDeleted  論理削除済みも含めるか
+   * @param deletedOnly     論理削除された学生のみ取得するか
+   * @return 条件に一致する受講生詳細DTOリスト
    */
   @GetMapping
   public ResponseEntity<List<StudentDetailDto>> getStudentList(
@@ -88,37 +76,12 @@ public class StudentController {
       @RequestParam(required = false, defaultValue = "false") boolean includeDeleted,
       @RequestParam(required = false, defaultValue = "false") boolean deletedOnly) {
 
-    logger.debug("GET - Fetching students list. furigana={}, includeDeleted={}", furigana, includeDeleted);
+    logger.debug("GET - Fetching students list. furigana={}, includeDeleted={}, deletedOnly={}",
+        furigana, includeDeleted, deletedOnly);
 
-    List<Student> students;
+    List<StudentDetailDto> students = service.getStudentList(furigana, includeDeleted, deletedOnly);
 
-    if (furigana != null && !furigana.isBlank()) {
-      // ふりがな検索 + 削除条件分岐
-      if (deletedOnly) {
-        students = service.findDeletedStudentsByFurigana(furigana);
-      } else if (includeDeleted) {
-        students = service.findStudentsByFuriganaIncludingDeleted(furigana);
-      } else {
-        students = service.findStudentsByFurigana(furigana);
-      }
-    } else {
-      // 全件検索 + 削除条件分岐
-      if (deletedOnly) {
-        students = service.searchDeletedStudents();
-      } else if (includeDeleted) {
-        students = service.searchAllStudents();
-      } else {
-        students = service.searchActiveStudents();
-      }
-    }
-
-    if (students.isEmpty()) {
-      throw new ResourceNotFoundException("指定された条件に一致する学生が見つかりません。");
-    }
-
-    List<StudentCourse> courses = service.searchAllCourses(); // すべてのコース取得（紐づけ用）
-    List<StudentDetailDto> response = converter.convertStudentDetailsDto(students, courses);
-    return ResponseEntity.ok(response);
+    return ResponseEntity.ok(students);
   }
 
   /**
@@ -146,11 +109,14 @@ public class StudentController {
   public ResponseEntity<StudentDetailDto> updateStudent(
       @PathVariable String studentId,
       @Valid @RequestBody StudentRegistrationRequest request) {
-    logger.debug("PUT - Updating student: {}", studentId);
+
     Student student = converter.toEntity(request.getStudent());
     student.setStudentId(studentId);
     student.setDeleted(request.isDeleted());
     List<StudentCourse> courses = converter.toEntityList(request.getCourses(), studentId);
+
+    logger.debug("PUT - Updating student: {}", studentId);
+
     service.updateStudent(student, courses);
     Student updated = service.findStudentById(studentId);
     List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentId);
@@ -168,14 +134,15 @@ public class StudentController {
   public ResponseEntity<StudentDetailDto> partialUpdateStudent(
       @PathVariable String studentId,
       @RequestBody StudentRegistrationRequest request) {
-    logger.debug("PATCH - Partially updating student: {}", studentId);
+
     Student existing = service.findStudentById(studentId);
     Student update = converter.toEntity(request.getStudent());
     converter.mergeStudent(existing, update);
-
     List<StudentCourse> convertedCourses = converter.toEntityList(request.getCourses(), studentId);
-    service.partialUpdateStudent(existing, convertedCourses);
 
+    logger.debug("PATCH - Partially updating student: {}", studentId);
+
+    service.partialUpdateStudent(existing, convertedCourses);
     Student updated = service.findStudentById(studentId);
     List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentId);
     return ResponseEntity.ok(converter.toDetailDto(updated, updatedCourses));

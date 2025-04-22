@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 学生・コースのエンティティ、DTO、ドメインモデル間の変換を行うコンバータークラス。
+ * 受講生・コースのエンティティ、DTO、ドメインモデル間の変換を行うコンバータークラス。
  */
 @Component
 public class StudentConverter {
@@ -19,8 +19,8 @@ public class StudentConverter {
   /**
    * StudentDto から Student エンティティに変換します。
    *
-   * @param dto DTO形式の学生情報
-   * @return エンティティ形式の学生情報
+   * @param dto DTO形式の受講生情報
+   * @return エンティティ形式の受講生情報
    */
   public Student toEntity(StudentDto dto) {
     return new Student(
@@ -42,8 +42,8 @@ public class StudentConverter {
   /**
    * Student エンティティから StudentDto に変換します。
    *
-   * @param entity エンティティ形式の学生情報
-   * @return DTO形式の学生情報
+   * @param entity エンティティ形式の受講生情報
+   * @return DTO形式の受講生情報
    */
   public StudentDto toDto(Student entity) {
     return new StudentDto(
@@ -64,7 +64,7 @@ public class StudentConverter {
    * StudentCourseDto から StudentCourse エンティティに変換します。
    *
    * @param dto コースDTO
-   * @param studentId 紐づく学生ID
+   * @param studentId 紐づく受講生ID
    * @return コースエンティティ
    */
   public StudentCourse toEntity(StudentCourseDto dto, String studentId) {
@@ -96,7 +96,7 @@ public class StudentConverter {
    * コースDTOのリストをエンティティリストに変換します。
    *
    * @param dtos DTOのリスト
-   * @param studentId 紐づく学生ID
+   * @param studentId 紐づく受講生ID
    * @return エンティティリスト
    */
   public List<StudentCourse> toEntityList(List<StudentCourseDto> dtos, String studentId) {
@@ -118,9 +118,9 @@ public class StudentConverter {
   }
 
   /**
-   * 学生とコースから詳細DTOを作成します。
+   * 受講生とコースから詳細DTOを作成します。
    *
-   * @param student 学生情報
+   * @param student 受講生情報
    * @param courses コース情報
    * @return 詳細DTO
    */
@@ -129,9 +129,9 @@ public class StudentConverter {
   }
 
   /**
-   * 学生とコースをドメインモデルに変換します。
+   * 受講生とコースをドメインモデルに変換します。
    *
-   * @param student 学生情報
+   * @param student 受講生情報
    * @param courses コース情報
    * @return ドメインモデル
    */
@@ -140,10 +140,10 @@ public class StudentConverter {
   }
 
   /**
-   * 学生とコースのリストから、詳細DTOのリストに変換します。
+   * 受講生とコースのリストから、詳細DTOのリストに変換します。
    *
-   * @param students 学生のリスト
-   * @param courses 全学生のコースのリスト
+   * @param students 受講生のリスト
+   * @param courses 全受講生のコースのリスト
    * @return 詳細DTOのリスト
    */
   public List<StudentDetailDto> convertStudentDetailsDto(List<Student> students, List<StudentCourse> courses) {
@@ -159,9 +159,9 @@ public class StudentConverter {
   }
 
   /**
-   * 既存の学生データに、新しいデータの null でないフィールドを上書きします（部分更新用）。
+   * 既存の受講生データに、新しいデータの null でないフィールドを上書きします（部分更新用）。
    *
-   * @param existing 現在の学生エンティティ
+   * @param existing 現在の受講生エンティティ
    * @param update 部分更新用のデータ
    */
   public void mergeStudent(Student existing, Student update) {

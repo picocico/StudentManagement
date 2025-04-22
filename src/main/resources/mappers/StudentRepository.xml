@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="raisetech.student.management.repository.StudentRepository">
+
+  <!-- 共通のマッピング -->
+  <resultMap id="StudentResultMap" type="raisetech.student.management.data.Student">
+    <result property="studentId" column="student_id"/>
+    <result property="fullName" column="full_name"/>
+    <result property="furigana" column="furigana"/>
+    <result property="nickname" column="nickname"/>
+    <result property="email" column="email"/>
+    <result property="location" column="location"/>
+    <result property="age" column="age"/>
+    <result property="gender" column="gender"/>
+    <result property="remarks" column="remarks"/>
+    <result property="createdAt" column="created_at"/>
+    <result property="deletedAt" column="deleted_at"/>
+    <result property="deleted" column="is_deleted"/>
+  </resultMap>
+
+  <!-- 動的検索 -->
+  <select id="searchStudents" resultMap="StudentResultMap">
+    SELECT * FROM students
+    WHERE 1=1
+    <if test="furigana != null and furigana != ''">
+      AND furigana LIKE CONCAT('%', #{furigana}, '%')
+    </if>
+    <choose>
+      <when test="deletedOnly">
+        AND is_deleted = true
+      </when>
+      <when test="!includeDeleted">
+        AND is_deleted = false
+      </when>
+      <!-- includeDeleted = true && deletedOnly = false の場合はフィルタなし -->
+    </choose>
+  </select>
+
+  <!-- ID検索 -->
+  <select id="findById" resultMap="StudentResultMap">
+    SELECT * FROM students WHERE student_id = #{studentId}
+  </select>
+
+  <!-- 挿入 -->
+  <insert id="insertStudent">
+    INSERT INTO students (student_id, full_name, furigana, nickname, email, location, age, gender, remarks, created_at, is_deleted)
+    VALUES (#{studentId}, #{fullName}, #{furigana}, #{nickname}, #{email}, #{location}, #{age}, #{gender}, #{remarks}, now(), #{deleted})
+  </insert>
+
+  <!-- 更新 -->
+  <update id="updateStudent">
+    UPDATE students SET
+    full_name = #{fullName},
+    furigana = #{furigana},
+    nickname = #{nickname},
+    email = #{email},
+    location = #{location},
+    age = #{age},
+    gender = #{gender},
+    remarks = #{remarks},
+    is_deleted = #{deleted},
+    deleted_at = #{deletedAt}
+    WHERE student_id = #{studentId}
+  </update>
+
+  <!-- 削除されていない学生 -->
+  <select id="searchActiveStudents" resultMap="StudentResultMap">
+    SELECT * FROM students WHERE is_deleted = false
+  </select>
+
+  <!-- 全学生 -->
+  <select id="findAllStudents" resultMap="StudentResultMap">
+    SELECT * FROM students
+  </select>
+
+  <!-- 削除済み学生 -->
+  <select id="findDeletedStudents" resultMap="StudentResultMap">
+    SELECT * FROM students WHERE is_deleted = true
+  </select>
+
+  <!-- ふりがな検索（削除されていない学生） -->
+  <select id="findByFurigana" resultMap="StudentResultMap">
+    SELECT * FROM students WHERE furigana LIKE CONCAT('%', #{furigana}, '%') AND is_deleted = false
+  </select>
+
+  <!-- ふりがな検索（削除状態問わず） -->
+  <select id="findByFuriganaIncludingDeleted" resultMap="StudentResultMap">
+    SELECT * FROM students WHERE furigana LIKE CONCAT('%', #{furigana}, '%')
+  </select>
+
+  <!-- ふりがな検索（削除済みのみ） -->
+  <select id="findDeletedStudentsByFurigana" resultMap="StudentResultMap">
+    SELECT * FROM students WHERE furigana LIKE CONCAT('%', #{furigana}, '%') AND is_deleted = true
+  </select>
+
+  <!-- 物理削除 -->
+  <delete id="deleteById">
+    DELETE FROM students WHERE student_id = #{studentId}
+  </delete>
+
+</mapper>
+
