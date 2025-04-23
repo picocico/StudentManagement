@@ -47,51 +47,6 @@ public interface StudentService {
   void partialUpdateStudent(Student student, List<StudentCourse> courses);
 
   /**
-   * 全受講生情報を取得します（論理削除されたデータも含む）。
-   *
-   * @return 受講生エンティティのリスト
-   */
-  List<Student> searchAllStudents();
-
-  /**
-   * 論理削除されていない受講生情報を取得します。
-   *
-   * @return アクティブな受講生エンティティのリスト
-   */
-  List<Student> searchActiveStudents();
-
-  /**
-   * 論理削除された受講生情報のみを取得します。
-   *
-   * @return 削除済みの受講生エンティティのリスト
-   */
-  List<Student> searchDeletedStudents();
-
-  /**
-   * ふりがなによる検索で、論理削除されていない受講生を取得します。
-   *
-   * @param furigana 検索するふりがな
-   * @return 該当する受講生エンティティのリスト
-   */
-  List<Student> findStudentsByFurigana(String furigana);
-
-  /**
-   * ふりがなによる検索で、論理削除された受講生も含めて取得します。
-   *
-   * @param furigana 検索するふりがな
-   * @return 該当する受講生エンティティのリスト
-   */
-  List<Student> findStudentsByFuriganaIncludingDeleted(String furigana);
-
-  /**
-   * ふりがなによる検索で、論理削除された受講生のみを取得します。
-   *
-   * @param furigana 検索するふりがな
-   * @return 該当する削除済み受講生エンティティのリスト
-   */
-  List<Student> findDeletedStudentsByFurigana(String furigana);
-
-  /**
    * 受講生IDにより受講生情報を取得します。
    *
    * @param studentId 受講生ID

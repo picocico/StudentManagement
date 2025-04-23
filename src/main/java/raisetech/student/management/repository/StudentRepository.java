@@ -45,50 +45,6 @@ public interface StudentRepository {
    */
   void updateStudent(Student student);
 
-  /**
-   * 論理削除されていない受講生情報を取得します。
-   *
-   * @return 有効な受講生情報のリスト
-   */
-  List<Student> searchActiveStudents();
-
-  /**
-   * 論理削除を含むすべての受講生情報を取得します。
-   *
-   * @return 全受講生情報のリスト
-   */
-  List<Student> findAllStudents();
-
-  /**
-   * 論理削除された受講生情報のみを取得します。
-   *
-   * @return 削除済み受講生情報のリスト
-   */
-  List<Student> findDeletedStudents();
-
-  /**
-   * ふりがなで部分一致検索し、論理削除されていない受講生を取得します。
-   *
-   * @param furigana 検索するふりがな（部分一致）
-   * @return 条件に一致する受講生情報のリスト
-   */
-  List<Student> findByFurigana(@Param("furigana") String furigana);
-
-  /**
-   * ふりがなで部分一致検索し、論理削除状態を問わず受講生情報を取得します。
-   *
-   * @param furigana 検索するふりがな（部分一致）
-   * @return 条件に一致する受講生情報のリスト
-   */
-  List<Student> findByFuriganaIncludingDeleted(@Param("furigana") String furigana);
-
-  /**
-   * ふりがなで部分一致検索し、論理削除された受講生情報のみを取得します。
-   *
-   * @param furigana 検索するふりがな（部分一致）
-   * @return 条件に一致する削除済み受講生情報のリスト
-   */
-  List<Student> findDeletedStudentsByFurigana(@Param("furigana") String furigana);
 
   /**
    * 受講生IDで該当する受講生情報を物理削除します。

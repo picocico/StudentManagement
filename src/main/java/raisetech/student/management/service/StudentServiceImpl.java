@@ -88,90 +88,13 @@ public class StudentServiceImpl implements StudentService {
    */
   @Override
   public List<StudentDetailDto> getStudentList(String furigana, boolean includeDeleted, boolean deletedOnly) {
-    List<Student> students;
-    if (furigana != null && !furigana.isBlank()) {
-      if (deletedOnly) {
-        students = findDeletedStudentsByFurigana(furigana);
-      } else if (includeDeleted) {
-        students = findStudentsByFuriganaIncludingDeleted(furigana);
-      } else {
-        students = findStudentsByFurigana(furigana);
-      }
-    } else {
-      if (deletedOnly) {
-        students = searchDeletedStudents();
-      } else if (includeDeleted) {
-        students = searchAllStudents();
-      } else {
-        students = searchActiveStudents();
-      }
-    }
-
+    logger.debug("Searching students with furigana={}, includeDeleted={}, deletedOnly={}",
+        furigana, includeDeleted, deletedOnly);
+    // 動的SQLにより1本化されたリポジトリメソッドを呼び出し
+    List<Student> students = repository.searchStudents(furigana, includeDeleted, deletedOnly); // 1本化！
     List<StudentCourse> courses = searchAllCourses();
+
     return converter.convertStudentDetailsDto(students, courses);
-  }
-
-  /**
-   * 全受講生（論理削除含む）を取得します。
-   *
-   * @return 受講生リスト
-   */
-  @Override
-  public List<Student> searchAllStudents() {
-    return repository.findAllStudents();
-  }
-
-  /**
-   * 論理削除されていない受講生を取得します。
-   *
-   * @return 受講生リスト
-   */
-  @Override
-  public List<Student> searchActiveStudents() {
-    return repository.searchActiveStudents();
-  }
-
-  /**
-   * 論理削除された受講生のみを取得します。
-   *
-   * @return 受講生リスト
-   */
-  @Override
-  public List<Student> searchDeletedStudents() {
-    return repository.findDeletedStudents();
-  }
-
-  /**
-   * ふりがなで部分一致検索を行い、論理削除されていない受講生を取得します。
-   *
-   * @param furigana ふりがな（部分一致）
-   * @return 受講生リスト
-   */
-  @Override
-  public List<Student> findStudentsByFurigana(String furigana) {
-    return repository.findByFurigana(furigana);
-  }
-
-  /**
-   * ふりがなで部分一致検索を行い、論理削除を含む受講生を取得します。
-   *
-   * @param furigana ふりがな（部分一致）
-   * @return 受講生リスト
-   */
-  @Override
-  public List<Student> findStudentsByFuriganaIncludingDeleted(String furigana) {
-    return repository.findByFuriganaIncludingDeleted(furigana);
-  }
-
-  /**
-   * ふりがなで部分一致検索を行い、論理削除された受講生を取得します。
-   *
-   * @param furigana ふりがな（部分一致）
-   * @return 受講生リスト
-   */
-  @Override
-  public List<Student> findDeletedStudentsByFurigana(String furigana) {
-    return repository.findDeletedStudentsByFurigana(furigana);
   }
 
   /**
