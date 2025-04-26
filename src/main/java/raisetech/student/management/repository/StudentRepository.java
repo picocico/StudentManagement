@@ -1,152 +1,59 @@
 package raisetech.student.management.repository;
 
 import java.util.List;
-import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import raisetech.student.management.data.Student;
-import raisetech.student.management.data.StudentCourse;
 
 /**
- * 受講生情報を扱うリポジトリ。
+ * 受講生情報に関するデータベース操作を行うMyBatisリポジトリインターフェースです。
  * <p>
- * 全件検索や単一条件での検索、コース情報の検索が行えるクラスです。
+ * 受講生の登録、更新、検索、削除などを提供し、XMLマッパーファイルでSQLを制御します。
  */
 @Mapper
 public interface StudentRepository {
 
   /**
-   * すべての受講生情報を取得します。
+   * 動的な検索条件（ふりがな、削除状態）に基づいて受講生情報を検索します。
    *
-   * @return すべての受講生情報を含むリスト
+   * @param furigana        ふりがなによる部分一致検索条件（nullまたは空文字は無視）
+   * @param includeDeleted  論理削除された受講生も含めるかどうか
+   * @param deletedOnly     論理削除された受講生のみ取得するかどうか
+   * @return 条件に一致する受講生情報のリスト
    */
-
-  @Select("SELECT * FROM students")
-  @Results({
-      @Result(property = "studentId", column = "student_id"),
-      @Result(property = "fullName", column = "full_name"),
-      @Result(property = "furigana", column = "furigana"),
-      @Result(property = "nickname", column = "nickname"),
-      @Result(property = "email", column = "email"),
-      @Result(property = "location", column = "location"),
-      @Result(property = "age", column = "age"),
-      @Result(property = "gender", column = "gender"),
-      @Result(property = "remarks", column = "remarks"),
-      @Result(property = "createdAt", column = "created_at"),
-      @Result(property = "deleted", column = "is_deleted"),
-      @Result(property = "deletedAt", column = "deleted_at")
-  })
-  List<Student> search(); // ← is_deleted を見ない（全件取得）
+  List<Student> searchStudents(@Param("furigana") String furigana, @Param("includeDeleted") boolean includeDeleted, @Param("deletedOnly") boolean deletedOnly);
 
   /**
-   * selectStudent:特定の受講生情報をstudentIdで探し出すSQL
+   * 受講生IDで受講生情報を取得します。
+   *
+   * @param studentId 受講生ID
+   * @return 該当する受講生情報（存在しない場合は null）
    */
-
-  @Select("SELECT * FROM students WHERE student_id = #{studentId}")
-  @Results({
-      @Result(property = "studentId", column = "student_id"),
-      @Result(property = "fullName", column = "full_name"),
-      @Result(property = "furigana", column = "furigana"),
-      @Result(property = "nickname", column = "nickname"),
-      @Result(property = "email", column = "email"),
-      @Result(property = "location", column = "location"),
-      @Result(property = "age", column = "age"),
-      @Result(property = "gender", column = "gender"),
-      @Result(property = "remarks", column = "remarks"),
-      @Result(property = "createdAt", column = "created_at"),
-      @Result(property = "deleted", column = "is_deleted"),
-      @Result(property = "deletedAt", column = "deleted_at")
-  })
-  Student findStudentById(@Param("studentId") String studentId);
+  Student findById(String studentId);
 
   /**
-   * selectStudent: 論理削除されていない受講生の情報を検索するSQL。
+   * 新しい受講生情報を登録します。
+   *
+   * @param student 登録する受講生情報
    */
-
-  @Select("SELECT * FROM students WHERE is_deleted = false")
-  @Results({
-      @Result(property = "studentId", column = "student_id"),
-      @Result(property = "fullName", column = "full_name"),
-      @Result(property = "furigana", column = "furigana"),
-      @Result(property = "nickname", column = "nickname"),
-      @Result(property = "email", column = "email"),
-      @Result(property = "location", column = "location"),
-      @Result(property = "age", column = "age"),
-      @Result(property = "gender", column = "gender"),
-      @Result(property = "remarks", column = "remarks"),
-      @Result(property = "createdAt", column = "created_at"),
-      @Result(property = "deleted", column = "is_deleted"),
-      @Result(property = "deletedAt", column = "deleted_at")
-  })
-  List<Student> searchActiveStudents();
-
-  /**
-   * selectStudent:特定の受講生情報をfuriganaで探し出すSQL 全角スペースを半角スペースに変換して検索
-   */
-
-  @Select("SELECT * FROM students WHERE REPLACE(furigana, '　', ' ') LIKE CONCAT('%', REPLACE(#{furigana}, '　', ' '), '%')")
-  @Results({
-      @Result(property = "studentId", column = "student_id"),
-      @Result(property = "fullName", column = "full_name"),
-      @Result(property = "furigana", column = "furigana"),
-      @Result(property = "nickname", column = "nickname"),
-      @Result(property = "email", column = "email"),
-      @Result(property = "location", column = "location"),
-      @Result(property = "age", column = "age"),
-      @Result(property = "gender", column = "gender"),
-      @Result(property = "remarks", column = "remarks"),
-      @Result(property = "createdAt", column = "created_at"),
-      @Result(property = "deleted", column = "is_deleted"),
-      @Result(property = "deletedAt", column = "deleted_at")
-  })
-  List<Student> findStudentsByFurigana(@Param("furigana") String furigana);
-
-  @Select("SELECT * FROM student_courses WHERE student_id = #{studentId}")
-  List<StudentCourse> findCoursesByStudentId(@Param("studentId") String studentId);
-
-  @Select("SELECT * FROM student_courses")
-  List<StudentCourse> findAllCourses();
-
-  /**
-   * insertStudent(Student student): 受講生の情報を登録するSQL。
-   */
-
-  @Insert(
-      "INSERT INTO students (student_id, full_name, furigana, nickname, email, location, age, gender, remarks, created_at, is_deleted) "
-          +
-          "VALUES (#{studentId}, #{fullName}, #{furigana}, #{nickname}, #{email}, #{location}, #{age}, #{gender}, #{remarks}, #{createdAt}, false)")
   void insertStudent(Student student);
 
   /**
-   * insertCourse(StudentCourse course): 受講コース情報を登録するSQL。
+   * 既存の受講生情報を更新します。
+   *
+   * @param student 更新する受講生情報
    */
-
-  @Insert(
-      "INSERT INTO student_courses (course_id, student_id, course_name, start_date, end_date, created_at) "
-          +
-          "VALUES (#{courseId}, #{studentId}, #{courseName}, #{startDate}, #{endDate}, #{createdAt})")
-  void insertCourse(StudentCourse course);
-
-  /**
-   * updateStudent:特定の受講生情報を更新するSQL
-   */
-
-  @Update(
-      "UPDATE students SET full_name = #{fullName}, furigana = #{furigana}, nickname = #{nickname}, "
-          +
-          "email = #{email}, location = #{location}, age = #{age}, gender = #{gender}, remarks = #{remarks}, "
-          +
-          "is_deleted = #{deleted} WHERE student_id = #{studentId}"
-  )
   void updateStudent(Student student);
 
 
   /**
-   * deleteStudent:受講生情報をstudentIdで特定し削除するSQL
+   * 受講生IDで該当する受講生情報を物理削除します。
+   *
+   * @param studentId 削除対象の受講生ID
    */
-
-  @Delete("DELETE FROM student_courses WHERE student_id = #{studentId}")
-  void deleteCoursesByStudentId(@Param("studentId") String studentId);
-
-  @Delete("DELETE FROM students WHERE student_id = #{studentId}")
-  void deleteStudentById(@Param("studentId") String studentId);
-
+  void deleteById(String studentId);
 }
+
+
+
+

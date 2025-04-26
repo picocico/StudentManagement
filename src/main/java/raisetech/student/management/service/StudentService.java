@@ -1,201 +1,94 @@
 package raisetech.student.management.service;
 
 import java.util.List;
-import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
-import raisetech.student.management.domain.StudentDetail;
-import raisetech.student.management.dto.StudentRegistrationRequest;
-import raisetech.student.management.repository.StudentRepository;
+import raisetech.student.management.dto.StudentDetailDto;
 
-@Service
-public class StudentService {
+/**
+ * 受講生管理に関するビジネスロジックを提供するサービスインターフェース。
+ * <p>
+ * このインターフェースは、受講生の登録・更新・削除・検索などの操作を定義します。
+ */
+public interface StudentService {
 
-  private final StudentRepository repository;
+  /**
+   * 条件に基づいて受講生詳細情報を取得します。
+   *
+   * @param furigana        ふりがなによる検索（部分一致、null または空文字の場合は無視）
+   * @param includeDeleted  削除済みデータを含めるかどうか
+   * @param deletedOnly     削除済みデータのみ取得するかどうか
+   * @return 受講生詳細情報のリスト
+   */
+  List<StudentDetailDto> getStudentList(String furigana, boolean includeDeleted, boolean deletedOnly);
 
-  @Autowired
-  public StudentService(StudentRepository repository) {
-    this.repository = repository;
-  }
+  /**
+   * 受講生情報とそのコース情報を登録します。
+   *
+   * @param student 受講生エンティティ
+   * @param courses コース情報のリスト
+   */
+  void registerStudent(Student student, List<StudentCourse> courses);
 
-  // 論理削除されていない受講生リストを取得
-  public List<StudentDetail> searchActiveStudentList() {
-    List<Student> students = repository.searchActiveStudents(); // is_deleted = false
-    return students.stream()
-        .map(student -> {
-          List<StudentCourse> courses = repository.findCoursesByStudentId(student.getStudentId());
-          return new StudentDetail(student, courses);
-        })
-        .toList();
-  }
+  /**
+   * 受講生情報とそのコース情報を全体更新します。
+   *
+   * @param student 更新対象の受講生エンティティ
+   * @param courses 新しいコース情報のリスト
+   */
+  void updateStudent(Student student, List<StudentCourse> courses);
 
-  // 受講生のリストを取得（論理削除も含む）
-  public List<StudentDetail> searchStudentList() {
-    List<Student> students = repository.search();
-    return students.stream()
-        .map(student -> {
-          List<StudentCourse> courses = repository.findCoursesByStudentId(student.getStudentId());
-          return new StudentDetail(student, courses);
-        })
-        .toList();
-  }
+  /**
+   * 受講生情報を部分的に更新します。
+   *
+   * @param student 更新対象の受講生エンティティ（部分更新）
+   * @param courses 更新対象のコース情報（null または空リストの場合はコースは変更しない）
+   */
+  void partialUpdateStudent(Student student, List<StudentCourse> courses);
 
-  public List<StudentCourse> searchCourseList() {
-    // 全てのコースリストを取得
-    return repository.findAllCourses();
-  }
+  /**
+   * 受講生IDにより受講生情報を取得します。
+   *
+   * @param studentId 受講生ID
+   * @return 受講生エンティティ
+   */
+  Student findStudentById(String studentId);
 
-  public List<StudentCourse> searchCoursesByStudentId(String studentId) {
-    // studentIdに紐付くコースリストを取得
-    return repository.findCoursesByStudentId(studentId);
-  }
+  /**
+   * 受講生IDに紐づくコース情報を取得します。
+   *
+   * @param studentId 受講生ID
+   * @return コースエンティティのリスト
+   */
+  List<StudentCourse> searchCoursesByStudentId(String studentId);
 
-  public Student findStudentById(String studentId) {
-    // studentIdで特定の生徒を探す
-    return repository.findStudentById(studentId);
-  }
+  /**
+   * 全てのコース情報を取得します。
+   *
+   * @return コースエンティティのリスト
+   */
+  List<StudentCourse> searchAllCourses();
 
-  public List<Student> findStudentsByFurigana(String furigana) {
-    // student.furiganaで特定の生徒を探す
-    return repository.findStudentsByFurigana(furigana);
-  }
+  /**
+   * 受講生を論理削除します。
+   *
+   * @param studentId 受講生ID
+   */
+  void softDeleteStudent(String studentId);
 
-  // @Transactional をつけることで、処理がすべて成功しないとデータが保存されないようにする。
-  @Transactional
-  public void registerStudentWithCourses(StudentRegistrationRequest request) {
-    // student_id が null または空の場合のみ、新しい UUID を生成
-    if (request.getStudent().getStudentId() == null || request.getStudent().getStudentId()
-        .isEmpty()) {
-      request.getStudent().setStudentId(UUID.randomUUID().toString());
-    }
+  /**
+   * 論理削除された受講生を復元します。
+   *
+   * @param studentId 受講生ID
+   */
+  void restoreStudent(String studentId);
 
-    // 学生情報の登録
-    repository.insertStudent(request.getStudent());
-
-    // コース情報の登録
-    if (request.getCourses() != null) {
-      for (StudentCourse course : request.getCourses()) {
-        // course_idを明示的にセット
-        course.setCourseId(UUID.randomUUID().toString());
-        course.setStudentId(request.getStudent().getStudentId()); // student_id をセット
-        repository.insertCourse(course);
-      }
-    }
-  }
-
-  // フル更新（フォームから courses を受け取ったときだけ呼ぶ）
-  @Transactional
-  public void updateStudentWithCourses(StudentRegistrationRequest request) {
-
-    Logger logger = LoggerFactory.getLogger(StudentService.class);
-
-// ログ①: フォームから受け取った削除フラグ
-    logger.debug("request.isDeleted() = {}", request.isDeleted());
-
-// ログ②: セット前のStudentオブジェクトの削除フラグ
-    logger.debug("Before set: student.isDeleted = {}", request.getStudent().getDeleted());
-
-// 削除フラグを Student オブジェクトに反映
-    request.getStudent().setDeleted(request.isDeleted());
-
-// ログ③: セット後のStudentオブジェクトの削除フラグ
-    logger.debug("After set: student.isDeleted = {}", request.getStudent().getDeleted());
-
-    repository.updateStudent(request.getStudent());
-
-    if (request.getCourses() != null && !request.getCourses().isEmpty()) {
-      repository.deleteCoursesByStudentId(request.getStudent().getStudentId());
-      for (StudentCourse course : request.getCourses()) {
-        course.setCourseId(UUID.randomUUID().toString());
-        course.setStudentId(request.getStudent().getStudentId());
-        repository.insertCourse(course);
-      }
-    }
-  }
-
-  @Transactional
-  public void partialUpdateStudentWithCourses(StudentRegistrationRequest request) {
-
-    Logger logger = LoggerFactory.getLogger(StudentService.class);
-
-    Student existing = repository.findStudentById(request.getStudent().getStudentId());
-    if (existing == null) {
-      throw new RuntimeException("受講生情報が存在しません");
-    }
-
-    logger.debug("PATCH: Before update - isDeleted = {}", existing.getDeleted());
-
-    // 名前の変更
-    if (request.getStudent().getFullName() != null) {
-      existing.setFullName(request.getStudent().getFullName());
-    }
-
-    // ふりがなの変更
-    if (request.getStudent().getFurigana() != null) {
-      existing.setFurigana(request.getStudent().getFurigana());
-    }
-
-    // ニックネームの変更
-    if (request.getStudent().getNickname() != null) {
-      existing.setNickname(request.getStudent().getNickname());
-    }
-
-    // emailの変更
-    if (request.getStudent().getEmail() != null) {
-      existing.setEmail(request.getStudent().getEmail());
-    }
-
-    // 居住地域の変更
-    if (request.getStudent().getLocation() != null) {
-      existing.setLocation(request.getStudent().getLocation());
-    }
-
-    // 年齢の変更
-    if (request.getStudent().getAge() != null) {
-      existing.setAge(request.getStudent().getAge());
-    }
-
-    // 性別の変更
-    if (request.getStudent().getGender() != null) {
-      existing.setGender(request.getStudent().getGender());
-    }
-
-    // 備考欄の変更
-    if (request.getStudent().getRemarks() != null) {
-      existing.setRemarks(request.getStudent().getRemarks());
-    }
-
-    // 論理削除の変更
-    if (request.getStudent().getDeleted() != null) {
-      if (request.getStudent().getDeleted()) {
-        existing.softDelete(); // ← フラグと日時を両方設定
-      } else {
-        existing.restore(); // ← 復元
-      }
-    }
-
-    repository.updateStudent(existing);
-
-    // コースの部分更新もする場合（指定があるときだけ）
-    if (request.getCourses() != null && !request.getCourses().isEmpty()) {
-      repository.deleteCoursesByStudentId(existing.getStudentId());
-
-      for (StudentCourse course : request.getCourses()) {
-        course.setCourseId(UUID.randomUUID().toString());
-        course.setStudentId(existing.getStudentId());
-        repository.insertCourse(course);
-      }
-    }
-  }
-
-  @Transactional
-  public void deleteStudent(String studentId) {
-    repository.deleteCoursesByStudentId(studentId); // まず関連コースを削除
-    repository.deleteStudentById(studentId);        // 次に生徒を削除
-  }
+  /**
+   * 受講生情報とそのコース情報を物理削除します。
+   *
+   * @param studentId 受講生ID
+   */
+  void deleteStudentPhysically(String studentId);
 }
+
+
