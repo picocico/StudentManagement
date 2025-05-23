@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="raisetech.student.management.repository.StudentCourseRepository">
+
+  <!-- 登録 -->
+  <insert id="insertCourses" parameterType="java.util.List">
+    INSERT INTO student_courses (
+    course_id,
+    student_id,
+    course_name,
+    start_date,
+    end_date,
+    created_at
+    )
+    VALUES
+    <foreach collection="list" item="course" separator=",">
+    (
+    #{course.courseId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
+    #{course.studentId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
+    #{course.courseName},
+    #{course.startDate},
+    #{course.endDate},
+    NOW()
+    )
+    </foreach>
+  </insert>
+
+  <!-- 部分追加（登録） -->
+  <insert id="insertIfNotExists" parameterType="StudentCourse">
+    INSERT INTO student_courses (course_id, student_id, course_name, start_date, end_date, created_at)
+    SELECT
+    #{courseId, jdbcType=BINARY, typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
+    #{studentId, jdbcType=BINARY, typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
+    #{courseName},
+    #{startDate},
+    #{endDate},
+    NOW()
+    FROM DUAL
+    WHERE NOT EXISTS (
+    SELECT 1 FROM student_courses
+    WHERE student_id = #{studentId}
+    AND course_name = #{courseName}
+    )
+  </insert>
+
+  <!-- 削除 -->
+  <delete id="deleteCoursesByStudentId" parameterType="byte[]">
+    DELETE FROM student_courses WHERE student_id = #{studentId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler}
+  </delete>
+
+  <!-- 特定の受講生のコースを取得 -->
+  <select id="findCoursesByStudentId" parameterType="byte[]" resultType="raisetech.student.management.data.StudentCourse">
+    SELECT * FROM student_courses WHERE student_id = #{studentId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler}
+  </select>
+
+  <!-- 全件取得 -->
+  <select id="findAllCourses" resultType="raisetech.student.management.data.StudentCourse">
+    SELECT * FROM student_courses
+  </select>
+
+</mapper>
+

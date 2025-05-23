@@ -47,12 +47,32 @@ public interface StudentService {
   void partialUpdateStudent(Student student, List<StudentCourse> courses);
 
   /**
+   * 既存の受講生に対して、新しい受講コースを追加します。
+   * <p>
+   * このメソッドは、すでに存在する {@code student_id + course_name} の組み合わせを
+   * 保持したまま、新たなコース情報だけをデータベースに登録します。
+   * 既存のコースは削除されず、重複も防止されます。
+   *
+   * @param studentId 受講生の識別子（Base64デコード済みのBINARY型UUID）
+   * @param newCourses 追加対象の新しいコース情報のリスト
+   *                   {@code studentId} に紐づけられている必要があります
+   */
+  void appendCourses(byte[] studentId, List<StudentCourse> newCourses);
+
+  /**
+   * 受講生情報のみを更新します（コース情報は変更しません）。
+   *
+   * @param student 更新対象の受講生情報
+   */
+  void updateStudentInfoOnly(Student student);
+
+  /**
    * 受講生IDにより受講生情報を取得します。
    *
    * @param studentId 受講生ID
    * @return 受講生エンティティ
    */
-  Student findStudentById(String studentId);
+  Student findStudentById(byte[] studentId);
 
   /**
    * 受講生IDに紐づくコース情報を取得します。
@@ -60,7 +80,7 @@ public interface StudentService {
    * @param studentId 受講生ID
    * @return コースエンティティのリスト
    */
-  List<StudentCourse> searchCoursesByStudentId(String studentId);
+  List<StudentCourse> searchCoursesByStudentId(byte[] studentId);
 
   /**
    * 全てのコース情報を取得します。
@@ -74,21 +94,21 @@ public interface StudentService {
    *
    * @param studentId 受講生ID
    */
-  void softDeleteStudent(String studentId);
+  void softDeleteStudent(byte[] studentId);
 
   /**
    * 論理削除された受講生を復元します。
    *
    * @param studentId 受講生ID
    */
-  void restoreStudent(String studentId);
+  void restoreStudent(byte[] studentId);
 
   /**
-   * 受講生情報とそのコース情報を物理削除します。
+   * 受講生情報とそのコース情報を物理削除します（管理者専用）。
    *
-   * @param studentId 受講生ID
+   * @param studentId 削除対象の受講生ID
    */
-  void deleteStudentPhysically(String studentId);
+  void forceDeleteStudent(byte[] studentId);
 }
 
 

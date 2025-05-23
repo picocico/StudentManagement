@@ -34,6 +34,8 @@ dependencies {
     //  Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    // Spring Security のスターター。認証・認可（ログイン制御やロールベースのアクセス制限）
+    implementation 'org.springframework.boot:spring-boot-starter-security'
 
     //MySQLドライバ
     runtimeOnly 'com.mysql:mysql-connector-j'
