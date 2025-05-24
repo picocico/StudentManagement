@@ -1,38 +1,79 @@
 package raisetech.student.management.dto;
 
 import jakarta.validation.constraints.*;
-import lombok.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
+/**
+ * 受講生の基本情報を表すデータ転送オブジェクト（DTO）。
+ * <p>
+ * 登録・更新・検索時のリクエストおよびレスポンスで使用されるクラスであり、
+ * バリデーションアノテーションにより、リクエストデータの整合性を保証します。
+ */
 @Data
 @NoArgsConstructor // ← 引数なしのデフォルトコンストラクタも自動生成
 @AllArgsConstructor // ← 全フィールド引数のコンストラクタを自動生成
 public class StudentDto {
 
+  /**
+   * 受講生ID（Base64エンコードされたUUID文字列）。
+   * <p>
+   * 新規登録時は省略可能で、取得・更新時に使用されます。
+   */
   private String studentId;
 
+  /**
+   * 氏名（必須、最大100文字）。
+   */
   @NotBlank(message = "名前は必須です。")
   @Size(max = 100, message = "名前は100文字以内で入力してください。")
   private String fullName;
 
+  /**
+   * ふりがな（必須）。
+   */
   @NotBlank(message = "ふりがなは必須です。")
   private String furigana;
 
+  /**
+   * ニックネーム（必須）。
+   */
   @NotBlank(message = "ニックネームは必須です。")
   private String nickname;
 
+  /**
+   * メールアドレス（必須、形式チェックあり）。
+   */
   @NotBlank(message = "メールアドレスを入力してください。")
   @Email(message = "メールアドレス形式が不正です。")
   private String email;
 
+  /**
+   * 居住地（任意）。
+   */
   private String location;
 
+  /**
+   * 年齢（任意、0以上）。
+   */
   @Min(value = 0, message = "年齢は0以上で入力してください。")
   private Integer age;
 
+  /**
+   * 性別（必須）。
+   */
   @NotBlank(message = "性別は必須です。")
   private String gender;
 
+  /**
+   * 備考（任意）。
+   */
   private String remarks;
+
+  /**
+   * 論理削除フラグ。trueの場合、削除された状態を表します。
+   */
   private Boolean deleted;
 }
 

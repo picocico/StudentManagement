@@ -29,7 +29,7 @@ public interface StudentRepository {
    * @param studentId 受講生ID
    * @return 該当する受講生情報（存在しない場合は null）
    */
-  Student findById(String studentId);
+  Student findById(@Param("studentId") byte[] studentId);
 
   /**
    * 新しい受講生情報を登録します。
@@ -45,13 +45,12 @@ public interface StudentRepository {
    */
   void updateStudent(Student student);
 
-
   /**
    * 受講生IDで該当する受講生情報を物理削除します。
    *
-   * @param studentId 削除対象の受講生ID
+   * @param studentId 物理削除対象の受講生ID
    */
-  void deleteById(String studentId);
+  void forceDeleteStudent(@Param("studentId") byte[] studentId);
 }
 
 

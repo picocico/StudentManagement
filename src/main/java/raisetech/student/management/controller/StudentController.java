@@ -2,9 +2,11 @@ package raisetech.student.management.controller;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,6 +25,7 @@ import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.service.StudentService;
+import raisetech.student.management.util.UUIDUtil;
 
 
 /**
@@ -37,37 +40,50 @@ import raisetech.student.management.service.StudentService;
 @RequiredArgsConstructor
 public class StudentController {
 
-  /** ロガー */
+  /**
+   * ロガー
+   */
   private static final Logger logger = LoggerFactory.getLogger(StudentController.class);
 
-  /** 受講生サービス */
+  /**
+   * 受講生サービス
+   */
   private final StudentService service;
 
-  /** 受講生コンバーター */
+  /**
+   * 受講生コンバーター
+   */
   private final StudentConverter converter;
 
   /**
    * 新規の受講生情報を登録します。
    *
    * @param request 登録する受講生情報およびコース情報
-   * @return 201 Created
+   * @return 201 Created + 登録された受講生の詳細情報（Student + Courses）
    */
   @PostMapping
-  public ResponseEntity<Void> registerStudent(@Valid @RequestBody StudentRegistrationRequest request) {
+  public ResponseEntity<StudentDetailDto> registerStudent(
+      @Valid @RequestBody StudentRegistrationRequest request) {
     Student student = converter.toEntity(request.getStudent());
-    List<StudentCourse> courses = converter.toEntityList(request.getCourses(), student.getStudentId());
+    byte[] studentIdBytes = student.getStudentId();
+
+    List<StudentCourse> courses = converter.toEntityList(request.getCourses(),
+        studentIdBytes);
 
     logger.debug("POST - Registering new student: {}", student.getFullName());
     service.registerStudent(student, courses);
-    return ResponseEntity.status(201).build();
+
+    StudentDetailDto responseDto = converter.toDetailDto(student, courses);
+
+    return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
   }
 
   /**
    * 条件付きで受講生一覧を取得します（ふりがな、削除状態）。
    *
-   * @param furigana        ふりがな検索（省略可能）
-   * @param includeDeleted  論理削除済みも含めるか
-   * @param deletedOnly     論理削除された学生のみ取得するか
+   * @param furigana       ふりがな検索（省略可能）
+   * @param includeDeleted 論理削除済みも含めるか
+   * @param deletedOnly    論理削除された学生のみ取得するか
    * @return 条件に一致する受講生詳細DTOリスト
    */
   @GetMapping
@@ -93,8 +109,10 @@ public class StudentController {
   @GetMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> getStudentDetail(@PathVariable String studentId) {
     logger.debug("GET - Fetching student detail: {}", studentId);
-    Student student = service.findStudentById(studentId);
-    List<StudentCourse> courses = service.searchCoursesByStudentId(studentId);
+    byte[] studentIdBytes = converter.decodeBase64(studentId);
+
+    Student student = service.findStudentById(studentIdBytes);
+    List<StudentCourse> courses = service.searchCoursesByStudentId(studentIdBytes);
     return ResponseEntity.ok(converter.toDetailDto(student, courses));
   }
 
@@ -102,7 +120,7 @@ public class StudentController {
    * 受講生情報を全体的に更新します。
    *
    * @param studentId 受講生ID
-   * @param request 更新内容
+   * @param request   更新内容
    * @return 更新後の受講生詳細情報
    */
   @PutMapping("/{studentId}")
@@ -110,16 +128,25 @@ public class StudentController {
       @PathVariable String studentId,
       @Valid @RequestBody StudentRegistrationRequest request) {
 
+    byte[] studentIdBytes = converter.decodeBase64(studentId);
+
+    // DTOからStudentを生成し、studentIdを正しく設定
     Student student = converter.toEntity(request.getStudent());
-    student.setStudentId(studentId);
+    student.setStudentId(studentIdBytes);
     student.setDeleted(request.isDeleted());
-    List<StudentCourse> courses = converter.toEntityList(request.getCourses(), studentId);
+
+    // コースも変換
+    List<StudentCourse> courses = converter.toEntityList(request.getCourses(), studentIdBytes);
 
     logger.debug("PUT - Updating student: {}", studentId);
 
+    // 更新処理
     service.updateStudent(student, courses);
-    Student updated = service.findStudentById(studentId);
-    List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentId);
+
+    // 更新後の取得
+    Student updated = service.findStudentById(studentIdBytes);
+    List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentIdBytes);
+
     return ResponseEntity.ok(converter.toDetailDto(updated, updatedCourses));
   }
 
@@ -127,7 +154,7 @@ public class StudentController {
    * 受講生情報を部分的に更新します。
    *
    * @param studentId 受講生ID
-   * @param request 更新対象のフィールド
+   * @param request   更新対象のフィールド
    * @return 更新後の受講生詳細情報
    */
   @PatchMapping("/{studentId}")
@@ -135,16 +162,31 @@ public class StudentController {
       @PathVariable String studentId,
       @RequestBody StudentRegistrationRequest request) {
 
-    Student existing = service.findStudentById(studentId);
+    byte[] studentIdBytes = converter.decodeBase64(studentId);
+
+    // 元のデータ取得とマージ
+    Student existing = service.findStudentById(studentIdBytes);
     Student update = converter.toEntity(request.getStudent());
     converter.mergeStudent(existing, update);
-    List<StudentCourse> convertedCourses = converter.toEntityList(request.getCourses(), studentId);
+
+    // コース情報変換（nullや空も許容）
+    List<StudentCourse> newCourses = converter.toEntityList(request.getCourses(), studentIdBytes);
 
     logger.debug("PATCH - Partially updating student: {}", studentId);
+    logger.debug("★★ appendCourses: {}", request.isAppendCourses());
 
-    service.partialUpdateStudent(existing, convertedCourses);
-    Student updated = service.findStudentById(studentId);
-    List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentId);
+    if (request.isAppendCourses()) {
+      // 新規追加のみ
+      service.appendCourses(studentIdBytes, newCourses);
+      service.updateStudentInfoOnly(existing); // ← コースを保持したまま、基本情報のみ更新
+    } else {
+      // 通常の置き換え（全削除＋insert）
+      service.partialUpdateStudent(existing, newCourses); // ← 全置き換え
+    }
+
+    // 最新状態を返す
+    Student updated = service.findStudentById(studentIdBytes);
+    List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentIdBytes);
     return ResponseEntity.ok(converter.toDetailDto(updated, updatedCourses));
   }
 
@@ -157,7 +199,8 @@ public class StudentController {
   @DeleteMapping("/{studentId}")
   public ResponseEntity<Void> deleteStudent(@PathVariable String studentId) {
     logger.debug("DELETE - Logically deleting student: {}", studentId);
-    service.softDeleteStudent(studentId);
+    byte[] studentIdBytes = converter.decodeBase64(studentId); // ← Base64からbyte[]へ変換
+    service.softDeleteStudent(studentIdBytes);
     return ResponseEntity.noContent().build();
   }
 
@@ -170,21 +213,9 @@ public class StudentController {
   @PatchMapping("/{studentId}/restore")
   public ResponseEntity<Void> restoreStudent(@PathVariable String studentId) {
     logger.debug("PATCH - Restoring student: {}", studentId);
-    service.restoreStudent(studentId);
-    return ResponseEntity.noContent().build();
-  }
-
-  /**
-   * 指定されたIDの受講生情報を物理削除します。
-   *
-   * @param studentId 削除対象の受講生ID
-   * @return 削除成功時は204 No Content
-   */
-  @DeleteMapping("/{studentId}/force")
-  public ResponseEntity<Void> deleteStudentPhysically(@PathVariable String studentId) {
-    service.deleteStudentPhysically(studentId);
+    byte[] studentIdBytes = converter.decodeBase64(studentId);
+    service.restoreStudent(studentIdBytes);
     return ResponseEntity.noContent().build();
   }
 }
-
 

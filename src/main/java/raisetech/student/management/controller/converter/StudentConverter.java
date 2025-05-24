@@ -1,6 +1,7 @@
 package raisetech.student.management.controller.converter;
 
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -9,6 +10,7 @@ import raisetech.student.management.dto.*;
 import java.util.UUID;
 import java.util.List;
 import java.util.stream.Collectors;
+import raisetech.student.management.util.UUIDUtil;
 
 /**
  * 受講生・コースのエンティティ、DTO、ドメインモデル間の変換を行うコンバータークラス。
@@ -17,14 +19,57 @@ import java.util.stream.Collectors;
 public class StudentConverter {
 
   /**
-   * StudentDto から Student エンティティに変換します。
+   * URLセーフな Base64 文字列にエンコードします。
+   * <p>
+   * RFC 4648 に準拠し、エンコード結果にはpadding（末尾の "="）は含まれません。
    *
-   * @param dto DTO形式の受講生情報
-   * @return エンティティ形式の受講生情報
+   * @param bytes エンコード対象のバイナリデータ（通常は UUID の byte[16]）
+   * @return URLセーフな Base64 エンコード文字列（paddingなし）
+   */
+  public String encodeBase64(byte[] bytes) {
+    return UUIDUtil.toBase64(bytes);
+  }
+
+  /**
+   * URLセーフな Base64 文字列をデコードし、元のバイト配列に変換します。
+   *
+   * @param base64 Base64 文字列（パディングなし、URLセーフ形式）
+   * @return デコードされたバイト配列（通常は UUID の byte[16]）
+   */
+  public byte[] decodeBase64(String base64) {
+    return UUIDUtil.fromBase64(base64);
+  }
+
+  /**
+   * ランダムなUUIDを生成し、それをバイト配列（16バイト）に変換して返します。
+   * <p>
+   * 生成されるバイト配列は、UUIDの128ビット（16バイト）のバイナリ表現です。
+   *
+   * @return ランダムなUUIDに基づく16バイトのバイト配列
+   */
+  public byte[] generateRandomBytes() {
+    return UUIDUtil.fromUUID(UUID.randomUUID());
+  }
+
+  /**
+   * StudentDto から Student エンティティに変換します。
+   * <p>
+   * 学生IDが指定されていない場合（null または 空文字）、新しいランダムUUIDを生成し、
+   * それをバイナリ形式（byte[16]）に変換してセットします。
+   *
+   * @param dto DTO形式の受講生情報（Base64文字列形式の studentId を含む場合あり）
+   * @return エンティティ形式の受講生情報（studentId は byte[] 型）
    */
   public Student toEntity(StudentDto dto) {
+    // studentId が null または空文字の場合、新規 UUID を生成して byte[] に変換する。
+    byte[] studentId = Optional.ofNullable(dto.getStudentId())
+        .filter(id -> !id.isBlank())  // 空文字は無視
+        .map(this::decodeBase64)
+        .orElseGet(this::generateRandomBytes); // 新規 UUID を byte[] で生成
+
+    // DTO の各フィールドを Student エンティティにマッピング
     return new Student(
-        dto.getStudentId() != null ? dto.getStudentId() : UUID.randomUUID().toString(),
+        studentId,    // UUIDを16バイトのbyte[]としてセット
         dto.getFullName(),
         dto.getFurigana(),
         dto.getNickname(),
@@ -33,8 +78,8 @@ public class StudentConverter {
         dto.getAge(),
         dto.getGender(),
         dto.getRemarks(),
-        null,
-        null,
+        null,              // createdAt はデータベース側で自動生成
+        null,              // updatedAt も同様
         dto.getDeleted()
     );
   }
@@ -47,7 +92,7 @@ public class StudentConverter {
    */
   public StudentDto toDto(Student entity) {
     return new StudentDto(
-        entity.getStudentId(),
+        encodeBase64(entity.getStudentId()),
         entity.getFullName(),
         entity.getFurigana(),
         entity.getNickname(),
@@ -64,13 +109,13 @@ public class StudentConverter {
    * StudentCourseDto から StudentCourse エンティティに変換します。
    *
    * @param dto コースDTO
-   * @param studentId 紐づく受講生ID
+   * @param studentIdBase64 紐づく受講生ID
    * @return コースエンティティ
    */
-  public StudentCourse toEntity(StudentCourseDto dto, String studentId) {
+  public StudentCourse toEntity(StudentCourseDto dto, String studentIdBase64) {
     return new StudentCourse(
         null,
-        studentId,
+        decodeBase64(studentIdBase64),
         dto.getCourseName(),
         dto.getStartDate(),
         dto.getEndDate(),
@@ -86,6 +131,7 @@ public class StudentConverter {
    */
   public StudentCourseDto toDto(StudentCourse entity) {
     return new StudentCourseDto(
+        encodeBase64(entity.getCourseId()),  // ← byte[] → String 変換
         entity.getCourseName(),
         entity.getStartDate(),
         entity.getEndDate()
@@ -95,13 +141,21 @@ public class StudentConverter {
   /**
    * コースDTOのリストをエンティティリストに変換します。
    *
-   * @param dtos DTOのリスト
-   * @param studentId 紐づく受講生ID
    * @return エンティティリスト
    */
-  public List<StudentCourse> toEntityList(List<StudentCourseDto> dtos, String studentId) {
-    return dtos.stream()
-        .map(dto -> toEntity(dto, studentId))
+  public List<StudentCourse> toEntityList(List<StudentCourseDto> dtoList, byte[] studentId) {
+    return dtoList.stream()
+        .map(dto -> new StudentCourse(
+            Optional.ofNullable(dto.getCourseId())
+                .filter(id -> !id.isBlank())
+                .map(this::decodeBase64)
+                .orElseGet(this::generateRandomBytes),
+            studentId,
+            dto.getCourseName(),
+            dto.getStartDate(),
+            dto.getEndDate(),
+            null
+        ))
         .collect(Collectors.toList());
   }
 
@@ -146,15 +200,12 @@ public class StudentConverter {
    * @param courses 全受講生のコースのリスト
    * @return 詳細DTOのリスト
    */
-  public List<StudentDetailDto> convertStudentDetailsDto(List<Student> students, List<StudentCourse> courses) {
-    Map<String, List<StudentCourse>> studentCourseMap = courses.stream()
-        .collect(Collectors.groupingBy(StudentCourse::getStudentId));
+  public List<StudentDetailDto> toDetailDtoList(List<Student> students, List<StudentCourse> courses) {
+    Map<String, List<StudentCourse>> courseMap = courses.stream()
+        .collect(Collectors.groupingBy(course -> encodeBase64(course.getStudentId())));
 
     return students.stream()
-        .map(student -> new StudentDetailDto(
-            toDto(student),
-            toDtoList(studentCourseMap.getOrDefault(student.getStudentId(), List.of()))
-        ))
+        .map(student -> toDetailDto(student, courseMap.getOrDefault(encodeBase64(student.getStudentId()), List.of())))
         .collect(Collectors.toList());
   }
 

@@ -1,7 +1,8 @@
 package raisetech.student.management.repository;
 
 import java.util.List;
-import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import raisetech.student.management.data.StudentCourse;
 
 /**
@@ -11,39 +12,32 @@ import raisetech.student.management.data.StudentCourse;
 public interface StudentCourseRepository {
 
   /**
-   * 受講生のコース情報を登録します。
+   * 受講生の複数コース情報を一括で登録します。
    *
-   * @param course 登録するコース情報
+   * @param courses 登録するコースのリスト
    */
-  @Insert("""
-      INSERT INTO student_courses (course_id, student_id, course_name, start_date, end_date, created_at)
-      VALUES (UUID(), #{studentId}, #{courseName}, #{startDate}, #{endDate}, now())
-      """)
-  void insertCourse(StudentCourse course);
+  void insertCourses(@Param("list") List<StudentCourse> courses);
+
+  /**
+   * 存在しない場合に限り、新しいコースを追加します。
+   *
+   * @param course 追加対象のコース情報
+   */
+  void insertIfNotExists(StudentCourse course);
 
   /**
    * 指定された受講生IDに紐づくすべてのコース情報を削除します。
-   *
-   * @param studentId 対象の受講生ID
    */
-  @Delete("DELETE FROM student_courses WHERE student_id = #{studentId}")
-  void deleteCoursesByStudentId(String studentId);
+  void deleteCoursesByStudentId(@Param("studentId") byte[] studentId);
 
   /**
    * 指定された受講生IDに紐づくコース情報を取得します。
-   *
-   * @param studentId 受講生ID
-   * @return 該当するコース情報のリスト
    */
-  @Select("SELECT * FROM student_courses WHERE student_id = #{studentId}")
-  List<StudentCourse> findCoursesByStudentId(String studentId);
+  List<StudentCourse> findCoursesByStudentId(@Param("studentId") byte[] studentId);
 
   /**
    * すべての受講生コース情報を取得します。
-   *
-   * @return 全コース情報のリスト
    */
-  @Select("SELECT * FROM student_courses")
   List<StudentCourse> findAllCourses();
 }
 

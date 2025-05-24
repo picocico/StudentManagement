@@ -7,6 +7,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * アプリケーション全体で発生する例外を一元的に処理するハンドラー。
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
  */
 @ControllerAdvice
 public class GlobalExceptionHandler {
+  private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
   /**
    * バリデーション失敗時の例外処理。
@@ -47,5 +51,25 @@ public class GlobalExceptionHandler {
     responseBody.put("status", "error");
     responseBody.put("message", ex.getMessage());
     return new ResponseEntity<>(responseBody, HttpStatus.NOT_FOUND);
+  }
+
+  /**
+   * リクエストが不正（例：IDのデコード失敗など）なときの処理。
+   */
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+    Map<String, Object> responseBody = new HashMap<>();
+    responseBody.put("status", "error");
+    responseBody.put("message", "無効なリクエストです: " + ex.getMessage());
+    return new ResponseEntity<>(responseBody, HttpStatus.BAD_REQUEST);
+  }
+
+  /**
+   * その他の予期せぬ例外。
+   */
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<String> handleGeneralException(Exception ex) {
+    logger.error("Unhandled exception occurred", ex);
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("予期しないエラーが発生しました。");
   }
 }

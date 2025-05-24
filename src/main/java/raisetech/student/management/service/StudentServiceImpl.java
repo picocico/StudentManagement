@@ -23,9 +23,10 @@ import raisetech.student.management.repository.StudentRepository;
 @RequiredArgsConstructor
 public class StudentServiceImpl implements StudentService {
 
-  private final StudentRepository repository;
+  private final StudentRepository studentRepository;
   private final StudentCourseRepository courseRepository;
   private final StudentConverter converter;
+
 
   private static final Logger logger = LoggerFactory.getLogger(StudentServiceImpl.class);
 
@@ -33,14 +34,14 @@ public class StudentServiceImpl implements StudentService {
    * 受講生を登録します。
    *
    * @param student 登録する受講生エンティティ
-   * @param courses 受講生に紐づくコースリスト
+   * @param courses 受講生に紐づくコースリスト（複数可）
    */
   @Override
   @Transactional
   public void registerStudent(Student student, List<StudentCourse> courses) {
-    repository.insertStudent(student);
-    for (StudentCourse course : courses) {
-      courseRepository.insertCourse(course);
+    studentRepository.insertStudent(student);
+    if (courses != null && !courses.isEmpty()) {
+      courseRepository.insertCourses(courses);
     }
   }
 
@@ -53,10 +54,10 @@ public class StudentServiceImpl implements StudentService {
   @Override
   @Transactional
   public void updateStudent(Student student, List<StudentCourse> courses) {
-    repository.updateStudent(student);
+    studentRepository.updateStudent(student);
     courseRepository.deleteCoursesByStudentId(student.getStudentId());
-    for (StudentCourse course : courses) {
-      courseRepository.insertCourse(course);
+    if (courses != null && !courses.isEmpty()) {
+      courseRepository.insertCourses(courses);
     }
   }
 
@@ -69,13 +70,40 @@ public class StudentServiceImpl implements StudentService {
   @Override
   @Transactional
   public void partialUpdateStudent(Student student, List<StudentCourse> courses) {
-    repository.updateStudent(student);
+    studentRepository.updateStudent(student);
     if (courses != null && !courses.isEmpty()) {
       courseRepository.deleteCoursesByStudentId(student.getStudentId());
-      for (StudentCourse course : courses) {
-        courseRepository.insertCourse(course);
-      }
+      courseRepository.insertCourses(courses);
     }
+  }
+
+  /**
+   * 既存の受講生に新しいコースのみを追加します（既存のコースは保持）。
+   *
+   * @param studentId  受講生ID
+   * @param newCourses 追加するコースリスト
+   */
+  public void appendCourses(byte[] studentId, List<StudentCourse> newCourses) {
+    for (StudentCourse course : newCourses) {
+      courseRepository.insertIfNotExists(course); // 存在しないときだけinsert
+    }
+  }
+
+  /**
+   * 受講生の基本情報のみを更新します。
+   * <p>
+   * このメソッドでは、氏名、メールアドレス、年齢などの基本属性のみが更新対象となり、
+   * コース情報（student_coursesテーブル）は一切変更されません。
+   * <p>
+   * PATCHリクエストで「コースの追加」のみを行う場合に併用され、
+   * 既存のコース情報を保持したまま、受講生の属性情報だけを変更したいケースで使用します。
+   *
+   * @param student 更新対象の受講生エンティティ（student_idを含む必要があります）
+   */
+  @Override
+  @Transactional
+  public void updateStudentInfoOnly(Student student) {
+    studentRepository.updateStudent(student);
   }
 
   /**
@@ -91,24 +119,24 @@ public class StudentServiceImpl implements StudentService {
     logger.debug("Searching students with furigana={}, includeDeleted={}, deletedOnly={}",
         furigana, includeDeleted, deletedOnly);
     // 動的SQLにより1本化されたリポジトリメソッドを呼び出し
-    List<Student> students = repository.searchStudents(furigana, includeDeleted, deletedOnly); // 1本化！
+    List<Student> students = studentRepository.searchStudents(furigana, includeDeleted, deletedOnly); // 1本化！
     List<StudentCourse> courses = searchAllCourses();
-
-    return converter.convertStudentDetailsDto(students, courses);
+    return converter.toDetailDtoList(students, courses);
   }
 
   /**
    * 受講生IDで受講生情報を取得します。
    *
-   * @param studentId 受講生ID
+   * @param studentId 受講生ID（BINARY型、Base64エンコード前の16バイト配列）
    * @return 該当する受講生
    * @throws ResourceNotFoundException 該当する受講生が存在しない場合
    */
   @Override
-  public Student findStudentById(String studentId) {
-    Student student = repository.findById(studentId);
+  public Student findStudentById(byte[] studentId) {
+    Student student = studentRepository.findById(studentId);
     if (student == null) {
-      throw new ResourceNotFoundException("受講生ID " + studentId + " が見つかりません。");
+      String idForLog = converter.encodeBase64(studentId);
+      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
     }
     return student;
   }
@@ -116,11 +144,11 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 受講生IDに紐づくコース情報を取得します。
    *
-   * @param studentId 受講生ID
+   * @param studentId 受講生ID（BINARY型、Base64エンコード前の16バイト配列）
    * @return コースリスト
    */
   @Override
-  public List<StudentCourse> searchCoursesByStudentId(String studentId) {
+  public List<StudentCourse> searchCoursesByStudentId(byte[] studentId) {
     return courseRepository.findCoursesByStudentId(studentId);
   }
 
@@ -137,55 +165,75 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 受講生を論理削除します。
    *
-   * @param studentId 受講生ID
+   * @param studentId 受講生ID（BINARY型、Base64エンコード前の16バイト配列）
    */
   @Override
   @Transactional
-  public void softDeleteStudent(String studentId) {
-    Student student = repository.findById(studentId);
-    if (student != null && !Boolean.TRUE.equals(student.getDeleted())) {
+  public void softDeleteStudent(byte[] studentId) {
+    Student student = studentRepository.findById(studentId);
+
+    // 対象の受講生が存在しない場合は例外をスロー
+    if (student == null) {
+      throw new ResourceNotFoundException("Student not found for ID: " + converter.encodeBase64(studentId));
+    }
+
+    // すでに論理削除済みでなければ、削除処理を行う
+    if (!Boolean.TRUE.equals(student.getDeleted())) {
       student.softDelete();
-      repository.updateStudent(student);
+      studentRepository.updateStudent(student);
+      logger.info("論理削除完了 - studentId: {}", converter.encodeBase64(studentId));
     }
   }
 
   /**
    * 論理削除された受講生を復元します。
    *
-   * @param studentId 受講生ID
+   * @param studentId 受講生ID（BINARY型、Base64エンコード前の16バイト配列）
    * @throws ResourceNotFoundException 受講生が存在しない場合
    */
   @Override
   @Transactional
-  public void restoreStudent(String studentId) {
-    Student student = repository.findById(studentId);
+  public void restoreStudent(byte[] studentId) {
+    Student student = studentRepository.findById(studentId);
+    String idForLog = converter.encodeBase64(studentId);
+
     if (student == null) {
-      throw new ResourceNotFoundException("受講生ID " + studentId + " が見つかりません。");
+      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
     }
 
-    logger.debug("Before restore: deleted = {}, deletedAt = {}", student.getDeleted(), student.getDeletedAt());
+    logger.debug("Before restore: studentId = {}, deleted = {}, deletedAt = {}",
+        idForLog,student.getDeleted(), student.getDeletedAt());
 
     if (Boolean.TRUE.equals(student.getDeleted())) {
       student.restore();
-      logger.debug("After restore: deleted = {}, deletedAt = {}", student.getDeleted(), student.getDeletedAt());
-      repository.updateStudent(student);
+      studentRepository.updateStudent(student);
+      logger.debug("After restore: studentId = {}, deleted = {}, deletedAt = {}",
+          idForLog,student.getDeleted(), student.getDeletedAt());
     }
   }
 
   /**
-   * 受講生を物理削除します（関連コース情報も削除）。
+   * 指定された受講生IDに該当する受講生情報および関連するコース情報を物理削除します。
+   * <p>
+   * この操作はデータベースから完全に削除され、復元はできません。
+   * 主に管理者向けの操作として利用されます。
    *
-   * @param studentId 受講生ID
-   * @throws ResourceNotFoundException 受講生が存在しない場合
+   * @param studentId 物理削除対象の受講生ID（UUIDをBINARY(16)型で格納した16バイトの配列）
+   * @throws ResourceNotFoundException 該当する受講生が存在しない場合にスローされます
    */
   @Override
-  public void deleteStudentPhysically(String studentId) {
-    Student existing = repository.findById(studentId);
-    if (existing == null) {
-      throw new ResourceNotFoundException("受講生ID " + studentId + " が見つかりません。");
+  @Transactional
+  public void forceDeleteStudent(byte[] studentId) {
+    String idForLog = converter.encodeBase64(studentId);
+    // 存在確認
+    if (studentRepository.findById(studentId) == null) {
+      throw new ResourceNotFoundException("学生ID " + idForLog + " が見つかりません。");
     }
+    // 関連するコースも削除
     courseRepository.deleteCoursesByStudentId(studentId);
-    repository.deleteById(studentId);
+    // 学生レコードの物理削除
+    studentRepository.forceDeleteStudent(studentId);
+    logger.info("物理削除完了 - studentId: {}", idForLog);
   }
 }
 
