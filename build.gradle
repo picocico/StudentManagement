@@ -44,13 +44,16 @@ dependencies {
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
 
     providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+    // Spring Boot テスト全般（@SpringBootTest, @TestConfiguration など）
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Mockito Core（Mockito.mock() に必要）
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-inline:5.2.0'
+
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     // Spring Boot Validation(Jakarta Validation API)
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-
-        testImplementation 'org.springframework.boot:spring-boot-starter-test'
     }
 
 tasks.named('test') {
