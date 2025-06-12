@@ -2,7 +2,6 @@ package raisetech.student.management.controller;
 
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,14 +24,12 @@ import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.service.StudentService;
-import raisetech.student.management.util.UUIDUtil;
 
 
 /**
  * 受講生に関するREST APIを提供するコントローラークラス。
  * <p>
- * このクラスは、受講生の登録、取得、更新、削除、復元、およびふりがなによる検索などの
- * 操作をエンドポイントとして提供します。
+ * このクラスは、受講生の登録、取得、更新、削除、復元、およびふりがなによる検索などの 操作をエンドポイントとして提供します。
  */
 @RestController
 @RequestMapping("/api/students")
@@ -217,5 +214,33 @@ public class StudentController {
     service.restoreStudent(studentIdBytes);
     return ResponseEntity.noContent().build();
   }
+
+  // ------------------------
+  // ▼ 以下：テスト用エンドポイント
+  // ------------------------
+
+  /**
+   * 【テスト用】MissingServletRequestParameterException 発生確認用。
+   * keywordパラメータをあえて必須にし、未指定時に例外を投げる。
+   */
+  @GetMapping("/test-missing-param")
+  public ResponseEntity<String> testMissing(@RequestParam(name = "keyword", required = true)
+  String keyword) {
+    return ResponseEntity.ok("受け取った keyword: " + keyword);
+  }
+
+  /**
+   * 【テスト用】MethodArgumentTypeMismatchException 発生確認用。
+   * idパラメータに文字列を渡すと、int型変換に失敗して例外が発生する。
+   */
+  @GetMapping("/test-type")
+  public ResponseEntity<String> testTypeMismatch(@RequestParam Integer id) {
+    if (id == null) {
+      throw new IllegalArgumentException("IDは整数で指定してください");
+    }
+    System.out.println("★★ Controller reached with id: " + id);
+    return ResponseEntity.ok("受け取った ID: " + id);
+  }
 }
+
 

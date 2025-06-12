@@ -58,13 +58,22 @@ public class UUIDUtil {
   }
 
   /**
-   * URLセーフなBase64文字列から byte[] にデコードします。
+   * URLセーフな Base64 文字列をバイナリデータ（byte[]）にデコードします。
+   * <p>
+   * 例：UUIDのBase64文字列（パディングなし）を元のbyte[16]形式に変換します。
+   * <p>
+   * 不正なBase64文字列が渡された場合は、詳細なメッセージを含む IllegalArgumentException をスローします。
    *
-   * @param base64 デコード対象のBase64文字列
-   * @return バイナリデータ（通常はUUIDのbyte[16]）
+   * @param base64 デコード対象のBase64文字列（URLセーフ、パディングなし）
+   * @return デコードされたバイナリデータ（通常は UUID を表す byte[16]）
+   * @throws IllegalArgumentException Base64形式が不正な場合（例："illegal base64 character" 等）
    */
   public static byte[] fromBase64(String base64) {
-    return Base64.getUrlDecoder().decode(base64);
+    try {
+      return Base64.getUrlDecoder().decode(base64);
+    } catch (IllegalArgumentException ex) {
+      throw new IllegalArgumentException("Base64の形式が不正です（" + ex.getMessage() + "）", ex);
+    }
   }
 
   /**
