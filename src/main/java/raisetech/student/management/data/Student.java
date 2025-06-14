@@ -1,5 +1,6 @@
 package raisetech.student.management.data;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,45 +13,61 @@ import lombok.AllArgsConstructor;
  * 基本情報（氏名、ふりがな、メールアドレス等）に加えて
  * 論理削除のためのフラグと削除日時も保持します。
  */
+@Schema(description = "受講生エンティティ（データベース保存用の学生情報）")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Student {
 
   /** 学生ID（BINARY型、UUIDの16バイト配列） */
+  @Schema(description = "学生ID（UUIDをBINARY形式で格納した16バイト配列）",
+      format = "byte", example = "MTIzNDU2Nzg5MGFiY2RlZg==")
   private byte[] studentId;
 
   /** 氏名 */
+  @Schema(description = "氏名", example = "山田 太郎")
   private String fullName;
 
   /** ふりがな */
+  @Schema(description = "ふりがな", example = "やまだ たろう")
   private String furigana;
 
   /** ニックネーム */
+  @Schema(description = "ニックネーム", example = "タロウ")
   private String nickname;
 
   /** メールアドレス */
+  @Schema(description = "メールアドレス", example = "taro.yamada@example.com")
   private String email;
 
   /** 居住地（都道府県など） */
+  @Schema(description = "居住地（都道府県など）", example = "Osaka,韓国")
   private String location;
 
   /** 年齢 */
+  @Schema(description = "年齢", example = "25")
   private Integer age;
 
   /** 性別 */
+  @Schema(description = "性別", example = "Male")
   private String gender;
 
   /** 備考 */
+  @Schema(description = "備考・自由記述欄", example = "メモや特記事項")
   private String remarks;
 
   /** 登録日時 */
+  @Schema(description = "登録日時", example = "2025-04-01 10:00:00")
   private LocalDateTime createdAt;
 
   /** 論理削除された日時（削除されていない場合は null） */
+  @Schema(description = "削除日時（論理削除時のみ値が入る）",
+      example = "2025-06-01 12:30:00", nullable = true)
   private LocalDateTime deletedAt;
 
   /** 削除フラグ（true：削除済み、false：有効） */
+  @Schema(description = "論理削除フラグ。trueの場合、削除された状態を表します。",
+      example = "false")
   private Boolean deleted;
 
   /**

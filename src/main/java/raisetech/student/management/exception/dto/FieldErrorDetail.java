@@ -1,5 +1,6 @@
 package raisetech.student.management.exception.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -13,15 +14,19 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Schema(description = "バリデーションエラー時のフィールドごとの詳細")
 public class FieldErrorDetail {
 
   /**
    * エラーが発生したフィールド名。
    */
+  @Schema(description = "エラーが発生したフィールド名", example = "email")
   private String field;
 
   /**
    * エラーに対応するメッセージ内容。
    */
+  @Schema(description = "そのフィールドに関するエラーメッセージ",
+      example = "メールアドレスの形式が不正です")
   private String message;
 }

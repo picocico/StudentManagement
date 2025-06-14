@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import raisetech.student.management.config.security.CustomAuthenticationEntryPoint;
 
 /**
  * Spring Securityの設定クラス。
@@ -37,9 +38,10 @@ public class SecurityConfig {
             // /api/admin/** へのアクセス（物理削除API）には認証が必要
             .requestMatchers("/api/admin/**").authenticated()
             .anyRequest().permitAll() // 他はすべて許可
-        );
-
-    http
+        )
+        .exceptionHandling(exception -> exception
+            .authenticationEntryPoint(new CustomAuthenticationEntryPoint())
+        )
         .httpBasic(basic -> {}) // 明示的にhttpBasicを有効化（空のラムダで設定）
         .csrf(AbstractHttpConfigurer::disable); // 明示的にCSRF保護を無効化
 
