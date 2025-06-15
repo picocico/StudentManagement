@@ -18,6 +18,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.bind.ServletRequestBindingException;
 import raisetech.student.management.exception.dto.ErrorResponse;
 import raisetech.student.management.exception.dto.FieldErrorDetail;
+import org.springframework.security.access.AccessDeniedException;
 
 
 /**
@@ -45,12 +46,12 @@ public class GlobalExceptionHandler {
         .collect(Collectors.toList());
 
     ErrorResponse response = new ErrorResponse(
-        400, // status
-        HttpStatus.BAD_REQUEST.value(), // code
-        "VALIDATION_FAILED", // errorType ←ここを文字列に修正
-        "E001",
-        "入力値に不備があります",
-        errorDetails
+        400,                             // HTTPステータス
+        HttpStatus.BAD_REQUEST.value(),  // 整数のステータスコード（
+        "VALIDATION_FAILED",             // エラータイプ（固定文字列）
+        "E001",                          // 独自のエラーコード
+        "入力値に不備があります",           // エラーメッセージ
+        errorDetails                    // フィールドエラー
     );
 
     return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
@@ -209,6 +210,29 @@ public class GlobalExceptionHandler {
     );
 
     return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+  }
+
+  /**
+   * 権限不足によるアクセス拒否（403 Forbidden）時に呼び出される例外ハンドラー。
+   * <p>
+   * 認証は成功しているが、必要なロールや権限が不足している場合に発生します。
+   * REST APIとして統一されたエラーレスポンスを返却します。
+   *
+   * @param ex Spring Security によってスローされる AccessDeniedException
+   * @return アクセス拒否のエラー内容を含む 403 Forbidden レスポンス
+   */
+  @ExceptionHandler(AccessDeniedException.class)
+  public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException ex) {
+    ErrorResponse response = new ErrorResponse(
+        403,
+        HttpStatus.FORBIDDEN.value(),
+        "FORBIDDEN",
+        "E403",
+        "アクセスが拒否されました。管理者権限が必要です。",
+        null
+    );
+
+    return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
   }
 
   /**
