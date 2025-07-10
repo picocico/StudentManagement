@@ -86,7 +86,9 @@ public class StudentController {
     List<StudentCourse> courses = converter.toEntityList(request.getCourses(),
         studentIdBytes);
 
-    logger.debug("POST - Registering new student: {}", student.getFullName());
+    logger.debug("POST - Registering new student: {}, ID(Base64): {}",
+        student.getFullName(),
+    converter.encodeBase64(studentIdBytes));
     service.registerStudent(student, courses);
 
     StudentDetailDto responseDto = converter.toDetailDto(student, courses);

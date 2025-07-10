@@ -118,6 +118,9 @@ public class StudentServiceImpl implements StudentService {
   public List<StudentDetailDto> getStudentList(String furigana, boolean includeDeleted, boolean deletedOnly) {
     logger.debug("Searching students with furigana={}, includeDeleted={}, deletedOnly={}",
         furigana, includeDeleted, deletedOnly);
+    if (includeDeleted && deletedOnly) {
+      throw new IllegalArgumentException("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
+    }
     // 動的SQLにより1本化されたリポジトリメソッドを呼び出し
     List<Student> students = studentRepository.searchStudents(furigana, includeDeleted, deletedOnly); // 1本化！
     List<StudentCourse> courses = searchAllCourses();
@@ -227,7 +230,7 @@ public class StudentServiceImpl implements StudentService {
     String idForLog = converter.encodeBase64(studentId);
     // 存在確認
     if (studentRepository.findById(studentId) == null) {
-      throw new ResourceNotFoundException("学生ID " + idForLog + " が見つかりません。");
+      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
     }
     // 関連するコースも削除
     courseRepository.deleteCoursesByStudentId(studentId);
@@ -236,5 +239,6 @@ public class StudentServiceImpl implements StudentService {
     logger.info("物理削除完了 - studentId: {}", idForLog);
   }
 }
+
 
 

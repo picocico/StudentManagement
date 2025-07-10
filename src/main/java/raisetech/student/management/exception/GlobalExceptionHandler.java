@@ -26,7 +26,7 @@ import org.springframework.security.access.AccessDeniedException;
  * <p>
  * 各種カスタム例外に対応し、適切なHTTPステータスコードとエラーメッセージを返却します。
  */
-@RestControllerAdvice(basePackages = "raisetech.student.management.controller")
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
   private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);

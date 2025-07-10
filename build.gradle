@@ -58,11 +58,17 @@ dependencies {
 
     // JUnit テスト　ランチャー
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // JUnit（Jupiter）の本体ライブラリ
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+
+    testImplementation 'org.assertj:assertj-core:3.25.1'
+
 
     // Spring Boot Validation(Jakarta Validation API)
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     }
 
 tasks.named('test') {
+    // JUnitを使ってテストを実行するための設定
     useJUnitPlatform()
 }
