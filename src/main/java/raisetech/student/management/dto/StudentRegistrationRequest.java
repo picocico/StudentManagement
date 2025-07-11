@@ -3,6 +3,7 @@ package raisetech.student.management.dto;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -27,6 +28,7 @@ public class StudentRegistrationRequest {
    */
   @Schema(description = "受講生の基本情報", requiredMode = Schema.RequiredMode.REQUIRED)
   @Valid
+  @NotNull(message = "student は必須です")
   private StudentDto student;
 
   /**
@@ -39,6 +41,7 @@ public class StudentRegistrationRequest {
       description = "受講生の受講コース一覧")
   )
   @Valid
+  @NotNull(message = "courses は必須です")
   private List<StudentCourseDto> courses;
 
   /**
