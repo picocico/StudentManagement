@@ -1,6 +1,7 @@
 package raisetech.student.management.service;
 
 import java.util.List;
+import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
@@ -11,6 +12,34 @@ import raisetech.student.management.dto.StudentDetailDto;
  * このインターフェースは、受講生の登録・更新・削除・検索などの操作を定義します。
  */
 public interface StudentService {
+
+  /**
+   * 受講生情報とコース受講情報を一括で更新します（全置換）。
+   * <p>
+   * - 学生本体（氏名等）の更新<br>
+   * - 既存の受講コースを全削除 ⇒ 引数のコース一覧に置き換え
+   *
+   * @param student 更新対象の学生エンティティ（studentId は必須）
+   * @param courses 更新後に紐づける受講コースの一覧（null/空配列は「0件に置換」）
+   * @return 更新後の学生エンティティ
+   * @throws IllegalArgumentException studentId が null の場合
+   * @throws raisetech.student.management.exception.ResourceNotFoundException 指定IDの学生が存在しない場合
+   */
+  @Transactional
+  Student updateStudentWithCourses(Student student, List<StudentCourse> courses);
+
+  /**
+   * 学生IDに紐づく受講コース一覧を取得します。
+   *
+   * @param studentId 学生ID（BINARY(16)）
+   * @return 受講コース一覧（0件の場合は空リスト）
+   * @throws IllegalArgumentException studentId が null の場合
+   */
+  List<StudentCourse> getCoursesByStudentId(byte[] studentId);
+
+  // 既存メソッド群（例）
+  // Student partialUpdateStudentWithCourses(...);
+  // List<Student> searchStudents(...);
 
   /**
    * 条件に基づいて受講生詳細情報を取得します。
@@ -110,5 +139,6 @@ public interface StudentService {
    */
   void forceDeleteStudent(byte[] studentId);
 }
+
 
 

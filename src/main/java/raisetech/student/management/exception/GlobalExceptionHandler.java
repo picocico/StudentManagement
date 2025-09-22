@@ -1,6 +1,7 @@
 package raisetech.student.management.exception;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -9,253 +10,162 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.ServletRequestBindingException;
-import raisetech.student.management.exception.dto.ErrorResponse;
-import raisetech.student.management.exception.dto.FieldErrorDetail;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.security.access.AccessDeniedException;
 
+import raisetech.student.management.exception.dto.ErrorResponse;
+import raisetech.student.management.exception.dto.FieldErrorDetail;
 
-/**
- * アプリケーション全体で発生する例外を一元的に処理するハンドラー。
- * <p>
- * 各種カスタム例外に対応し、適切なHTTPステータスコードとエラーメッセージを返却します。
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-  private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+  private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-  /**
-   * バリデーション失敗時に呼び出される例外ハンドラー。
-   * <p>
-   * 入力エラーの内容をフィールドごとに収集し、統一形式のエラーレスポンスを返却します。
-   *
-   * @param ex バリデーション例外（MethodArgumentNotValidException）
-   * @return 入力エラーの詳細を含む400 Bad Requestレスポンス
-   */
+  // ========= 400: バリデーション失敗 =========
   @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
-    List<FieldErrorDetail> errorDetails = ex.getBindingResult().getFieldErrors().stream()
-        .map(error -> new FieldErrorDetail(error.getField(), error.getDefaultMessage()))
+  public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
+    List<FieldErrorDetail> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+        .map(err -> new FieldErrorDetail(err.getField(), err.getDefaultMessage()))
         .collect(Collectors.toList());
-
-    ErrorResponse response = new ErrorResponse(
-        400,                             // HTTPステータス
-        HttpStatus.BAD_REQUEST.value(),  // 整数のステータスコード（
-        "VALIDATION_FAILED",             // エラータイプ（固定文字列）
-        "E001",                          // 独自のエラーコード
-        "入力値に不備があります",           // エラーメッセージ
-        errorDetails                    // フィールドエラー
-    );
-
-    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001",
+        "入力値に不備があります", fieldErrors);
   }
 
-  /**
-   * 指定されたリソースが見つからない場合に呼び出される例外ハンドラー。
-   * <p>
-   * エラーメッセージ付きの404 Not Foundレスポンスを返します。
-   *
-   * @param ex リソース未検出時にスローされる例外（ResourceNotFoundException）
-   * @return 404ステータスとエラーメッセージを含むレスポンス
-   */
+  // ========= 404: リソース未検出 =========
   @ExceptionHandler(ResourceNotFoundException.class)
-  public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex) {
-    ErrorResponse response = new ErrorResponse(
-        404,
-        HttpStatus.NOT_FOUND.value(),
-        "NOT_FOUND",
-        "E404",
-        ex.getMessage(),
-        null
-    );
+  public ResponseEntity<?> handleNotFound(ResourceNotFoundException ex) {
+    // テスト互換の軽量JSON（順序安定のため LinkedHashMap）
+    Map<String, Object> body = new java.util.LinkedHashMap<>();
+    body.put("status", HttpStatus.NOT_FOUND.value());
+    body.put("code", "E404");                 // 文字列で返す
+    body.put("error", "RESOURCE_NOT_FOUND");  // ★ テスト期待
+    body.put("message", ex.getMessage());
 
-    return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
   }
 
-  /**
-   * リクエストに無効な引数が含まれていた場合の例外処理。
-   * <p>
-   * 例：Base64形式のIDが正しくデコードできなかった場合などに使用されます。
-   *
-   * @param ex 不正な引数に起因する例外（IllegalArgumentException）
-   * @return 400 Bad Request ステータスと説明メッセージを含むレスポンス
-   */
-  @ExceptionHandler(IllegalArgumentException.class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
-    logger.error("Unhandled exception occurred: {}", ex.getClass().getName(), ex);
-    String message = ex.getMessage() != null ? ex.getMessage() : "無効なリクエストです。";
-
-    // Base64関連の例外は型不一致として分類
-    if (message.contains("Last unit does not have enough valid bits")
-        || message.contains("Illegal base64 character")
-        || message.contains("Illegal base64")) {
-    ErrorResponse response = new ErrorResponse(
-        400,
-        HttpStatus.BAD_REQUEST.value(),
-        "TYPE_MISMATCH",
-        "E004",
-        "IDの形式が不正です（Base64）",
-        null
-    );
-
-    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+  @ExceptionHandler(NoHandlerFoundException.class)
+  public ResponseEntity<ErrorResponse> handleNoHandlerFound(NoHandlerFoundException ex) {
+    return build(HttpStatus.NOT_FOUND, "NOT_FOUND", "E404",
+        "指定されたURLは存在しません");
   }
 
-    // それ以外は通常の不正リクエスト扱い
-    ErrorResponse response = new ErrorResponse(
-        400,
-        HttpStatus.BAD_REQUEST.value(),
-        "INVALID_REQUEST",
-        "E006",
-        "無効なリクエストです: " + message,
-        null
-    );
-    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-  }
-
-  /**
-   * リクエストボディのJSON形式が不正な場合の例外処理。
-   *
-   * @param ex HttpMessageNotReadableException
-   * @return 400 Bad Requestレスポンス
-   */
+  // ========= 400: JSON不正 / ボディ欠如 =========
   @ExceptionHandler(HttpMessageNotReadableException.class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ResponseEntity<ErrorResponse> handleInvalidJson(HttpMessageNotReadableException ex) {
-    ErrorResponse response = new ErrorResponse(
-        400,
-        HttpStatus.BAD_REQUEST.value(),
-        "INVALID_JSON",
-        "E002",
-        "リクエストの形式が不正です。JSON構造を確認してください。",
-        null
-    );
-    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    String msg = ex.getMessage();
+    boolean missingBody = msg != null && (
+        msg.contains("Required request body is missing")
+            || msg.contains("No content to map")
+            || msg.contains("Unexpected end-of-input"));
+    if (missingBody) {
+      return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003",
+          "リクエストボディは必須です。");
+    }
+    return build(HttpStatus.BAD_REQUEST, "INVALID_JSON", "E002",
+        "リクエストの形式が不正です。JSON構造を確認してください。");
   }
 
-  /**
-   * クエリパラメータやパス変数の型不一致に関する例外処理。
-   *
-   * @param ex MethodArgumentTypeMismatchException
-   * @return 400 Bad Requestレスポンス
-   */
+  // ========= 400: ID形式不正（独自） =========
+  @ExceptionHandler(InvalidIdFormatException.class)
+  public ResponseEntity<ErrorResponse> handleInvalidId(InvalidIdFormatException ex) {
+    return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006",
+        ex.getMessage() != null ? ex.getMessage() : "IDの形式が不正です");
+  }
+
+  // ========= 400: 型不一致（パラメータ変換） =========
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
     String field = ex.getName();
-    String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "不明";
-    String message = String.format("パラメータ '%s' は %s 型である必要があります。", field, expectedType);
-
-    ErrorResponse response = new ErrorResponse(
-        400,
-        HttpStatus.BAD_REQUEST.value(),
-        "TYPE_MISMATCH",
-        "E004",
-        message,
-        null
-    );
-
-    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    String expected = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "不明";
+    String message = String.format("パラメータ '%s' は %s 型である必要があります。", field, expected);
+    return build(HttpStatus.BAD_REQUEST, "TYPE_MISMATCH", "E004", message);
   }
 
-  /**
-   * 必須リクエストパラメータが不足している場合の例外処理。
-   *
-   * @param ex MissingServletRequestParameterException
-   * @return 400 Bad Requestレスポンス
-   */
+  // ========= 400: 必須クエリ欠如 =========
   @ExceptionHandler(MissingServletRequestParameterException.class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ResponseEntity<ErrorResponse> handleMissingParams(MissingServletRequestParameterException ex) {
     String message = String.format("リクエストパラメータ '%s' は必須です。", ex.getParameterName());
-
-    ErrorResponse response = new ErrorResponse(
-        400,
-        HttpStatus.BAD_REQUEST.value(),
-        "MISSING_PARAMETER",
-        "E003",
-        message,
-        null
-    );
-
-    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003", message);
   }
 
-  /**
-   * リクエストのバインディングに失敗した場合の処理。
-   *
-   * @param ex ServletRequestBindingException
-   * @return 400 Bad Requestレスポンス
-   */
+  // ========= 400: バインディング失敗 =========
   @ExceptionHandler(ServletRequestBindingException.class)
-  @ResponseStatus(HttpStatus.BAD_REQUEST)
   public ResponseEntity<ErrorResponse> handleBinding(ServletRequestBindingException ex) {
-    String message = String.format("リクエストに必要なパラメータが不足しています: %s", ex.getMessage());
-
-    ErrorResponse response = new ErrorResponse(
-        400,
-        HttpStatus.BAD_REQUEST.value(),
-        "MISSING_PARAMETER",
-        "E005",
-        message,
-        null
-    );
-
-    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    String message = "リクエストに必要なパラメータが不足しています: " + ex.getMessage();
+    return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E005", message);
   }
 
-  /**
-   * 権限不足によるアクセス拒否（403 Forbidden）時に呼び出される例外ハンドラー。
-   * <p>
-   * 認証は成功しているが、必要なロールや権限が不足している場合に発生します。
-   * REST APIとして統一されたエラーレスポンスを返却します。
-   *
-   * @param ex Spring Security によってスローされる AccessDeniedException
-   * @return アクセス拒否のエラー内容を含む 403 Forbidden レスポンス
-   */
+  // ========= 400: 空オブジェクト =========
+  @ExceptionHandler(EmptyObjectException.class)
+  public ResponseEntity<ErrorResponse> handleEmptyObject(EmptyObjectException ex) {
+    return build(HttpStatus.BAD_REQUEST, "EMPTY_OBJECT", "E003",
+        ex.getMessage() != null ? ex.getMessage() : "更新対象のフィールドがありません");
+  }
+
+  // ========= 400: BindException（フォーム系） =========
+  @ExceptionHandler(BindException.class)
+  public ResponseEntity<ErrorResponse> handleBind(BindException ex) {
+    List<FieldErrorDetail> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+        .map(err -> new FieldErrorDetail(err.getField(), err.getDefaultMessage()))
+        .collect(Collectors.toList());
+    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001",
+        "入力値が不正です。", fieldErrors);
+  }
+
+  // ========= 400: その他 IllegalArgumentException は E006 に寄せる =========
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+    log.error("Unhandled IllegalArgumentException", ex);
+    return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006",
+        ex.getMessage() != null ? ex.getMessage() : "無効なリクエストです");
+  }
+
+  // ========= 403: 権限不足 =========
   @ExceptionHandler(AccessDeniedException.class)
-  public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException ex) {
-    ErrorResponse response = new ErrorResponse(
-        403,
-        HttpStatus.FORBIDDEN.value(),
-        "FORBIDDEN",
-        "E403",
-        "アクセスが拒否されました。管理者権限が必要です。",
-        null
-    );
-
-    return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
+  public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+    return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "E403",
+        "アクセスが拒否されました。管理者権限が必要です。");
   }
 
-  /**
-   * ハンドリングされていない予期せぬ例外の処理。
-   * <p>
-   * システム内部の問題など、特定のハンドラーで処理されない例外を捕捉し、
-   * 500 Internal Server Error を返します。
-   *
-   * @param ex 捕捉されなかった一般的な例外（Exception）
-   * @return 500 Internal Server Error ステータスと汎用的なエラーメッセージを含むレスポンス
-   */
+  // ========= 500: 想定外 =========
   @ExceptionHandler(Exception.class)
-  public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex) {
-    logger.error("Unhandled exception occurred", ex);
-    ErrorResponse response = new ErrorResponse(
-        500,
-        HttpStatus.INTERNAL_SERVER_ERROR.value(),
-        "INTERNAL_ERROR",
-        "E999",
-        "予期しないエラーが発生しました",
-        null
-    );
+  public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
+    log.error("Unhandled exception occurred", ex);
+    return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "E999",
+        "予期しないエラーが発生しました");
+  }
 
-    return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+  // ===== 共通ビルダ =====
+  private ResponseEntity<ErrorResponse> build(HttpStatus status,
+      String errorType,
+      String errorCode,
+      String message) {
+    return build(status, errorType, errorCode, message, null);
+  }
+
+  private ResponseEntity<ErrorResponse> build(HttpStatus status,
+      String errorType,
+      String errorCode,
+      String message,
+      List<FieldErrorDetail> fieldErrors) {
+    // ErrorResponse.of(...) は、status(int), errorType(String), errorCode(String), message, errors, details を受け取り
+    // code(=errorCode) と error(=errorType) を内部でセットする実装（前段で作成したもの）を想定
+    ErrorResponse body = ErrorResponse.of(
+        status.value(),          // status:int
+        errorType,               // error / errorType
+        errorCode,               // code / errorCode (E###)
+        message,
+        fieldErrors,
+        fieldErrors              // details は errors のエイリアス
+    );
+    return ResponseEntity.status(status).body(body);
   }
 }

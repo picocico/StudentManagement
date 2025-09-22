@@ -1,1 +1,19 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT) // ← FAIL_ON_PROJECT だと build.gradle の repos が無視される
+    repositories {
+        mavenCentral()
+    }
+}
+
+// ← 上の2ブロックの後に書く
 rootProject.name = 'StudentManagement'
+
+// マルチプロジェクトならここで include(...) を書く
+// include 'app', 'core' など

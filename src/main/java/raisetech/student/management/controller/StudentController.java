@@ -1,20 +1,28 @@
 package raisetech.student.management.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,13 +33,17 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
+import raisetech.student.management.exception.EmptyObjectException;
+import raisetech.student.management.exception.MissingParameterException;
 import raisetech.student.management.exception.dto.ErrorResponse;
 import raisetech.student.management.service.StudentService;
+import raisetech.student.management.util.UUIDUtil;
 
 
 /**
@@ -39,6 +51,7 @@ import raisetech.student.management.service.StudentService;
  * <p>
  * このクラスは、受講生の登録、取得、更新、削除、復元、およびふりがなによる検索などの 操作をエンドポイントとして提供します。
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/students")
 @Validated
@@ -61,6 +74,8 @@ public class StudentController {
    */
   private final StudentConverter converter;
 
+  private final ObjectMapper objectMapper;
+
   /**
    * 新規の受講生情報を登録します。
    *
@@ -68,7 +83,9 @@ public class StudentController {
    * @return 201 Created + 登録された受講生の詳細情報（Student + Courses）
    */
   @Operation(summary = "受講生登録", description = "受講生および受講コースを新規登録します。",
-      requestBody = @RequestBody(description = "登録対象の受講生およびコース情報", required = true),
+      requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+      description = "登録対象の受講生およびコース情報",
+      required = true),
       responses = {
           @ApiResponse(responseCode = "201", description = "登録に成功",
               content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
@@ -77,9 +94,14 @@ public class StudentController {
           )
       }
   )
-  @PostMapping
+  @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<StudentDetailDto> registerStudent(
-      @Valid @RequestBody StudentRegistrationRequest request) {
+       @Valid @RequestBody StudentRegistrationRequest request) {
+
+    log.debug("DTO runtime type = {}", request.getClass().getName());
+    log.debug("student={}, courses={}", request.getStudent(), request.getCourses());
+
     Student student = converter.toEntity(request.getStudent());
     byte[] studentIdBytes = student.getStudentId();
 
@@ -95,6 +117,38 @@ public class StudentController {
 
     return ResponseEntity.status(HttpStatus.CREATED).body(responseDto);
   }
+
+  // 追加（テストが通ったら削除してOK）
+  @PostMapping(path = "/debug-dto",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE)
+  public Map<String, Object> debugDto(@RequestBody StudentRegistrationRequest req) {
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("studentNull", req.getStudent() == null);
+    m.put("coursesNull", req.getCourses() == null);
+    if (req.getStudent() != null) {
+      m.put("fullName", req.getStudent().getFullName());
+      m.put("gender", req.getStudent().getGender());
+    }
+    if (req.getCourses() != null && !req.getCourses().isEmpty()) {
+      m.put("firstCourseName", req.getCourses().get(0).getCourseName());
+      m.put("firstStartDate", String.valueOf(req.getCourses().get(0).getStartDate()));
+    }
+    return m;
+  }
+
+  /** 一時デバッグ用: 生のJSONがどう届いているか確認 */
+  @PostMapping(path = "/debug-raw",
+      consumes = MediaType.APPLICATION_JSON_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE)
+  public Map<String, Object> debugRaw(@RequestBody Map<String, Object> raw) {
+    Map<String, Object> m = new LinkedHashMap<>();
+    m.put("keys", raw.keySet());
+    m.put("rawType", raw.getClass().getName());
+    return m;
+  }
+
+
 
   /**
    * 条件付きで受講生一覧を取得します（ふりがな、削除状態）。
@@ -163,15 +217,15 @@ public class StudentController {
   /**
    * 受講生情報を全体的に更新します。
    *
-   * @param studentId 受講生ID
-   * @param request   更新内容
+   * @param studentIdBase64 受講生ID
+   * @param req  更新内容
    * @return 更新後の受講生詳細情報
    */
   @Operation(
       summary = "受講生情報更新（全体）",
       description = "受講生情報とコース情報を全て更新します。",
       parameters = @Parameter(name = "studentId", description = "更新対象の受講生ID", required = true),
-      requestBody = @RequestBody(
+      requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
           description = "更新内容（受講生情報＋コース）",
           required = true
       ),
@@ -189,43 +243,45 @@ public class StudentController {
   )
   @PutMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> updateStudent(
-      @PathVariable String studentId,
-      @Valid @RequestBody StudentRegistrationRequest request) {
+      @PathVariable ("studentId") String studentIdBase64,
+      @Valid @RequestBody StudentRegistrationRequest req  // ★ @Valid を付与
+  ) {
+    // 0) ここでは何もしない（@Valid でNGならこのメソッド自体が呼ばれません）
 
-    byte[] studentIdBytes = converter.decodeBase64(studentId);
+    // 1) IDデコード（Base64不正/UUID不正は InvalidIdFormatException → E006）
+    UUID uuid = converter.decodeUuidOrThrow(studentIdBase64);
+    byte[] studentId = UUIDUtil.fromUUID(uuid);
 
-    // DTOからStudentを生成し、studentIdを正しく設定
-    Student student = converter.toEntity(request.getStudent());
-    student.setStudentId(studentIdBytes);
-    student.setDeleted(request.isDeleted());
+    // 2) 変換（@Valid 済みなのでここに到達している）
+    Student toUpdate = converter.toEntity(req.getStudent());
+    // パスのIDを最優先に統一（ボディのIDが入っていても上書き）
+    toUpdate.setStudentId(studentId);
 
-    // コースも変換
-    List<StudentCourse> courses = converter.toEntityList(request.getCourses(), studentIdBytes);
+    List<StudentCourse> courses = converter.toEntityList(req.getCourses(), studentId);
 
-    logger.debug("PUT - Updating student: {}", studentId);
+    // 3) 再取得→DTO化（レスポンスの studentId はパスのBase64で上書き）
+    Student updated = service.updateStudentWithCourses(toUpdate, courses);
 
-    // 更新処理
-    service.updateStudent(student, courses);
+    // 表示用ID文字列（必要なら事前生成して渡す。内部で再デコードさせない）
+    String idBase64ForResponse = converter.encodeBase64(studentId); // ← encode側を用意
+    StudentDetailDto dto = converter.toDetailDto(updated, courses, idBase64ForResponse);
 
-    // 更新後の取得
-    Student updated = service.findStudentById(studentIdBytes);
-    List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentIdBytes);
+    return ResponseEntity.ok(dto);
 
-    return ResponseEntity.ok(converter.toDetailDto(updated, updatedCourses));
   }
 
   /**
    * 受講生情報を部分的に更新します。
    *
    * @param studentId 受講生ID
-   * @param request   更新対象のフィールド
+   * @param body   更新対象のフィールド
    * @return 更新後の受講生詳細情報
    */
   @Operation(
       summary = "受講生情報新（部分）",
       description = "指定項目のみ受講生情報を部分的に更新します。appendCourses=trueの場合はコース追加。",
       parameters = @Parameter(name = "studentId", description = "部分更新対象の受講生ID",required = true),
-      requestBody = @RequestBody(
+      requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
           description = "部分更新する受講生情報＋（オプション）コース情報",
           required = true
       ),
@@ -238,37 +294,76 @@ public class StudentController {
           )
       }
   )
-  @PatchMapping("/{studentId}")
+  @PatchMapping(
+      value = "/{studentId}",
+      produces = MediaType.APPLICATION_JSON_VALUE // ★ 成功時に JSON を返すことを明示
+  )
   public ResponseEntity<StudentDetailDto> partialUpdateStudent(
       @PathVariable String studentId,
-      @RequestBody StudentRegistrationRequest request) {
+      @RequestBody(required = false) Map<String, Object> body // ← Mapで受ける
+  ) throws BindException {
 
-    byte[] studentIdBytes = converter.decodeBase64(studentId);
-
-    // 元のデータ取得とマージ
-    Student existing = service.findStudentById(studentIdBytes);
-    Student update = converter.toEntity(request.getStudent());
-    converter.mergeStudent(existing, update);
-
-    // コース情報変換（nullや空も許容）
-    List<StudentCourse> newCourses = converter.toEntityList(request.getCourses(), studentIdBytes);
-
-    logger.debug("PATCH - Partially updating student: {}", studentId);
-    logger.debug("★★ appendCourses: {}", request.isAppendCourses());
-
-    if (request.isAppendCourses()) {
-      // 新規追加のみ
-      service.appendCourses(studentIdBytes, newCourses);
-      service.updateStudentInfoOnly(existing); // ← コースを保持したまま、基本情報のみ更新
-    } else {
-      // 通常の置き換え（全削除＋insert）
-      service.partialUpdateStudent(existing, newCourses); // ← 全置き換え
+    // --- 0) リクエスト存在チェック ---
+    // テストは「ボディが空 or {}」→ MISSING_PARAMETER(E001) を期待
+    if (body == null || body.isEmpty()) {
+      throw new MissingParameterException("リクエストボディが空です"); // E001
     }
 
-    // 最新状態を返す
-    Student updated = service.findStudentById(studentIdBytes);
-    List<StudentCourse> updatedCourses = service.searchCoursesByStudentId(studentIdBytes);
-    return ResponseEntity.ok(converter.toDetailDto(updated, updatedCourses));
+    // --- 1) Map -> DTO 変換 ---
+    final StudentRegistrationRequest request = objectMapper.convertValue(
+        body, StudentRegistrationRequest.class);
+
+    // ここで「student キーが存在し null」のケースを明示的に E001 扱いにする
+    // テスト名: partialUpdateStudent_student情報がnullの場合_400を返すこと
+    if (request == null || request.getStudent() == null) {
+      BeanPropertyBindingResult errors = new BeanPropertyBindingResult(request, "request");
+      errors.addError(new FieldError("request", "student", "student は必須です。"));
+      throw new BindException(errors); // E001
+    }
+
+    // --- 2) “空更新”の判定（値が全く入っていない等）→ これは E003（EMPTY_OBJECT）
+    // 例: フィールドキーはあるが、実質どの項目も更新値を持たない場合など
+    if (request.isPatchEmpty()) {
+      throw new EmptyObjectException("更新対象のフィールドがありません"); // E003
+    }
+
+    // --- 3) IDデコード（Base64/UUID不正は既存ハンドラで 400/E006）---
+    final byte[] studentIdBytes = converter.decodeBase64(studentId);
+
+    // --- 4) append / courses の確定 ---
+    final boolean append = Boolean.TRUE.equals(request.getAppendCourses());
+    final boolean hasCourses = request.getCourses() != null && !request.getCourses().isEmpty();
+    logger.debug("★★ appendCourses(normalized): {}", append);
+    logger.debug("PATCH - Partially updating student: {}", studentId);
+
+    // --- 5) 既存取得 & 基本情報マージ ---
+    final Student existing = service.findStudentById(studentIdBytes);
+    // （部分更新：来ている項目だけ上書き）
+    final Student update = converter.toEntity(request.getStudent());
+    converter.mergeStudent(existing, update);
+
+    // --- 6) コース更新 ---
+    final List<StudentCourse> updatedCourses;
+    if (hasCourses) {
+      final List<StudentCourse> newCourses = converter.toEntityList(request.getCourses(), studentIdBytes);
+      if (append) {
+        service.appendCourses(studentIdBytes, newCourses);     // 追加
+        service.updateStudentInfoOnly(existing);                // 基本情報だけ更新
+        updatedCourses = service.searchCoursesByStudentId(studentIdBytes); // DB最新を返す
+      } else {
+        service.partialUpdateStudent(existing, newCourses);     // 置換（削除→挿入）
+        updatedCourses = newCourses;                            // 今回の置換結果をそのまま返す
+      }
+    } else {
+      // コースは触らない：基本情報のみ
+      service.updateStudentInfoOnly(existing);
+      updatedCourses = service.searchCoursesByStudentId(studentIdBytes);
+    }
+
+    // --- 7) 成功レスポンス（本文あり！） ---
+    final Student updated = service.findStudentById(studentIdBytes);
+    final StudentDetailDto dto = converter.toDetailDto(updated, updatedCourses); // ★ base64 ID を渡す
+    return ResponseEntity.ok(dto);
   }
 
   /**

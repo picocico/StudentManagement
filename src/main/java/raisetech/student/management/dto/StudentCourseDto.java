@@ -1,6 +1,7 @@
 package raisetech.student.management.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -31,6 +32,7 @@ public class StudentCourseDto {
    * コース名。
    */
   @Schema(description = "コース名", example = "Java基礎", requiredMode = Schema.RequiredMode.REQUIRED)
+  @NotBlank(message = "コース名は必須です")
   private String courseName;
 
   /**

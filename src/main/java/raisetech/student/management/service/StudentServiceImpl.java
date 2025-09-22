@@ -1,6 +1,7 @@
 package raisetech.student.management.service;
 
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,6 +137,10 @@ public class StudentServiceImpl implements StudentService {
    */
   @Override
   public Student findStudentById(byte[] studentId) {
+    if (studentId == null || studentId.length != 16) {
+      throw new IllegalArgumentException("UUIDの形式が不正です");
+    }
+
     Student student = studentRepository.findById(studentId);
     if (student == null) {
       String idForLog = converter.encodeBase64(studentId);
@@ -238,7 +243,59 @@ public class StudentServiceImpl implements StudentService {
     studentRepository.forceDeleteStudent(studentId);
     logger.info("物理削除完了 - studentId: {}", idForLog);
   }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  @Transactional
+  public Student updateStudentWithCourses(Student student, List<StudentCourse> courses) {
+    Objects.requireNonNull(student, "student must not be null");
+    byte[] studentId = student.getStudentId();
+    if (studentId == null) {
+      throw new IllegalArgumentException("studentId must not be null");
+    }
+
+    // 1) 存在確認（StudentRepository#findById は null返し仕様）
+    Student present = studentRepository.findById(studentId);
+    if (present == null) {
+      throw new ResourceNotFoundException("student", "studentId");
+    }
+
+    // 2) 学生本体の更新（メソッド名は updateStudent）
+    studentRepository.updateStudent(student);
+
+    // 3) コース全削除 → 一括Insert（メソッド名：deleteCoursesByStudentId / insertCourses）
+    courseRepository.deleteCoursesByStudentId(studentId);
+    if (courses != null && !courses.isEmpty()) {
+      for (StudentCourse sc : courses) {
+        sc.setStudentId(studentId); // 念のため上書き
+      }
+      courseRepository.insertCourses(courses);
+    }
+
+    // 4) 最新の学生を再取得（null返し仕様に合わせる）
+    Student updated = studentRepository.findById(studentId);
+    if (updated == null) {
+      // 直前で更新しているので通常起きないが、整合性確保のため
+      throw new ResourceNotFoundException("student", "studentId");
+    }
+    return updated;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<StudentCourse> getCoursesByStudentId(byte[] studentId) {
+    if (studentId == null) {
+      throw new IllegalArgumentException("studentId must not be null");
+    }
+    // メソッド名：findCoursesByStudentId
+    return courseRepository.findCoursesByStudentId(studentId);
+  }
 }
+
 
 
 

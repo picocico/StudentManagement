@@ -15,7 +15,7 @@ import lombok.AllArgsConstructor;
 @Schema(description = "受講生の基本情報 DTO")
 @Data
 @NoArgsConstructor // ← 引数なしのデフォルトコンストラクタも自動生成
-@AllArgsConstructor // ← 全フィールド引数のコンストラクタを自動生成
+@AllArgsConstructor
 public class StudentDto {
 
   /**
