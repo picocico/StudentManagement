@@ -1,0 +1,47 @@
+name: Gradle Test & Reports
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Run tests and coverage
+        run: ./gradlew -i test jacocoTestReport
+
+      - name: Upload reports (HTML & XML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/test-results/test/*.xml
+            build/reports/tests/test/**
+            build/reports/jacoco/test/html/**
+
+      - name: Comment JUnit summary on PR
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "build/test-results/test/*.xml"
+
+      - name: Coverage quick link (job summary)
+        if: always()
+        run: |
+          echo "## Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "Open artifact **test-reports** → build/reports/jacoco/test/html/index.html" >> $GITHUB_STEP_SUMMARY
