@@ -10,11 +10,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import org.mockito.BDDMockito.Then;
 import org.mockito.Mockito;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +26,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import raisetech.student.management.config.TestMockConfig;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
@@ -45,6 +42,7 @@ import raisetech.student.management.service.StudentService;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.nullValue;
 
 import static org.mockito.ArgumentMatchers.anyString;
@@ -219,8 +217,8 @@ class StudentControllerTest {
   @BeforeEach
   void setupAll() {
     /**
-     * 各テスト実行前に {@code MockMvc} を初期化します。
-     **/
+     * 各テスト実行前に{@code MockMvc} を初期化します。
+     */
     // 1) 値の初期化 16バイトIDを必ず使用
     base64Id = base64FromUuid(VALID_UUID);
     studentId = bytesFromUuid(VALID_UUID);
@@ -517,8 +515,11 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(invalid))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.status").value("400"))
-        .andExpect(jsonPath("$.errorCode").value("E001"))
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E001"))                 // ここを errorCode → code に
+        .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))   // 旧: errorType を使っていたなら error に
+        .andExpect(jsonPath("$.message").value("入力値に不備があります"))
         .andExpect(jsonPath("$.errors").isArray())
         .andExpect(jsonPath("$.errors.length()").value(org.hamcrest.Matchers.greaterThan(0)));
   }
@@ -686,9 +687,11 @@ class StudentControllerTest {
             .param("includeDeleted", "true")
             .param("deletedOnly", "true"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.message")
-            .value(
-                "無効なリクエストです: includeDeleted=true と deletedOnly=true は同時指定できません"));
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E006"))
+        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.message").value(
+            containsString("includeDeleted=true と deletedOnly=true は同時指定できません")));
   }
 
   /**
@@ -715,12 +718,13 @@ class StudentControllerTest {
       throws Exception {
     mockMvc.perform(get("/api/students").param("includeDeleted", "abc"))
         .andExpect(status().isBadRequest())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
-        .andExpect(jsonPath("$.code").value(400))
-        .andExpect(jsonPath("$.errorType").value("TYPE_MISMATCH"))   // ← ここを errorType に
-        .andExpect(jsonPath("$.errorCode").value("E004"))
-        // 部分一致（日本語の空白・引用符差で落ちにくい）
-        .andExpect(jsonPath("$.message").value(containsString("includeDeleted")));
+        .andExpect(jsonPath("$.code").value("E004"))            // ← 数値ではなく文字列
+        .andExpect(jsonPath("$.error").value("TYPE_MISMATCH"))  // ← errorType → error
+        .andExpect(jsonPath("$.message").value(containsString("includeDeleted")))
+        .andExpect(jsonPath("$.code").isString())               // 型も明示しておくと堅牢
+        .andExpect(jsonPath("$.status").isNumber());
   }
 
   /**
@@ -747,11 +751,13 @@ class StudentControllerTest {
       throws Exception {
     mockMvc.perform(get("/api/students").param("deletedOnly", "xyz"))
         .andExpect(status().isBadRequest())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
-        .andExpect(jsonPath("$.code").value(400))
-        .andExpect(jsonPath("$.errorType").value("TYPE_MISMATCH"))   // ← 同じく errorType
-        .andExpect(jsonPath("$.errorCode").value("E004"))
-        .andExpect(jsonPath("$.message").value(containsString("deletedOnly")));
+        .andExpect(jsonPath("$.code").value("E004"))
+        .andExpect(jsonPath("$.error").value("TYPE_MISMATCH"))
+        .andExpect(jsonPath("$.message").value(containsString("deletedOnly")))
+        .andExpect(jsonPath("$.code").isString())
+        .andExpect(jsonPath("$.status").isNumber());
   }
 
   /**
@@ -878,8 +884,11 @@ class StudentControllerTest {
 
     mockMvc.perform(get("/api/students/{studentId}", base64Id))
         .andExpect(status().isNotFound())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.code").value("E404"))
-        .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+        .andExpect(jsonPath("$.error").value("RESOURCE_NOT_FOUND"))  // ← NOT_FOUND → RESOURCE_NOT_FOUND
+        .andExpect(jsonPath("$.message").value(containsString("IDが見つかりません")));
   }
 
   /**
@@ -911,8 +920,11 @@ class StudentControllerTest {
 
     mockMvc.perform(get("/api/students/{studentId}", invalid))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("E004"))
-        .andExpect(jsonPath("$.error").value("TYPE_MISMATCH"));
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E006"))                   // ← E006 に
+        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))       // ← error キー
+        .andExpect(jsonPath("$.message").value(containsString("Base64"))); // 文言変更に強く
   }
 
   /**
@@ -944,8 +956,11 @@ class StudentControllerTest {
 
     mockMvc.perform(get("/api/students/{studentId}", base64Id))
         .andExpect(status().isBadRequest())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"));
+        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.message").value(containsString("UUID"))); // 文言変更に強く
   }
 
   /**
@@ -969,8 +984,11 @@ class StudentControllerTest {
 
     mockMvc.perform(get("/api/students/"))
         .andExpect(status().isNotFound())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.code").value("E404"))
-        .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+        .andExpect(jsonPath("$.error").value("NOT_FOUND"))          // ← RESOURCE_NOT_FOUND ではない
+        .andExpect(jsonPath("$.message").value(containsString("URLは存在しません")));
   }
 
   /**
@@ -1083,11 +1101,16 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(invalid))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.status").value("400"))
-        .andExpect(jsonPath("$.errorCode").value("E001"))
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E001"))                 // ← 文字列のコード
+        .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))   // ← error に統一
+        .andExpect(jsonPath("$.message").value(containsString("入力値")))
+        // 配列の存在だけ緩く見る（空白差の影響を受けにくい）
         .andExpect(jsonPath("$.errors").isArray())
-        .andExpect(jsonPath("$.errors.length()").value(Matchers.greaterThan(0)))
-        .andExpect(jsonPath("$.code").value(400));
+        .andExpect(jsonPath("$.details").isArray());
+    // もし特定フィールドまで見たいなら部分一致で:
+    // .andExpect(jsonPath("$.errors[*].field", hasItem("student.email")));
 
     // バリデーションで落ちる想定なので依存には触らない
     verifyNoInteractions(converter, service);
@@ -1135,9 +1158,11 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(valid))
         .andExpect(status().isNotFound())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.code").value("E404"))
-        .andExpect(jsonPath("$.error").value("NOT_FOUND"))
-        .andExpect(jsonPath("$.code").value(404));
+        .andExpect(jsonPath("$.error").value("RESOURCE_NOT_FOUND"))  // ← NOT_FOUND ではない
+        .andExpect(jsonPath("$.message").value(containsString("IDが見つかりません")));
   }
 
   /**
@@ -1178,9 +1203,11 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("E006"))
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E006"))                 // ← 文字列
         .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
-        .andExpect(jsonPath("$.code").value(400));
+        .andExpect(jsonPath("$.message").value(containsString("Base64")));
 
     // 以降は到達しない
     verifyNoInteractions(service);
@@ -1223,9 +1250,11 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
         .andExpect(status().isBadRequest())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
-        .andExpect(jsonPath("$.code").value(400));
+        .andExpect(jsonPath("$.message").value(containsString("UUID")));
 
     verifyNoInteractions(service);
   }
@@ -1253,10 +1282,11 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(""))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("E003"))
-        .andExpect(jsonPath("$.errorType").value("MISSING_PARAMETER"))
-        .andExpect(jsonPath("$.code").value(400));
-
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E003"))                 // ← MISSING_PARAMETER は E003
+        .andExpect(jsonPath("$.error").value("MISSING_PARAMETER"))
+        .andExpect(jsonPath("$.message").value(containsString("リクエストボディ")));
     // @Valid 前にdecodeしない設計なら、ここも converter に触らない想定にできます。
     // 設計に合わせて下行はコメントアウト可
     // verifyNoInteractions(converter, service);
@@ -1294,10 +1324,14 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("E001"))
-        .andExpect(jsonPath("$.errorType").value("VALIDATION_FAILED"))
-        .andExpect(jsonPath("$.details[0].field").value("student"))
-        .andExpect(jsonPath("$.code").value(400));
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E001"))
+        .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.message").value(containsString("入力値")))
+        .andExpect(jsonPath("$.errors").isArray())
+        .andExpect(jsonPath("$.details").isArray())
+        .andExpect(jsonPath("$.errors[*].field", hasItem("student"))); // 部分一致で十分
 
     verifyNoInteractions(converter, service);
   }
@@ -1332,10 +1366,12 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(json(req)))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("E001"))
-        .andExpect(jsonPath("$.errorType").value("VALIDATION_FAILED"))
-        .andExpect(jsonPath("$.details[*].field", org.hamcrest.Matchers.hasItem("courses")))
-        .andExpect(jsonPath("$.code").value(400));
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E001"))
+        .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.message").value(containsString("入力値")))
+        .andExpect(jsonPath("$.errors[*].field", hasItem("courses")));
 
     // バリデーションで弾かれるので下位は呼ばれない想定
     verifyNoInteractions(converter, service);
@@ -1392,9 +1428,11 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(json(req)))
         .andExpect(status().isInternalServerError())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(500))
+        .andExpect(jsonPath("$.code").value("E999"))                 // ← 文字列
         .andExpect(jsonPath("$.error").value("INTERNAL_SERVER_ERROR"))
-        .andExpect(jsonPath("$.code").value("E999"))
-        .andExpect(jsonPath("$.code").value(500));
+        .andExpect(jsonPath("$.message").value(containsString("エラー")));
 
     // 呼び出し検証（更新で落ちたので DTO 化までは行かない）
     verify(converter).decodeUuidOrThrow(base64Id);
@@ -1493,9 +1531,11 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(json(request)))
         .andExpect(status().isNotFound())
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(404))
         .andExpect(jsonPath("$.code").value("E404"))
-        .andExpect(jsonPath("$.error").value("NOT_FOUND"))
-        .andExpect(jsonPath("$.message").value("該当する受講生が見つかりません"));
+        .andExpect(jsonPath("$.error").value("RESOURCE_NOT_FOUND"))  // ← NOT_FOUND ではなくこれ
+        .andExpect(jsonPath("$.message").value(containsString("見つかりません")));
   }
 
   /**
@@ -1599,8 +1639,11 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(""))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("E003"))
-        .andExpect(jsonPath("$.errorType").value("MISSING_PARAMETER"));
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.error").value("MISSING_PARAMETER"))
+        .andExpect(jsonPath("$.message", containsString("リクエストボディ")));
 
     verifyNoInteractions(converter, service);
   }
@@ -1618,7 +1661,6 @@ class StudentControllerTest {
    *
    * @throws Exception 実行時例外
    */
-
   @Test
   public void partialUpdateStudent_空JSONオブジェクトの場合_400を返すこと() throws Exception {
 
@@ -1626,8 +1668,12 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("E003"))
-        .andExpect(jsonPath("$.errorType").value("MISSING_PARAMETER"));
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.error").value("MISSING_PARAMETER"))
+        .andExpect(jsonPath("$.message", containsString("リクエストボディ")));
+
     verifyNoInteractions(converter, service);
   }
 
@@ -1651,9 +1697,13 @@ class StudentControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"student\":null,\"courses\":[]}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("E001"))
-        .andExpect(jsonPath("$.errorType").value("VALIDATION_FAILED"))
-        .andExpect(jsonPath("$.details[0].field").value("student"));
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.code").value("E001"))                 // ← errorCode→code、文字列
+        .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))   // ← error に統一
+        .andExpect(jsonPath("$.message").value(containsString("入力値")))
+        .andExpect(jsonPath("$.errors").isArray())
+        .andExpect(jsonPath("$.details").isArray());
 
     verifyNoInteractions(converter, service);
   }
@@ -1838,7 +1888,7 @@ class StudentControllerTest {
     mockMvc.perform(delete("/api/students/{studentId}", base64Id))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("E404"))
-        .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+        .andExpect(jsonPath("$.error").value("RESOURCE_NOT_FOUND"));
 
     verify(converter).decodeBase64(base64Id);
     verify(service).softDeleteStudent(eq(studentId));

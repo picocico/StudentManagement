@@ -1,6 +1,7 @@
 package raisetech.student.management.exception.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -33,6 +34,12 @@ public class ErrorResponse {
   @Schema(description = "errors と同義の互換フィールド", nullable = true)
   private List<FieldErrorDetail> details;
 
+  // 互換用: errorCode は code のエイリアスとしてシリアライズする
+  @JsonProperty("errorCode")
+  public String getErrorCode() {
+    return code;
+  }
+
   // 便利ファクトリ
   public static ErrorResponse of(int status, String error, String code, String message) {
     return of(status, error, code, message, null, null);
@@ -41,6 +48,7 @@ public class ErrorResponse {
   public static ErrorResponse of(
       int status, String error, String code, String message,
       List<FieldErrorDetail> errors, List<FieldErrorDetail> details) {
-    return new ErrorResponse(status, code, error, message, errors, details != null ? details : errors);
+    return new ErrorResponse(status, code, error, message, errors,
+        details != null ? details : errors);
   }
 }
