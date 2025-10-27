@@ -16,12 +16,13 @@ public interface StudentRepository {
   /**
    * 動的な検索条件（ふりがな、削除状態）に基づいて受講生情報を検索します。
    *
-   * @param furigana        ふりがなによる部分一致検索条件（nullまたは空文字は無視）
-   * @param includeDeleted  論理削除された受講生も含めるかどうか
-   * @param deletedOnly     論理削除された受講生のみ取得するかどうか
+   * @param furigana       ふりがなによる部分一致検索条件（nullまたは空文字は無視）
+   * @param includeDeleted 論理削除された受講生も含めるかどうか
+   * @param deletedOnly    論理削除された受講生のみ取得するかどうか
    * @return 条件に一致する受講生情報のリスト
    */
-  List<Student> searchStudents(@Param("furigana") String furigana, @Param("includeDeleted") boolean includeDeleted, @Param("deletedOnly") boolean deletedOnly);
+  List<Student> searchStudents(@Param("furigana") String furigana,
+      @Param("includeDeleted") boolean includeDeleted, @Param("deletedOnly") boolean deletedOnly);
 
   /**
    * 受講生IDで受講生情報を取得します。

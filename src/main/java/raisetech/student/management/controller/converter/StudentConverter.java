@@ -8,9 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
 import org.springframework.stereotype.Component;
-
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.domain.StudentDetail;
@@ -39,7 +37,9 @@ import raisetech.student.management.util.UUIDUtil;
 @Component
 public class StudentConverter {
 
-  /** 文字列IDとして許容する文字（英数・ドット・アンダースコア・ハイフン） */
+  /**
+   * 文字列IDとして許容する文字（英数・ドット・アンダースコア・ハイフン）
+   */
   private static final Pattern ID_TEXT_PATTERN = Pattern.compile("^[0-9A-Za-z._\\-]+$");
 
   // ------------------------------------------------------------
@@ -57,7 +57,9 @@ public class StudentConverter {
    * @throws IllegalArgumentException 長さが16バイト以外の場合
    */
   public String encodeBase64(byte[] bytes) {
-    if (bytes == null) return null;
+    if (bytes == null) {
+      return null;
+    }
     if (bytes.length != 16) {
       throw new IllegalArgumentException("UUIDの形式が不正です");
     }
@@ -83,8 +85,8 @@ public class StudentConverter {
   }
 
   /**
-   * 互換ラッパー：既存コードが呼ぶ {@code decodeBase64(String)} を維持します。
-   * 実体は {@link #decodeBase64ToBytes(String)} です。
+   * 互換ラッパー：既存コードが呼ぶ {@code decodeBase64(String)} を維持します。 実体は {@link #decodeBase64ToBytes(String)}
+   * です。
    *
    * @param encoded URL-safe Base64（paddingなし）文字列
    * @return 復号したバイト配列（長さチェックはしません）
@@ -163,8 +165,7 @@ public class StudentConverter {
   /**
    * {@link StudentDto} から {@link Student} エンティティに変換します。
    * <p>
-   * {@code dto.studentId} が未指定（null または空文字）の場合は、新規にランダムUUIDを採番し、
-   * その生16バイトをセットします。
+   * {@code dto.studentId} が未指定（null または空文字）の場合は、新規にランダムUUIDを採番し、 その生16バイトをセットします。
    * </p>
    *
    * @param dto 受講生DTO（IDは Base64 文字列）
@@ -224,7 +225,7 @@ public class StudentConverter {
    *
    * <p>{@code dto.courseId} が未指定なら新規採番し、{@code studentIdBase64} は必ず Base64 復号して紐付けます。</p>
    *
-   * @param dto コースDTO（IDは Base64 文字列）
+   * @param dto             コースDTO（IDは Base64 文字列）
    * @param studentIdBase64 受講生ID（Base64 文字列）
    * @return コースエンティティ（IDは生16バイト）
    * @throws InvalidIdFormatException Base64が不正な場合（「（Base64）」）
@@ -266,7 +267,7 @@ public class StudentConverter {
    * コースDTOのリストをエンティティリストに変換します。
    * <p>各 {@code dto.courseId} が未指定なら新規採番し、{@code studentId} を紐付けます。</p>
    *
-   * @param dtoList コースDTO一覧
+   * @param dtoList   コースDTO一覧
    * @param studentId 紐付け先の受講生ID（生16バイト）
    * @return コースエンティティ一覧
    * @throws InvalidIdFormatException Base64不正なIDが含まれる場合（「（Base64）」）
@@ -323,13 +324,14 @@ public class StudentConverter {
    * {@link #toDetailDto(Student, List)} の拡張版。
    * <p>パスで受け取った Base64 ID（理論上DB返却と同一）を最終的に反映したい場合に使用します。</p>
    *
-   * @param student 受講生エンティティ
-   * @param courses コースエンティティ一覧
+   * @param student          受講生エンティティ
+   * @param courses          コースエンティティ一覧
    * @param base64IdOverride 上書きしたい Base64 学生ID
    * @return 詳細DTO（{@code base64IdOverride} が非nullなら学生IDを上書き）
    */
   @SuppressWarnings("unused")
-  public StudentDetailDto toDetailDto(Student student, List<StudentCourse> courses, String base64IdOverride) {
+  public StudentDetailDto toDetailDto(Student student, List<StudentCourse> courses,
+      String base64IdOverride) {
     StudentDetailDto dto = toDetailDto(student, courses);
     if (dto != null && dto.getStudent() != null && base64IdOverride != null) {
       dto.getStudent().setStudentId(base64IdOverride);
@@ -358,16 +360,18 @@ public class StudentConverter {
    * <p>コースは受講生ID（Base64）でグルーピングします。</p>
    *
    * @param students 受講生エンティティ一覧
-   * @param courses 全コースエンティティ一覧
+   * @param courses  全コースエンティティ一覧
    * @return 詳細DTO一覧
    * @throws IllegalArgumentException いずれかのIDが16バイト以外の場合
    */
-  public List<StudentDetailDto> toDetailDtoList(List<Student> students, List<StudentCourse> courses) {
+  public List<StudentDetailDto> toDetailDtoList(List<Student> students,
+      List<StudentCourse> courses) {
     Map<String, List<StudentCourse>> courseMap = courses.stream()
         .collect(Collectors.groupingBy(course -> encodeBase64(course.getStudentId())));
 
     return students.stream()
-        .map(student -> toDetailDto(student, courseMap.getOrDefault(encodeBase64(student.getStudentId()), List.of())))
+        .map(student -> toDetailDto(student,
+            courseMap.getOrDefault(encodeBase64(student.getStudentId()), List.of())))
         .collect(Collectors.toList());
   }
 
@@ -379,17 +383,33 @@ public class StudentConverter {
    * 既存の受講生データに、新しいデータの null でないフィールドを上書きします（部分更新）。
    *
    * @param existing 現在の受講生エンティティ（更新対象）
-   * @param update 部分更新用の受講生エンティティ（nullでないフィールドのみ採用）
+   * @param update   部分更新用の受講生エンティティ（nullでないフィールドのみ採用）
    */
   public void mergeStudent(Student existing, Student update) {
-    if (update.getFullName() != null) existing.setFullName(update.getFullName());
-    if (update.getFurigana() != null) existing.setFurigana(update.getFurigana());
-    if (update.getNickname() != null) existing.setNickname(update.getNickname());
-    if (update.getEmail() != null) existing.setEmail(update.getEmail());
-    if (update.getLocation() != null) existing.setLocation(update.getLocation());
-    if (update.getAge() != null) existing.setAge(update.getAge());
-    if (update.getGender() != null) existing.setGender(update.getGender());
-    if (update.getRemarks() != null) existing.setRemarks(update.getRemarks());
+    if (update.getFullName() != null) {
+      existing.setFullName(update.getFullName());
+    }
+    if (update.getFurigana() != null) {
+      existing.setFurigana(update.getFurigana());
+    }
+    if (update.getNickname() != null) {
+      existing.setNickname(update.getNickname());
+    }
+    if (update.getEmail() != null) {
+      existing.setEmail(update.getEmail());
+    }
+    if (update.getLocation() != null) {
+      existing.setLocation(update.getLocation());
+    }
+    if (update.getAge() != null) {
+      existing.setAge(update.getAge());
+    }
+    if (update.getGender() != null) {
+      existing.setGender(update.getGender());
+    }
+    if (update.getRemarks() != null) {
+      existing.setRemarks(update.getRemarks());
+    }
   }
 }
 

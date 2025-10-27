@@ -28,8 +28,8 @@ public class StudentDetail {
   /**
    * 受講生の詳細情報を生成するコンストラクタ。
    *
-   * @param student        受講生の基本情報
-   * @param studentCourse  受講生が登録しているコース情報のリスト
+   * @param student       受講生の基本情報
+   * @param studentCourse 受講生が登録しているコース情報のリスト
    */
   public StudentDetail(Student student, List<StudentCourse> studentCourse) {
     this.student = student;

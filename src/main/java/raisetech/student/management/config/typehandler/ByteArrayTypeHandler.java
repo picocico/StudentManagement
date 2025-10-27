@@ -1,13 +1,13 @@
 package raisetech.student.management.config.typehandler;
 
+import java.sql.CallableStatement;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import org.apache.ibatis.type.BaseTypeHandler;
 import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedJdbcTypes;
 import org.apache.ibatis.type.MappedTypes;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.CallableStatement;
-import java.sql.SQLException;
 
 /**
  * MyBatis における {@code byte[]} 型と JDBC の BINARY 型とのマッピングを扱う TypeHandler。
@@ -22,14 +22,15 @@ public class ByteArrayTypeHandler extends BaseTypeHandler<byte[]> {
   /**
    * {@code byte[]} 型のパラメータを {@link PreparedStatement} に設定します。
    *
-   * @param ps         PreparedStatement オブジェクト
-   * @param i          パラメータのインデックス
-   * @param parameter  設定する byte 配列（通常は UUID のバイナリ形式）
-   * @param jdbcType   JDBC タイプ（この場合は BINARY）
+   * @param ps        PreparedStatement オブジェクト
+   * @param i         パラメータのインデックス
+   * @param parameter 設定する byte 配列（通常は UUID のバイナリ形式）
+   * @param jdbcType  JDBC タイプ（この場合は BINARY）
    * @throws SQLException JDBC 操作時の例外
    */
   @Override
-  public void setNonNullParameter(PreparedStatement ps, int i, byte[] parameter, JdbcType jdbcType) throws SQLException {
+  public void setNonNullParameter(PreparedStatement ps, int i, byte[] parameter, JdbcType jdbcType)
+      throws SQLException {
     ps.setBytes(i, parameter);
   }
 
@@ -49,8 +50,8 @@ public class ByteArrayTypeHandler extends BaseTypeHandler<byte[]> {
   /**
    * {@link ResultSet} からカラムのインデックスを指定して byte 配列を取得します。
    *
-   * @param rs           ResultSet オブジェクト
-   * @param columnIndex  カラムのインデックス
+   * @param rs          ResultSet オブジェクト
+   * @param columnIndex カラムのインデックス
    * @return 取得された byte 配列、または NULL の場合は null
    * @throws SQLException JDBC 操作時の例外
    */
@@ -62,8 +63,8 @@ public class ByteArrayTypeHandler extends BaseTypeHandler<byte[]> {
   /**
    * {@link CallableStatement} からカラムのインデックスを指定して byte 配列を取得します。
    *
-   * @param cs           CallableStatement オブジェクト
-   * @param columnIndex  カラムのインデックス
+   * @param cs          CallableStatement オブジェクト
+   * @param columnIndex カラムのインデックス
    * @return 取得された byte 配列、または NULL の場合は null
    * @throws SQLException JDBC 操作時の例外
    */

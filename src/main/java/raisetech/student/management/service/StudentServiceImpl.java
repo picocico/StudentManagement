@@ -3,8 +3,7 @@ package raisetech.student.management.service;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.controller.converter.StudentConverter;
@@ -20,6 +19,7 @@ import raisetech.student.management.repository.StudentRepository;
  * <p>
  * 受講生およびコース情報の登録・更新・削除・検索といったビジネスロジックを提供します。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StudentServiceImpl implements StudentService {
@@ -27,9 +27,6 @@ public class StudentServiceImpl implements StudentService {
   private final StudentRepository studentRepository;
   private final StudentCourseRepository courseRepository;
   private final StudentConverter converter;
-
-
-  private static final Logger logger = LoggerFactory.getLogger(StudentServiceImpl.class);
 
   /**
    * 受講生を登録します。
@@ -93,11 +90,9 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 受講生の基本情報のみを更新します。
    * <p>
-   * このメソッドでは、氏名、メールアドレス、年齢などの基本属性のみが更新対象となり、
-   * コース情報（student_coursesテーブル）は一切変更されません。
+   * このメソッドでは、氏名、メールアドレス、年齢などの基本属性のみが更新対象となり、 コース情報（student_coursesテーブル）は一切変更されません。
    * <p>
-   * PATCHリクエストで「コースの追加」のみを行う場合に併用され、
-   * 既存のコース情報を保持したまま、受講生の属性情報だけを変更したいケースで使用します。
+   * PATCHリクエストで「コースの追加」のみを行う場合に併用され、 既存のコース情報を保持したまま、受講生の属性情報だけを変更したいケースで使用します。
    *
    * @param student 更新対象の受講生エンティティ（student_idを含む必要があります）
    */
@@ -110,20 +105,23 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 検索条件に基づいて受講生詳細情報リストを取得します。
    *
-   * @param furigana        ふりがな検索（省略可能）
-   * @param includeDeleted  論理削除済みも含めるか
-   * @param deletedOnly     論理削除済みのみ取得するか
+   * @param furigana       ふりがな検索（省略可能）
+   * @param includeDeleted 論理削除済みも含めるか
+   * @param deletedOnly    論理削除済みのみ取得するか
    * @return 受講生詳細DTOリスト
    */
   @Override
-  public List<StudentDetailDto> getStudentList(String furigana, boolean includeDeleted, boolean deletedOnly) {
-    logger.debug("Searching students with furigana={}, includeDeleted={}, deletedOnly={}",
+  public List<StudentDetailDto> getStudentList(String furigana, boolean includeDeleted,
+      boolean deletedOnly) {
+    log.debug("Searching students with furigana={}, includeDeleted={}, deletedOnly={}",
         furigana, includeDeleted, deletedOnly);
     if (includeDeleted && deletedOnly) {
-      throw new IllegalArgumentException("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
+      throw new IllegalArgumentException(
+          "includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
     }
     // 動的SQLにより1本化されたリポジトリメソッドを呼び出し
-    List<Student> students = studentRepository.searchStudents(furigana, includeDeleted, deletedOnly); // 1本化！
+    List<Student> students = studentRepository.searchStudents(furigana, includeDeleted,
+        deletedOnly); // 1本化！
     List<StudentCourse> courses = searchAllCourses();
     return converter.toDetailDtoList(students, courses);
   }
@@ -182,14 +180,15 @@ public class StudentServiceImpl implements StudentService {
 
     // 対象の受講生が存在しない場合は例外をスロー
     if (student == null) {
-      throw new ResourceNotFoundException("Student not found for ID: " + converter.encodeBase64(studentId));
+      throw new ResourceNotFoundException(
+          "Student not found for ID: " + converter.encodeBase64(studentId));
     }
 
     // すでに論理削除済みでなければ、削除処理を行う
     if (!Boolean.TRUE.equals(student.getDeleted())) {
       student.softDelete();
       studentRepository.updateStudent(student);
-      logger.info("論理削除完了 - studentId: {}", converter.encodeBase64(studentId));
+      log.info("論理削除完了 - studentId: {}", converter.encodeBase64(studentId));
     }
   }
 
@@ -209,22 +208,21 @@ public class StudentServiceImpl implements StudentService {
       throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
     }
 
-    logger.debug("Before restore: studentId = {}, deleted = {}, deletedAt = {}",
-        idForLog,student.getDeleted(), student.getDeletedAt());
+    log.debug("Before restore: studentId = {}, deleted = {}, deletedAt = {}",
+        idForLog, student.getDeleted(), student.getDeletedAt());
 
     if (Boolean.TRUE.equals(student.getDeleted())) {
       student.restore();
       studentRepository.updateStudent(student);
-      logger.debug("After restore: studentId = {}, deleted = {}, deletedAt = {}",
-          idForLog,student.getDeleted(), student.getDeletedAt());
+      log.debug("After restore: studentId = {}, deleted = {}, deletedAt = {}",
+          idForLog, student.getDeleted(), student.getDeletedAt());
     }
   }
 
   /**
    * 指定された受講生IDに該当する受講生情報および関連するコース情報を物理削除します。
    * <p>
-   * この操作はデータベースから完全に削除され、復元はできません。
-   * 主に管理者向けの操作として利用されます。
+   * この操作はデータベースから完全に削除され、復元はできません。 主に管理者向けの操作として利用されます。
    *
    * @param studentId 物理削除対象の受講生ID（UUIDをBINARY(16)型で格納した16バイトの配列）
    * @throws ResourceNotFoundException 該当する受講生が存在しない場合にスローされます
@@ -241,7 +239,7 @@ public class StudentServiceImpl implements StudentService {
     courseRepository.deleteCoursesByStudentId(studentId);
     // 学生レコードの物理削除
     studentRepository.forceDeleteStudent(studentId);
-    logger.info("物理削除完了 - studentId: {}", idForLog);
+    log.info("物理削除完了 - studentId: {}", idForLog);
   }
 
   /**
@@ -294,8 +292,22 @@ public class StudentServiceImpl implements StudentService {
     // メソッド名：findCoursesByStudentId
     return courseRepository.findCoursesByStudentId(studentId);
   }
+
+  @Override
+  @Transactional
+  public void replaceCourses(byte[] studentIdBytes, List<StudentCourse> newCourses) {
+    // 受講生の存在チェック（必要なら既存メソッド呼び出し）
+    findStudentById(studentIdBytes);
+
+    // 既存コースを全削除
+    courseRepository.deleteCoursesByStudentId(studentIdBytes);
+
+    // 新規があれば挿入
+    if (newCourses != null && !newCourses.isEmpty()) {
+      for (StudentCourse c : newCourses) {
+        c.setStudentId(studentIdBytes); // 念のためセット
+      }
+      courseRepository.insertCourses(newCourses);
+    }
+  }
 }
-
-
-
-

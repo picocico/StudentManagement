@@ -3,15 +3,14 @@ package raisetech.student.management.data;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 /**
  * 受講生とコースの関連情報を保持するエンティティクラス。
  * <p>
- * 受講生がどのコースに所属しているか、受講期間などを管理します。
- * データベースの student_courses テーブルに対応します。
+ * 受講生がどのコースに所属しているか、受講期間などを管理します。 データベースの student_courses テーブルに対応します。
  */
 @Schema(description = "受講生コース情報")
 @Data

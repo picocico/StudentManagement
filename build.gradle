@@ -4,6 +4,7 @@ plugins {
     id 'org.springframework.boot' version '3.4.0'
     id 'io.spring.dependency-management' version '1.1.6'
     id 'jacoco'
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 group = 'raisetech'
@@ -12,6 +13,38 @@ version = '0.0.1-SNAPSHOT'
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+spotless {
+    // Javaコードの整形
+    java {
+        target 'src/**/*.java'
+        // Google Java Format。必要ならバージョン固定も可: googleJavaFormat('1.17.0')
+        googleJavaFormat()
+        // 使われていない import を削除
+        removeUnusedImports()
+        // import の並び順（好みで）：標準→javax→org→com→（空行）→プロジェクト
+        importOrder 'java', 'javax', 'org', 'com', ''
+        // 末尾空白/改行などの微整形
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    // build.gradle など Gradleスクリプトも整形（オプション）
+    groovyGradle {
+        target '*.gradle', 'gradle/**/*.gradle'
+        // Greclipse フォーマッタを使う（設定ファイルがあれば指定も可）
+        greclipse()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+
+    // ついでに Markdown / gitignore なども（オプション）
+    format 'misc', {
+        target '.gitignore', '**/*.md'
+        trimTrailingWhitespace()
+        endWithNewline()
     }
 }
 
@@ -102,6 +135,13 @@ tasks.jacocoTestReport {
         xml.required = true   // CIツール等が読む用
         csv.required = false
         html.required = true  // 人が見る用（PR添付にも便利）
+    }
+}
+
+tasks.withType(Test).configureEach {
+    testLogging {
+        events "failed", "skipped"   // 必要なら "passed" も
+        showStandardStreams = true   // ← これが肝
     }
 }
 

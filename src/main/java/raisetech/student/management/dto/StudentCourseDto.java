@@ -2,16 +2,15 @@ package raisetech.student.management.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDate;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import java.time.LocalDate;
 
 /**
  * 受講生が登録しているコース情報を表すデータ転送オブジェクト（DTO）。
  * <p>
- * クライアントとのリクエストおよびレスポンス時に使用されるクラスで、
- * {@code StudentCourse} エンティティの必要な情報のみを提供します。
+ * クライアントとのリクエストおよびレスポンス時に使用されるクラスで、 {@code StudentCourse} エンティティの必要な情報のみを提供します。
  */
 @Schema(description = "受講生コース情報 DTO")
 @Data

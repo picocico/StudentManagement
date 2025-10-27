@@ -1,0 +1,35 @@
+# src/test/resources/application-test.yml
+
+server:
+  error:
+    include-message: ALWAYS
+    include-binding-errors: ALWAYS
+    include-stacktrace: ALWAYS
+
+# テスト時のログ粒度（必要に応じて調整）
+logging:
+  level:
+    root: INFO
+    raisetech.student.management.exception.GlobalExceptionHandler: DEBUG
+    org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: TRACE
+    org.springframework.http.converter.json: DEBUG
+
+# MyBatis のSQLログを見たい場合（必要な時だけ）
+mybatis:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 再現性重視でタイムゾーン固定したい場合（不要なら消してOK）
+spring:
+  jackson:
+    time-zone: UTC
+    serialization:
+      WRITE_DATES_AS_TIMESTAMPS: false
+
+# Security フィルタは @WebMvcTest で addFilters=false にしているので通常不要
+# 本当に全体テスト(@SpringBootTest)で切りたいときだけ
+# spring:
+#   security:
+#     user:
+#       name: test
+#       password: test

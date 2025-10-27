@@ -6,17 +6,16 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import java.util.List;
 import lombok.Setter;
 
 /**
  * 受講生の登録・更新リクエストに使用されるデータ転送オブジェクト（DTO）。
  * <p>
- * 受講生の基本情報と受講コース情報をまとめて送信するための構造であり、
- * バリデーションアノテーションによりネストされたオブジェクトも検証されます。
+ * 受講生の基本情報と受講コース情報をまとめて送信するための構造であり、 バリデーションアノテーションによりネストされたオブジェクトも検証されます。
  */
 @Schema(description = "受講生登録リクエスト（基本情報＋コース情報）")
 @Getter
@@ -24,6 +23,7 @@ import lombok.Setter;
 @Data
 @NoArgsConstructor // ← 引数なしのデフォルトコンストラクタも自動生成
 public class StudentRegistrationRequest {
+
   /**
    * 登録または更新対象の受講生情報。
    * <p>
@@ -42,7 +42,7 @@ public class StudentRegistrationRequest {
    */
   @ArraySchema(
       schema = @Schema(implementation = StudentCourseDto.class,
-      description = "受講生の受講コース一覧")
+          description = "受講生の受講コース一覧")
   )
   @Valid
   @NotNull(message = "courses は必須です")
@@ -71,13 +71,12 @@ public class StudentRegistrationRequest {
   private Boolean appendCourses;// ← trueならコースを追加、falseなら置き換え
 
   /**
-   * 部分更新リクエストが空かどうか判定
-   * （student, courses, appendCourses すべて未指定）
+   * 部分更新リクエストが空かどうか判定 （student, courses, appendCourses すべて未指定）
    */
   public boolean isPatchEmpty() {
-    boolean noStudent  = (student == null);
-    boolean noCourses  = (courses == null || courses.isEmpty());
-    boolean noAppend   = (appendCourses == null || !appendCourses);
+    boolean noStudent = (student == null);
+    boolean noCourses = (courses == null || courses.isEmpty());
+    boolean noAppend = (appendCourses == null || !appendCourses);
     // 何も意味のある変更がない → 空更新
     return noStudent && noCourses && noAppend;
   }

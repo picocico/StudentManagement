@@ -1,16 +1,18 @@
 package raisetech.student.management.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 /**
  * 受講生の基本情報を表すデータ転送オブジェクト（DTO）。
  * <p>
- * 登録・更新・検索時のリクエストおよびレスポンスで使用されるクラスであり、
- * バリデーションアノテーションにより、リクエストデータの整合性を保証します。
+ * 登録・更新・検索時のリクエストおよびレスポンスで使用されるクラスであり、 バリデーションアノテーションにより、リクエストデータの整合性を保証します。
  */
 @Schema(description = "受講生の基本情報 DTO")
 @Data

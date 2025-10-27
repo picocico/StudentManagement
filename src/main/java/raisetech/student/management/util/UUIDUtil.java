@@ -7,8 +7,8 @@ import java.util.UUID;
 /**
  * UUIDとBase64、byte[]相互の変換を提供するユーティリティクラス。
  * <p>
- * UUID（128bit）をバイナリ配列（byte[16]）やURLセーフなBase64形式に変換し、
- * データベース（BINARY(16)）やWeb API（Base64文字列）との整合性を保つために使用されます。
+ * UUID（128bit）をバイナリ配列（byte[16]）やURLセーフなBase64形式に変換し、 データベース（BINARY(16)）やWeb
+ * API（Base64文字列）との整合性を保つために使用されます。
  */
 public class UUIDUtil {
 
@@ -23,7 +23,9 @@ public class UUIDUtil {
    * @param uuid UUIDオブジェクト
    * @return UUIDのバイナリ表現（byte[16]）
    */
-  /** UUID -> 16バイト配列 */
+  /**
+   * UUID -> 16バイト配列
+   */
   public static byte[] fromUUID(UUID uuid) {
     if (uuid == null) {
       throw new IllegalArgumentException("UUIDはnullにできません");
@@ -95,9 +97,8 @@ public class UUIDUtil {
   //========================
 
   /**
-   * Base64文字列（URLセーフ/通常のどちらでも可）を
-   * UUIDバイナリ（byte[16]）にデコードします。<br>
-   * 16バイトでない場合は IllegalArgumentException を投げます。
+   * Base64文字列（URLセーフ/通常のどちらでも可）を UUIDバイナリ（byte[16]）にデコードします。<br> 16バイトでない場合は
+   * IllegalArgumentException を投げます。
    *
    * @param base64 Base64文字列（URLセーフ推奨、パディングなしでも可）
    * @return UUIDを表す byte[16]
@@ -114,7 +115,9 @@ public class UUIDUtil {
     } catch (IllegalArgumentException ex) {
       // Base64自体が不正な場合の文言
       String msg = ex.getMessage();
-      if (msg == null || msg.isBlank()) msg = "Base64の形式が不正です";
+      if (msg == null || msg.isBlank()) {
+        msg = "Base64の形式が不正です";
+      }
       throw new IllegalArgumentException(msg, ex);
     }
   }
@@ -157,8 +160,7 @@ public class UUIDUtil {
   //========================
 
   /**
-   * 動作確認用のmainメソッド。
-   * Base64文字列からUUID形式を表示します。
+   * 動作確認用のmainメソッド。 Base64文字列からUUID形式を表示します。
    */
   public static void main(String[] args) {
     String base64Id = "GdgYbbFeRU6A70yPTVUN2A"; // 例: Webで受け取ったID

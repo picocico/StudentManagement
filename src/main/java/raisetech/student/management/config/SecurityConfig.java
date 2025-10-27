@@ -3,8 +3,8 @@ package raisetech.student.management.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -15,8 +15,7 @@ import raisetech.student.management.config.security.CustomAuthenticationEntryPoi
 /**
  * Spring Securityの設定クラス。
  * <p>
- * 本設定では、物理削除API（/api/admin/**）へのアクセスに認証を要求し、
- * その他のAPIは認証不要としています。また、Basic認証とCSRF無効化を明示的に設定します。
+ * 本設定では、物理削除API（/api/admin/**）へのアクセスに認証を要求し、 その他のAPIは認証不要としています。また、Basic認証とCSRF無効化を明示的に設定します。
  */
 @Configuration
 @EnableWebSecurity
@@ -24,13 +23,13 @@ import raisetech.student.management.config.security.CustomAuthenticationEntryPoi
 
 public class SecurityConfig {
 
- /**
-  * アプリケーション全体のセキュリティフィルタチェーンを定義します。
-  *
-  * @param http HttpSecurityオブジェクト（Spring Securityの設定API）
-  * @return セキュリティフィルタチェーン
-  * @throws Exception セキュリティ設定中に例外が発生した場合
-  */
+  /**
+   * アプリケーション全体のセキュリティフィルタチェーンを定義します。
+   *
+   * @param http HttpSecurityオブジェクト（Spring Securityの設定API）
+   * @return セキュリティフィルタチェーン
+   * @throws Exception セキュリティ設定中に例外が発生した場合
+   */
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http
@@ -42,7 +41,8 @@ public class SecurityConfig {
         .exceptionHandling(exception -> exception
             .authenticationEntryPoint(new CustomAuthenticationEntryPoint())
         )
-        .httpBasic(basic -> {}) // 明示的にhttpBasicを有効化（空のラムダで設定）
+        .httpBasic(basic -> {
+        }) // 明示的にhttpBasicを有効化（空のラムダで設定）
         .csrf(AbstractHttpConfigurer::disable); // 明示的にCSRF保護を無効化
 
     return http.build();
