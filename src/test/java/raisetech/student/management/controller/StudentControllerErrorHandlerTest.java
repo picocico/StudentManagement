@@ -463,7 +463,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * </ul>
    * Then:
    * <ul>
-   *   <li>errorCode=E003 を検証</li>
+   *   <li>code=E003 を検証</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -472,7 +472,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   public void testMissingServletRequestParameterException() throws Exception {
     mockMvc.perform(get("/api/students/test-missing-param")) // keyword を指定しない
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("E003")); // GlobalExceptionHandler 側のエラーコードに応じて変更
+        .andExpect(jsonPath("$.code").value("E003")); // GlobalExceptionHandler 側のエラーコードに応じて変更
   }
 
   /**
@@ -487,7 +487,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * </ul>
    * Then:
    * <ul>
-   *   <li>errorCode=E004 を検証</li>
+   *   <li>code=E004 を検証</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -497,7 +497,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     mockMvc.perform(get("/api/students/test-type")
             .param("id", "abc")) // int 型に変換できない文字列
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.errorCode").value("E004"));
+        .andExpect(jsonPath("$.code").value("E004"));
   }
 }
 

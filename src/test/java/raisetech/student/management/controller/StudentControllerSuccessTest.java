@@ -337,14 +337,9 @@ class StudentControllerSuccessTest extends ControllerTestBase {
         .thenReturn(new StudentDetailDto(outStudent, List.of(outCourse)));
 
     if (DEBUG) {
-      StudentRegistrationRequest debug =
-          objectMapper.readValue(body, StudentRegistrationRequest.class);
-
-      System.out.println("DEBUG student=" + debug.getStudent());
-      System.out.println("DEBUG courses=" + debug.getCourses());
-
-      assertThat(debug.getStudent()).isNotNull();
-      assertThat(debug.getCourses()).isNotNull();
+      var root = objectMapper.readTree(body);
+      assertThat(root.path("student").isMissingNode()).isFalse();
+      assertThat(root.path("courses").isArray()).isTrue();
     }
 
     mockMvc.perform(post("/api/students")
@@ -352,7 +347,6 @@ class StudentControllerSuccessTest extends ControllerTestBase {
             .accept(MediaType.APPLICATION_JSON)
             .characterEncoding("UTF-8")
             .content(body))
-        .andDo(maybePrint())  // ← 無条件の .andDo(print()) を削除して、条件付きへ
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.student.studentId").value(base64Id))
         .andExpect(jsonPath("$.student.fullName").value(fullName))

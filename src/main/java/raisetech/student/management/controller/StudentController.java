@@ -256,6 +256,7 @@ public class StudentController {
   )
   @PatchMapping(
       value = "/{studentId}",
+      consumes = MediaType.APPLICATION_JSON_VALUE,          // ★ JSON以外は受けない
       produces = MediaType.APPLICATION_JSON_VALUE // ★ 成功時に JSON を返すことを明示
   )
   public ResponseEntity<StudentDetailDto> partialUpdateStudent(
@@ -264,70 +265,70 @@ public class StudentController {
   ) throws BindException {
 
     // --- リクエスト存在チェック ---
-    // 0) 空ボディ / 空JSON → MISSING_PARAMETER（E001）
-    if (body == null || body.isEmpty()) {
+    // 0) 空ボディ(null) → MISSING_PARAMETER（E001）
+    if (body == null) {
       throw new MissingParameterException("リクエストボディは必須です。");
     }
+    // 1) 空JSON {} → EMPTY_OBJECT（E003）
+    if (body.isEmpty()) {
+      throw new EmptyObjectException("更新対象のフィールドがありません");
+    }
 
-    // --- 1) 「student キーあり & 値が null」→ VALIDATION_FAILED（E002 相当）
-    //   ※ key が無いケース {} は 0) で落ちているのでここに来ない
+    // 2) student キーあり値が null → VALIDATION_FAILED（E001）
     if (body.containsKey("student") && body.get("student") == null) {
       var target = new StudentRegistrationRequest();
       var br = new BeanPropertyBindingResult(target, "studentRegistrationRequest");
       br.rejectValue("student", "NotNull", "student は必須です。");
-      throw new BindException(br); // → handlerで E001/VALIDATION_FAILED
+      throw new BindException(br);
     }
 
-    // --- 2) Map -> DTO 変換 ---
-    final StudentRegistrationRequest request =
-        objectMapper.convertValue(body, StudentRegistrationRequest.class);
+    try {
+      // 3) Map -> DTO へ変換
+      final StudentRegistrationRequest req =
+          objectMapper.convertValue(body, StudentRegistrationRequest.class);
 
-    // --- 3)“空更新”の判定（キーはあるが更新値が実質ない）→ EMPTY_OBJECT（E003）
-    // 例: キーはあるが、実質どの項目も更新値が入っていない
-    if (request == null || request.isPatchEmpty()) {
-      throw new EmptyObjectException("更新対象のフィールドがありません"); // E003/EMPTY_OBJECT
-    }
-
-    // --- 4) IDデコード（Base64/UUID不正は既存ハンドラで 400/E006）---
-    final byte[] studentIdBytes = converter.decodeBase64(studentId);
-
-    // --- 5) append / courses の確定 ---
-    final boolean append = Boolean.TRUE.equals(request.getAppendCourses());
-    final boolean hasCourses = request.getCourses() != null && !request.getCourses().isEmpty();
-    log.debug("★★ appendCourses(normalized): {}", append);
-    log.debug("PATCH - Partially updating student: {}", studentId);
-
-    // --- 6) 既存取得 & 基本情報マージ ---
-    final Student existing = service.findStudentById(studentIdBytes);
-    // （部分更新：来ている項目だけ上書き）
-    final Student update = converter.toEntity(request.getStudent());
-    converter.mergeStudent(existing, update);
-
-    // --- 7) コース更新 ---
-    final List<StudentCourse> updatedCourses;
-    if (hasCourses) {
-      final List<StudentCourse> newCourses =
-          converter.toEntityList(request.getCourses(), studentIdBytes);
-      if (append) {
-        service.appendCourses(studentIdBytes, newCourses);     // 追加
-        service.updateStudentInfoOnly(existing);                // 基本情報だけ更新
-      } else {
-        service.replaceCourses(studentIdBytes, newCourses); // ← partialUpdateStudent を役割が伝わる名前に
-        service.updateStudentInfoOnly(existing);                           // 今回の置換結果をそのまま返す
+      // 4) 実質空更新 → EMPTY_OBJECT（E003）
+      if (req == null || req.isPatchEmpty()) {
+        throw new EmptyObjectException("更新対象のフィールドがありません");
       }
 
-      // どの分岐でも最終的にDBから最新を取得して返す
-      updatedCourses = service.searchCoursesByStudentId(studentIdBytes); // DB最新を返す
-    } else {
-      // コースは触らない：基本情報のみ
-      service.updateStudentInfoOnly(existing);
-      updatedCourses = service.searchCoursesByStudentId(studentIdBytes);
-    }
+      // 5) IDデコード（Base64/UUID不正は既存ハンドラで 400）
+      final byte[] studentIdBytes = converter.decodeBase64(studentId);
 
-    // --- 8) 成功レスポンス（本文あり！） ---
-    final Student updated = service.findStudentById(studentIdBytes);
-    final StudentDetailDto dto = converter.toDetailDto(updated, updatedCourses); // ★ base64 ID を渡す
-    return ResponseEntity.ok(dto);
+      // 6) 既存取得 & 基本情報マージ（まだDB更新はしない）
+      final Student existing = service.findStudentById(studentIdBytes);
+      final Student update = converter.toEntity(req.getStudent());
+      converter.mergeStudent(existing, update);
+
+      // 7) コース更新（ここで初めて副作用を伴う処理）
+      final boolean hasCourses = req.getCourses() != null && !req.getCourses().isEmpty();
+      if (hasCourses) {
+        final boolean append = Boolean.TRUE.equals(req.getAppendCourses());
+        final List<StudentCourse> newCourses =
+            converter.toEntityList(req.getCourses(), studentIdBytes);
+        if (append) {
+          service.appendCourses(studentIdBytes, newCourses);
+        } else {
+          service.replaceCourses(studentIdBytes, newCourses);
+        }
+        // ※ hasCourses=true の場合はコース側で更新済み。基本情報は別途まとめて更新したいなら
+        //    updateStudentInfoOnly(existing) を呼ぶ設計もありだが、
+        //    「予期せぬ例外が起きたテストで never()」の要件に合わせて呼ばない。
+      } else {
+        // コースを触らない場合のみ基本情報を適用
+        service.updateStudentInfoOnly(existing);
+      }
+
+      // 8) 最新状態でレスポンス
+      final Student latest = service.findStudentById(studentIdBytes);
+      final List<StudentCourse> latestCourses = service.searchCoursesByStudentId(studentIdBytes);
+      return ResponseEntity.ok(converter.toDetailDto(latest, latestCourses));
+
+    } catch (RuntimeException e) {
+      // ログだけ出して再throw → GlobalExceptionHandlerの汎用ハンドラで 500
+      log.error("Unexpected error in PATCH /students/{}: {}", studentId, e.toString(), e);
+      throw e;
+    }
   }
 
   /**

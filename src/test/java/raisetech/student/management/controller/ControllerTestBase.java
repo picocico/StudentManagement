@@ -1,10 +1,14 @@
 package raisetech.student.management.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.ByteBuffer;
@@ -75,13 +79,15 @@ abstract class ControllerTestBase {
           || "true".equalsIgnoreCase(System.getenv("DEBUG_TESTS"));
 
   // .andDo(...) に差せる条件付きハンドラ
+  // デフォルトは無出力（-DDEBUG_MOCKMVC=true でのみ有効化）
   protected static org.springframework.test.web.servlet.ResultHandler maybePrint() {
-    return result -> {
-      if (DEBUG) {
-        print().handle(result); // 標準の print() をそのまま呼ぶ
-        System.out.println(result.getResponse().getContentAsString()); // ついでに本文も
-      }
-    };
+    // デフォルトは無出力
+    if (!Boolean.parseBoolean(System.getProperty("DEBUG_MOCKMVC", "false"))) {
+      return result -> {
+      }; // no-op
+    }
+    // デバッグ時のみ本文表示やprint()を使う
+    return org.springframework.test.web.servlet.result.MockMvcResultHandlers.print();
   }
 
   // テスト共通で使う「常に16バイト」のID
@@ -154,6 +160,7 @@ abstract class ControllerTestBase {
    */
   @BeforeEach
   void setupAll() {
+
     // 1) 値の初期化 16バイトIDを必ず使用
     base64Id = base64FromUuid(VALID_UUID);
     studentId = bytesFromUuid(VALID_UUID);
@@ -255,6 +262,10 @@ abstract class ControllerTestBase {
     // encodeBase64 の共通スタブが必要なら、VALID_UUID から作った bytes に合わせる
     when(converter.encodeBase64(argThat(arr -> Arrays.equals(arr, studentId))))
         .thenReturn(base64Id);
+
+    // 共通ハッピーパス・スタブ（必要なら各テストで上書きOK）
+    stubConverterHappyPath();
+    stubServiceHappyPath();
   }
 
   // ←――――――――――――――――――――――――――――――――――――――――――――――
@@ -315,25 +326,128 @@ abstract class ControllerTestBase {
 
     var root = objectMapper.readTree(resp.getContentAsString());
 
-    // errorType / error のどちらでもOK
-    String actualType = root.hasNonNull("errorType")
-        ? root.get("errorType").asText()
-        : root.path("error").asText("");
-    assertThat(actualType).isEqualTo(expectedType);
+    // error は必須（旧: errorType は非対応）
+    String actualType = root.path("error").asText("");
+    assertThat(actualType)
+        .as("error フィールドは必須")
+        .isEqualTo(expectedType);
 
-    // errorCode / code（int or String）どちらでもOK
-    String actualCode = root.hasNonNull("errorCode")
-        ? root.get("errorCode").asText()
-        : (root.has("code")
-            ? (root.get("code").isInt()
-            ? String.valueOf(root.get("code").asInt())
-            : root.get("code").asText())
-            : "");
-    assertThat(actualCode).contains(expectedCodeSubstring); // "E404" や "400" 部分一致
+    // code は必須（常に "E***" の String を想定）
+    String actualCode = root.path("code").asText("");
+    assertThat(actualCode)
+        .as("code フィールドは必須（例: E001, E004）")
+        .isNotBlank()
+        .contains(expectedCodeSubstring);
+
+    // 旧キーは存在しないことを明示チェック（Smoke の契約を固定化）
+    assertThat(root.has("errorCode")).as("旧キー errorCode は出力しない").isFalse();
+    assertThat(root.has("errorType")).as("旧キー errorType は出力しない").isFalse();
 
     if (expectedMessageSubstringOrNull != null) {
       String actualMsg = root.path("message").asText("");
       assertThat(actualMsg).contains(expectedMessageSubstringOrNull);
     }
+  }
+
+  // --------------------
+  // stubbing helpers
+  // --------------------
+
+  /**
+   * Converter の「共通ハッピーパス」スタブを設定します。
+   * <p>
+   * Controller の単体テストで、変換レイヤーの振る舞いを安定化させるための 最低限のダミー挙動（成功シナリオ）を一括で登録します。 個々のテストで上書き（再スタブ）して構いません。
+   *
+   * <h4>設定内容</h4>
+   * <ul>
+   *   <li>{@code decodeBase64(String)}: 任意入力 → ダミー16進配列（{@code byte[]{1,2,3}}）</li>
+   *   <li>{@code toEntity(...)}: 任意入力（null 可）→ 空の {@code Student} を返却</li>
+   *   <li>{@code mergeStudent(...)}: void メソッド → 何もしない（素通し）</li>
+   *   <li>{@code toEntityList(...)}: 任意入力 → 空リスト</li>
+   *   <li>{@code toDetailDto(...)}: 最小限の {@code StudentDetailDto}（または mock）を返却</li>
+   * </ul>
+   *
+   * <h4>意図</h4>
+   * 変換の正当性そのものはこのテストでは検証対象外とし、
+   * Controller の分岐やエラーハンドリングだけに焦点を当てます。
+   *
+   * <h4>注意</h4>
+   * {@code StudentDetailDto} にデフォルトコンストラクタが無い場合は mock 返却にフォールバックします。
+   */
+  // 共通（ハッピーパス）スタブを流し込む
+  protected void stubConverterHappyPath() {
+    // Controller で decodeBase64 を呼ぶケースに対応
+    when(converter.decodeBase64(anyString())).thenReturn(new byte[]{1, 2, 3});
+
+    // toEntity(null 可)。必要最低限の空オブジェクトでOK
+    when(converter.toEntity(any())).thenAnswer(inv -> new Student());
+
+    // mergeStudent は void：素通し
+    doAnswer(inv -> null).when(converter).mergeStudent(any(Student.class), any(Student.class));
+
+    // toEntityList：空リストでOK（個別テストで上書き可能）
+    when(converter.toEntityList(anyList(), any())).thenReturn(List.of());
+
+    // toDetailDto：最小のダミーを返す
+    // new StudentDetailDto() が無ければ、下の行をコメントアウトして、代わりに mock を返してOK
+    try {
+      when(converter.toDetailDto(any(Student.class), anyList()))
+          .thenAnswer(inv -> {
+            try {
+              return new StudentDetailDto(); // ← デフォコン無ければ次行に切替
+            } catch (Throwable t) {
+              return org.mockito.Mockito.mock(StudentDetailDto.class);
+            }
+          });
+    } catch (Throwable ignore) {
+      when(converter.toDetailDto(any(Student.class), anyList()))
+          .thenReturn(org.mockito.Mockito.mock(StudentDetailDto.class));
+    }
+  }
+
+  /**
+   * Service の「共通ハッピーパス」スタブを設定します。
+   * <p>
+   * DB アクセスを伴うサービス層を無害化し、Controller の挙動を疎結合に 検証するための標準スタブです。個々のテストで上書き可能です。
+   *
+   * <h4>設定内容</h4>
+   * <ul>
+   *   <li>{@code findStudentById(...)}: 新規 {@code Student} を返却</li>
+   *   <li>{@code searchCoursesByStudentId(...)}: 空リストを返却</li>
+   *   <li>{@code updateStudentInfoOnly / appendCourses / replaceCourses}: void → 何もしない</li>
+   * </ul>
+   *
+   * <h4>意図</h4>
+   * 永続化やビジネスロジックの副作用を排し、Controller レベルの
+   * 入出力・例外ハンドリングに集中してテストできるようにします。
+   */
+  protected void stubServiceHappyPath() {
+    when(service.findStudentById(any())).thenReturn(new Student());
+    when(service.searchCoursesByStudentId(any())).thenReturn(List.of());
+
+    // void メソッドは doNothing
+    doNothing().when(service).updateStudentInfoOnly(any(Student.class));
+    doNothing().when(service).appendCourses(any(), anyList());
+    doNothing().when(service).replaceCourses(any(), anyList());
+  }
+
+  /**
+   * 「想定外の実行時例外（500/E999 相当）」を能動的に発火させるための補助。
+   * <p>
+   * 早い段階（例：{@code decodeBase64(...)}）で {@link RuntimeException} を投げるようにスタブし、
+   * 後続のサービス呼び出しへ到達しない経路を作ります。
+   *
+   * <h4>用途</h4>
+   * <ul>
+   *   <li>GlobalExceptionHandler の 500 系ハンドリング（メッセージ／コード／ログ）の検証</li>
+   *   <li>{@code NeverWantedButInvoked} 回避（サービスが呼ばれないことの保証）</li>
+   * </ul>
+   *
+   * <h4>使い方</h4>
+   * 対象テストメソッドの冒頭で本メソッドを呼び出してから、通常通り MockMvc を実行します。
+   */
+  protected void makeConverterThrowEarly() {
+    when(converter.decodeBase64(anyString()))
+        .thenThrow(new RuntimeException("boom"));
   }
 }

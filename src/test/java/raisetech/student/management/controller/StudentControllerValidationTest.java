@@ -642,11 +642,10 @@ class StudentControllerValidationTest extends ControllerTestBase {
             .contentType(MediaType.APPLICATION_JSON)
             .content("{}"))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-        .andExpect(jsonPath("$.status").value(400))
+        .andExpect(jsonPath("$.error").value("EMPTY_OBJECT"))
         .andExpect(jsonPath("$.code").value("E003"))
-        .andExpect(jsonPath("$.error").value("MISSING_PARAMETER"))
-        .andExpect(jsonPath("$.message", containsString("リクエストボディ")));
+        .andExpect(jsonPath("$.message").value(
+            org.hamcrest.Matchers.containsString("更新対象のフィールドがありません")));
 
     verifyNoInteractions(converter, service);
   }

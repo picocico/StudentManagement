@@ -22,8 +22,26 @@ import raisetech.student.management.exception.dto.FieldErrorDetail;
 
 /**
  * 例外→統一フォーマットの {@link ErrorResponse} へ変換するハンドラ群。
- * <p>原則として {@code code=E***}, {@code error=種別ラベル} の形に統一します。
- * 詳細エラーがある場合は {@code build(..., fieldErrors)} を利用します。</p>
+ *
+ * <p><strong>準拠事項（ErrorResponse 最終仕様）</strong></p>
+ * <ul>
+ *   <li>出力キーは <code>status</code>, <code>code</code>, <code>error</code>, <code>message</code> を基本とし、
+ *       必要時のみ <code>errors</code>（複数バリデーション等）を付与します。</li>
+ *   <li><em>レガシー別名</em>の <code>errorType</code> / <code>errorCode</code> は<strong>一切出力しません</strong>（互換目的でも不出力）。</li>
+ *   <li><code>details</code> は互換用の別名として扱い、原則出力しません（やむを得ず出す場合でも
+ *       <code>errors</code> と内容の重複を避けます）。</li>
+ *   <li>原則として <code>code="E***"</code>、<code>error=種別ラベル</code>（例：EMPTY_OBJECT / MISSING_PARAMETER / TYPE_MISMATCH）に統一します。</li>
+ * </ul>
+ *
+ * <p><strong>実装ノート</strong></p>
+ * <ul>
+ *   <li>ハンドラはすべて {@code build(...)} 系を経由し、キー順序や欠落キーを吸収して
+ *       シリアライズの一貫性を保ちます。</li>
+ *   <li>テスト（ErrorContract*）は、上記フォーマットへの準拠（レガシーキー不出力／必須キーの存在）を
+ *       スモークとして常時検証します。</li>
+ * </ul>
+ *
+ * <p>詳細仕様は README の「ErrorResponse（最終仕様）」を参照してください。</p>
  */
 @Slf4j
 @RestControllerAdvice
@@ -37,9 +55,8 @@ public class GlobalExceptionHandler {
     var details = ex.getBindingResult().getFieldErrors().stream()
         .map(err -> new FieldErrorDetail(err.getField(), err.getDefaultMessage()))
         .toList();
-    // ★ ここをテスト期待に合わせる
-    String msg = "入力値に不備があります";
-    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001", msg, details);
+    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001", "入力値に不備があります",
+        details);
   }
 
   @ExceptionHandler(ConstraintViolationException.class)
@@ -60,7 +77,7 @@ public class GlobalExceptionHandler {
         details);
   }
 
-  // ========= 404: リソース未検出 =========
+  /// ========= 404: リソース未検出 =========
   @ExceptionHandler(ResourceNotFoundException.class)
   public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
     String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
@@ -71,56 +88,66 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(NoHandlerFoundException.class)
   public ResponseEntity<ErrorResponse> handleNoHandlerFound(NoHandlerFoundException ex) {
-    return build(HttpStatus.NOT_FOUND, "NOT_FOUND", "E404", "指定されたURLは存在しません");
+    return build(HttpStatus.NOT_FOUND, "NOT_FOUND", "E404", "指定されたURLは存在しません", null);
   }
 
-  // ========= 400: JSON不正 / ボディ欠如 =========
+  /// ========= 400: JSON不正 / ボディ欠如 =========
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException ex) {
     String raw = ex.getMessage();
+    Throwable root = (ex.getCause() != null) ? ex.getCause() : ex;
 
-    // 1) ボディ欠落
-    if (raw != null && (
-        raw.contains("Required request body is missing")
-            || raw.contains("No content to map")
-            || raw.contains("Unexpected end-of-input"))) {
+    // 1) ボディ欠落（required=true で空 / 0byte / 途中終了 など）
+    if (raw != null && (raw.contains("Required request body is missing")
+        || raw.contains("No content to map")
+        || raw.contains("Unexpected end-of-input")
+        || raw.contains("JSON parse error")              // Spring 6 でよく見る
+        || raw.contains("End-of-input")                  // Jackson 文言
+    )) {
       return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003",
-          "リクエストボディは必須です。");
+          "リクエストボディは必須です。", null);
     }
 
-    // 2) JSON不正（Jacksonの代表的な原因も拾う）
-    Throwable root = ex.getCause();
+    // 2) JSON 構造不正
     if (root instanceof com.fasterxml.jackson.core.JsonParseException
         || root instanceof com.fasterxml.jackson.databind.exc.MismatchedInputException) {
       return build(HttpStatus.BAD_REQUEST, "INVALID_JSON", "E002",
-          "リクエストのJSONが不正です。構造を確認してください。");
+          "リクエストのJSONが不正です。構造を確認してください。", null);
     }
 
-    // 3) その他もまとめて 400 / E006
+    // 3) その他
     return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006",
-        "リクエストボディの形式が不正です");
+        "リクエストボディの形式が不正です", null);
   }
 
-  // ========= 400: ID形式不正（独自） =========
+  /// ========= 400: ID形式不正（Base64/UUID長） =========
   @ExceptionHandler(InvalidIdFormatException.class)
   public ResponseEntity<ErrorResponse> handleInvalidId(InvalidIdFormatException ex) {
-    return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006",
-        ex.getMessage() != null ? ex.getMessage() : "IDの形式が不正です");
+    String msg = (ex.getMessage() != null && !ex.getMessage().isBlank())
+        ? ex.getMessage()
+        : "IDの形式が不正です";
+    var details = List.of(new FieldErrorDetail("studentId", msg));
+    return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006", msg, details);
   }
 
-  // ========= 400: 型不一致（パラメータ変換） =========
+  /// ========= 400: 型不一致（クエリ/パスパラメータ変換） =========
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-    String name = ex.getName();                 // 例: includeDeleted / deletedOnly
-    Object value = ex.getValue();               // 例: abc / xyz
-    String required =
+    String field = ex.getName();
+    String rejected = String.valueOf(ex.getValue());
+    String expected =
         ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
-    String msg = String.format("リクエストパラメータ '%s' の型が不正です（値='%s'、期待型=%s）", name,
-        value, required);
-    return build(HttpStatus.BAD_REQUEST, "TYPE_MISMATCH", "E004", msg);
+
+    var detail = new FieldErrorDetail(
+        field,
+        String.format("型不一致（値='%s', 期待型=%s）", rejected, expected)
+    );
+    String msg = String.format("リクエストパラメータ '%s' の型が不正です", field);
+
+    return build(HttpStatus.BAD_REQUEST, "TYPE_MISMATCH", "E004", msg, List.of(detail));
   }
 
-  // ========= 400: 必須クエリ欠如 =========
+  /// ========= 400: 必須クエリ欠如 =========
   @ExceptionHandler(MissingServletRequestParameterException.class)
   public ResponseEntity<ErrorResponse> handleMissingParam(
       MissingServletRequestParameterException ex) {
@@ -129,28 +156,35 @@ public class GlobalExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003", msg, null);
   }
 
-  // ========= 400: バインディング不足/欠落（ヘッダ等含む） =========
+  /// ========= 400: バインディング不足/欠落（ヘッダ等含む） =========
   @ExceptionHandler(ServletRequestBindingException.class)
   public ResponseEntity<ErrorResponse> handleBinding(ServletRequestBindingException ex) {
     String message = "リクエストに必要なパラメータが不足しています: " + ex.getMessage();
-    return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003", message);
+    return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003", message, null);
   }
 
-  // ========= 400: 空オブジェクト =========
-  @ExceptionHandler(EmptyObjectException.class)
-  public ResponseEntity<ErrorResponse> handleEmptyObject(EmptyObjectException ex) {
-    return build(HttpStatus.BAD_REQUEST, "EMPTY_OBJECT", "E003",
-        ex.getMessage() != null ? ex.getMessage() : "更新対象のフィールドがありません");
-  }
-
-  // ========= 400: 空ボディ / 空JSON（独自） =========
+  /// 　========= 400:空ボディ（Controller側で MissingParameterException を投げるケース）=========
   @ExceptionHandler(MissingParameterException.class)
   public ResponseEntity<ErrorResponse> handleMissingParameter(MissingParameterException ex) {
-    return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003",
-        ex.getMessage() != null ? ex.getMessage() : "リクエストボディは必須です。");
+    String msg = (ex.getMessage() == null || ex.getMessage().isBlank())
+        ? "リクエストボディは必須です。"
+        : ex.getMessage();
+    return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003", msg, null);
   }
 
-  // ========= 400: その他 IllegalArgumentException は E006 に寄せる =========
+  /// ========= 400: 空オブジェクト（キーはあるが実質更新対象なし）=========
+  // 用途: PATCH などで JSON ボディ自体はあるが、更新すべき値が 1つも無い場合に投げるアプリ独自例外。
+  // 例: {} / {"student":{}} / {"appendCourses":null,"courses":[]} など、業務的に「更新なし」と判定。
+  // 返却: 400 Bad Request / error=EMPTY_OBJECT / code=E003 / message=「更新対象のフィールドがありません」
+  @ExceptionHandler(EmptyObjectException.class)
+  public ResponseEntity<ErrorResponse> handleEmptyObject(EmptyObjectException ex) {
+    String msg = (ex.getMessage() == null || ex.getMessage().isBlank())
+        ? "更新対象のフィールドがありません"
+        : ex.getMessage();
+    return build(HttpStatus.BAD_REQUEST, "EMPTY_OBJECT", "E003", msg, null);
+  }
+
+  /// ========= 400: その他 IllegalArgumentException は E006 に寄せる =========
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ErrorResponse> handleBadInput(IllegalArgumentException ex) {
     String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
@@ -159,14 +193,14 @@ public class GlobalExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006", message, null);
   }
 
-  // ========= 403: 権限不足 =========
+  /// ========= 403: 権限不足 =========
   @ExceptionHandler(AccessDeniedException.class)
   public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
     return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "E403",
-        "アクセスが拒否されました。管理者権限が必要です。");
+        "アクセスが拒否されました。管理者権限が必要です。", null);
   }
 
-  // ========= 500: 想定外 =========
+  /// ========= 500: 想定外 =========
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
     return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "E999",
@@ -182,8 +216,9 @@ public class GlobalExceptionHandler {
    *
    * @see #build(HttpStatus, String, String, String, java.util.List)
    */
-  private ResponseEntity<ErrorResponse> build(HttpStatus status, String errorType, String errorCode,
-      String message) {
+  private ResponseEntity<ErrorResponse> build(
+      HttpStatus status, String errorType, String errorCode, String message
+  ) {
     return build(status, errorType, errorCode, message, null);
   }
 
@@ -213,46 +248,43 @@ public class GlobalExceptionHandler {
    *   <li>{@code body.errors} と {@code body.details} は同内容（エイリアス）になります。</li>
    * </ul>
    *
-   * @param status      HTTP ステータス
-   * @param errorType   エラー種別ラベル（例: NOT_FOUND, VALIDATION_FAILED）
-   * @param errorCode   エラーコード（例: E404, E002）
-   * @param message     メッセージ
-   * @param fieldErrors フィールドエラー一覧（省略可）
+   * @param status    HTTP ステータス
+   * @param errorType エラー種別ラベル（例: NOT_FOUND, VALIDATION_FAILED）
+   * @param errorCode エラーコード（例: E404, E002）
+   * @param message   メッセージ
+   * @param details   フィールドエラー一覧（省略可）
    * @return エラーレスポンス
    */
   private ResponseEntity<ErrorResponse> build(
       HttpStatus status,
-      String errorType,   // ← errorCode
-      String errorCode,   // ← errorType
+      String errorType,          // 例: VALIDATION_FAILED
+      String errorCode,          // 例: E001
       String message,
-      List<FieldErrorDetail> fieldErrors) {
-
-    // 呼び出し側で順番が逆（code,error）になっていても吸収する
-    if (isErrorCode(errorType) && !isErrorCode(errorCode)) {
-      String tmp = errorType;
-      errorType = errorCode; // INVALID_REQUEST 等
-      errorCode = tmp;       // E006 等
+      List<FieldErrorDetail> details // ない時は null を渡す
+  ) {
+    // （任意）引数チェックで誤用を早期発見
+    if (isErrorCode(errorType) || !isErrorCode(errorCode)) {
+      // テストや開発時は例外で即気づけるようにする（本番で例外にしたくなければ log.warn に変更）
+      throw new IllegalArgumentException(
+          "build(...) の引数順が不正です: errorType=" + errorType + ", errorCode=" + errorCode);
     }
 
-    // ErrorResponse.of(...) は、status(int), errorType(String), errorCode(String), message, errors, details を受け取り
-    // code(=errorCode) と error(=errorType) を内部でセットする実装（前段で作成したもの）を想定
-    ErrorResponse body = new ErrorResponse();
-    body.setStatus(status.value());
-    // ここがポイント：code には E***、error には種別文字列
-    body.setCode(errorCode);     // 例: E003, E006, E001
-    body.setError(errorType);   // 例: MISSING_PARAMETER, INVALID_REQUEST, VALIDATION_FAILED
-    body.setMessage(message);
-
-    // null/空はシリアライズから落としたい想定（@JsonInclude(Include.NON_NULL) 等）
     List<FieldErrorDetail> safe =
-        (fieldErrors == null || fieldErrors.isEmpty()) ? null : List.copyOf(fieldErrors);
-    body.setErrors(safe);
-    body.setDetails(safe);// ← details を errors のエイリアスとして同じ内容にする
-    // details を物理的に別プロパティとして持つならこちらも同じ参照をセット
-    // （ErrorResponseに setDetails(...) がある場合のみ）
+        (details == null || details.isEmpty()) ? null : List.copyOf(details);
+
+    var body = ErrorResponse.builder()
+        .status(status.value())
+        .code(errorCode)     // ← E***
+        .error(errorType)    // ← 種別ラベル
+        .message(message)
+        .errors(safe)
+        .details(safe)       // エイリアス
+        .build();
+
     return ResponseEntity.status(status).body(body);
   }
 
+  // ヘルパー：Eddd 判定
   private static boolean isErrorCode(String s) {
     return s != null && s.matches("E\\d{3}");
   }

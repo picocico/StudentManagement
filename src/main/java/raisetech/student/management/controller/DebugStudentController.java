@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 
+// Note: このエンドポイントは @Profile("test") のみで有効。
+// 本番プロファイルではコンテナに登録されない（副作用防止）。
 @Profile("test") // ← test プロファイルでのみ有効
 @RestController
 @RequestMapping("/api/students")

@@ -11,6 +11,8 @@ import raisetech.student.management.service.StudentService;
 @TestConfiguration
 public class TestMockConfig {
 
+  // @Primary: @WebMvcTest が作るコンテキストに、
+  // 実装クラスの本物Beanが紛れないようモックを最優先に差し替えるため
   @Bean
   @Primary
   public StudentService service() {
