@@ -9,10 +9,9 @@ server:
 # テスト時のログ粒度（必要に応じて調整）
 logging:
   level:
-    root: INFO
-    raisetech.student.management.exception.GlobalExceptionHandler: DEBUG
-    org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: TRACE
-    org.springframework.http.converter.json: DEBUG
+    root: WARN
+    org.springframework.web: WARN
+    raisetech.student.management: INFO
 
 # MyBatis のSQLログを見たい場合（必要な時だけ）
 mybatis:

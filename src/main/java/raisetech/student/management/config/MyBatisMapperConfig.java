@@ -7,6 +7,4 @@ import org.springframework.context.annotation.Profile;
 @Configuration
 @Profile("!test") // ← テストでは無効
 @MapperScan("raisetech.student.management.repository")
-public class MyBatisMapperConfig {
-
-}
+public class MyBatisMapperConfig {}

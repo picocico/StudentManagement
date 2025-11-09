@@ -1,148 +1,150 @@
 plugins {
-    id 'java'
-    id 'war'
-    id 'org.springframework.boot' version '3.4.0'
-    id 'io.spring.dependency-management' version '1.1.6'
-    id 'jacoco'
-    id 'com.diffplug.spotless' version '6.25.0'
+	id 'java'
+	id 'war'
+	id 'org.springframework.boot' version '3.4.0'
+	id 'io.spring.dependency-management' version '1.1.6'
+	id 'jacoco'
+	id 'com.diffplug.spotless' version '6.25.0'
 }
 
 group = 'raisetech'
 version = '0.0.1-SNAPSHOT'
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
 }
 
 spotless {
-    // Javaコードの整形
-    java {
-        target 'src/**/*.java'
-        // Google Java Format。必要ならバージョン固定も可: googleJavaFormat('1.17.0')
-        googleJavaFormat()
-        // 使われていない import を削除
-        removeUnusedImports()
-        // import の並び順（好みで）：標準→javax→org→com→（空行）→プロジェクト
-        importOrder 'java', 'javax', 'org', 'com', ''
-        // 末尾空白/改行などの微整形
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
+	// Javaコードの整形
+	java {
+		target 'src/**/*.java'
+		// Google Java Format。必要ならバージョン固定も可: googleJavaFormat('1.17.0')
+		googleJavaFormat()
+		// 使われていない import を削除
+		removeUnusedImports()
+		// import の並び順（好みで）：標準→javax→org→com→（空行）→プロジェクト
+		importOrder 'java', 'javax', 'org', 'com', ''
+		// 末尾空白/改行などの微整形
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
 
-    // build.gradle など Gradleスクリプトも整形（オプション）
-    groovyGradle {
-        target '*.gradle', 'gradle/**/*.gradle'
-        // Greclipse フォーマッタを使う（設定ファイルがあれば指定も可）
-        greclipse()
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
+	// build.gradle など Gradleスクリプトも整形（オプション）
+	groovyGradle {
+		target '*.gradle', 'gradle/**/*.gradle'
+		// Greclipse フォーマッタを使う（設定ファイルがあれば指定も可）
+		greclipse()
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
 
-    // ついでに Markdown / gitignore なども（オプション）
-    format 'misc', {
-        target '.gitignore', '**/*.md'
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
+	// ついでに Markdown / gitignore なども（オプション）
+	format 'misc', {
+		target '.gitignore', '**/*.md'
+		trimTrailingWhitespace()
+		endWithNewline()
+	}
 }
 
 repositories {
-    mavenCentral()
+	mavenCentral()
 }
 
-configurations { // Mockito を -javaagent で渡すための専用構成（依存を引っ張らない）
-    mockitoAgent {
-        transitive = false
-    }
+configurations {
+	// Mockito を -javaagent で渡すための専用構成（依存を引っ張らない）
+	mockitoAgent {
+		transitive = false
+	}
 }
 
 dependencies {
-    // --- アプリ依存 ---
-    // Spring Boot
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    // Thymeleaf
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-    // OpenAPI Generator
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
-    //　便利機能、ユーティリティ
-    implementation 'org.apache.commons:commons-lang3:3.18.0'
-    // Spring Security のスターター。認証・認可（ログイン制御やロールベースのアクセス制限）
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-    //MyBatis
-    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
-    // Spring Boot Validation(Jakarta Validation API)
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    //MySQLドライバ
-    runtimeOnly 'com.mysql:mysql-connector-j'
-    // Tomcat（組み込みサーバー）
-    providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+	// --- アプリ依存 ---
+	// Spring Boot
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	// Thymeleaf
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+	// OpenAPI Generator
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
+	//　便利機能、ユーティリティ
+	implementation 'org.apache.commons:commons-lang3:3.18.0'
+	// Spring Security のスターター。認証・認可（ログイン制御やロールベースのアクセス制限）
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	//MyBatis
+	implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
+	// Spring Boot Validation(Jakarta Validation API)
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	//MySQLドライバ
+	runtimeOnly 'com.mysql:mysql-connector-j'
+	// Tomcat（組み込みサーバー）
+	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
 
-    // --- Lombok ---
-    //  Lombok
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+	// --- Lombok ---
+	//  Lombok
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
 
-    // --- テスト依存 ---
-    // Spring Boot テスト全般（@SpringBootTest, @TestConfiguration など）
-    // まとめて入る（JUnit/AssertJ/Mockito）
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    // JUnit5 と Mockito の連携（@ExtendWith(MockitoExtension.class) を使うなら推奨）
-    testImplementation "org.mockito:mockito-core:5.13.0"
-    testImplementation "org.mockito:mockito-junit-jupiter:5.13.0"
+	// --- テスト依存 ---
+	// Spring Boot テスト全般（@SpringBootTest, @TestConfiguration など）
+	// まとめて入る（JUnit/AssertJ/Mockito）
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	// JUnit5 と Mockito の連携（@ExtendWith(MockitoExtension.class) を使うなら推奨）
+	testImplementation "org.mockito:mockito-core:5.13.0"
+	testImplementation "org.mockito:mockito-junit-jupiter:5.13.0"
 
-    // testImplementation 'org.mockito:mockito-core:5.12.0'
+	// testImplementation 'org.mockito:mockito-core:5.12.0'
 
-    // （任意）AssertJ を明示バージョン固定したい場合のみ：
-    // testImplementation 'org.assertj:assertj-core:3.26.3'
-    // JUnit テスト　ランチャー
-    // testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    // JUnit（Jupiter）の本体ライブラリ
-    // testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+	// （任意）AssertJ を明示バージョン固定したい場合のみ：
+	// testImplementation 'org.assertj:assertj-core:3.26.3'
+	// JUnit テスト　ランチャー
+	// testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	// JUnit（Jupiter）の本体ライブラリ
+	// testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
 }
 
 tasks.named('test') {
-    useJUnitPlatform() // JUnitを使ってテストを実行するための設定
-    // ★ テスト実行後にカバレッジレポートを必ず作る
-    finalizedBy 'jacocoTestReport'
+	useJUnitPlatform() // JUnitを使ってテストを実行するための設定
+	// ★ テスト実行後にカバレッジレポートを必ず作る
+	finalizedBy 'jacocoTestReport'
 
-    // ★ JUnitのXML/HTMLレポートを明示有効化（XMLはPRコメントActionが読む）
-    reports {
-        junitXml.required = true
-        html.required = true
-    }
+	// ★ JUnitのXML/HTMLレポートを明示有効化（XMLはPRコメントActionが読む）
+	reports {
+		junitXml.required = true
+		html.required = true
+	}
 
-// JavaAgent は不要（mockito-inline を使用するため）
-// jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
-// ★ Mockito を javaagent で起動（警告の根本原因を解消）
+	// JavaAgent は不要（mockito-inline を使用するため）
+	// jvmArgs "-javaagent:${configurations.mockitoAgent.singleFile}"
+	// ★ Mockito を javaagent で起動（警告の根本原因を解消）
 
-    testLogging {
-        events "passed", "skipped", "failed"
-        exceptionFormat "full"
-        showStandardStreams = true
-    }
+	testLogging {
+		events "passed", "skipped", "failed"
+		exceptionFormat "full"
+		showStandardStreams = true
+	}
 }
 
 // ★ JaCoCo のバージョンと出力形式
 jacoco {
-    toolVersion = '0.8.11'
+	toolVersion = '0.8.11'
 }
 
 tasks.jacocoTestReport {
-    dependsOn tasks.test
-    reports {
-        xml.required = true   // CIツール等が読む用
-        csv.required = false
-        html.required = true  // 人が見る用（PR添付にも便利）
-    }
+	dependsOn tasks.test
+	reports {
+		xml.required = true   // CIツール等が読む用
+		csv.required = false
+		html.required = true  // 人が見る用（PR添付にも便利）
+	}
 }
 
 tasks.withType(Test).configureEach {
-    testLogging {
-        events "failed", "skipped"   // 必要なら "passed" も
-        showStandardStreams = true   // ← これが肝
-    }
+	testLogging {
+		events "failed", "skipped"   // 必要なら "passed" も
+		showStandardStreams = true   // ← これが肝
+	}
 }
 
 // （任意）最低カバレッジでCIを落としたい場合

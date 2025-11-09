@@ -7,20 +7,36 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * テスト（"test" プロファイル）実行時専用のSpring Security設定クラス。
+ *
+ * <p>この設定は、特定のデバッグ用エンドポイントへのアクセスを、 メインのセキュリティ設定（認証・認可）よりも優先して許可するために使用されます。
+ */
 @Profile("test")
 @Configuration
 public class TestSecurityConfig {
 
-  // デバッグ用エンドポイント専用のチェーン（最優先で評価）
+  /**
+   * デバッグ用エンドポイント（/api/students/debug-dto, /api/students/debug-raw）専用の セキュリティフィルタチェーンを定義します。
+   *
+   * <p>{@code @Order(0)} を指定することで、他の（デフォルトの）{@link SecurityFilterChain} よりも <b>最優先</b>で評価されます。
+   *
+   * <p>{@code securityMatcher} で指定された2つのパスにのみこの設定が適用され、 CSRF保護が無効化された上で、すべてのアクセス（認証なし）が許可されます。
+   *
+   * @param http {@link HttpSecurity} ビルダ
+   * @return デバッグエンドポイント専用の {@link SecurityFilterChain}
+   * @throws Exception HttpSecurity設定時の例外
+   */
   @Order(0)
   @Bean(name = "testSecurityFilterChain")
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     return http
-        .securityMatcher("/api/students/debug-dto", "/api/students/debug-raw") // この2パスだけ
-        .csrf(csrf -> csrf.disable())          // CSRF 無効（POSTしやすく）
-        .authorizeHttpRequests(auth -> auth
-            .anyRequest().permitAll()
-        )
+        // ★ 全てのリクエストに適用（securityMatcher を広げる or 省略）
+        .securityMatcher("/**")
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+        .httpBasic(b -> b.disable())
+        .formLogin(f -> f.disable())
         .build();
   }
 }

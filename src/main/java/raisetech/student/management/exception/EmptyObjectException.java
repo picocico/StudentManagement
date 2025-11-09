@@ -3,9 +3,7 @@ package raisetech.student.management.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-/**
- * リクエストボディが空オブジェクト {} の場合に投げる例外。 GlobalExceptionHandler で捕捉して E003 を返す。
- */
+/** リクエストボディが空オブジェクト {} の場合に投げる例外。 GlobalExceptionHandler で捕捉して E003 を返す。 */
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 public class EmptyObjectException extends RuntimeException {
 

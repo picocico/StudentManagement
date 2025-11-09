@@ -1,15 +1,15 @@
 pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        mavenCentral()
-    }
+	repositories {
+		gradlePluginPortal()
+		mavenCentral()
+	}
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT) // ← FAIL_ON_PROJECT だと build.gradle の repos が無視される
-    repositories {
-        mavenCentral()
-    }
+	repositoriesMode.set(RepositoriesMode.PREFER_PROJECT) // ← FAIL_ON_PROJECT だと build.gradle の repos が無視される
+	repositories {
+		mavenCentral()
+	}
 }
 
 // ← 上の2ブロックの後に書く

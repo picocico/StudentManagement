@@ -6,8 +6,8 @@ import java.util.UUID;
 
 /**
  * UUIDとBase64、byte[]相互の変換を提供するユーティリティクラス。
- * <p>
- * UUID（128bit）をバイナリ配列（byte[16]）やURLセーフなBase64形式に変換し、 データベース（BINARY(16)）やWeb
+ *
+ * <p>UUID（128bit）をバイナリ配列（byte[16]）やURLセーフなBase64形式に変換し、 データベース（BINARY(16)）やWeb
  * API（Base64文字列）との整合性を保つために使用されます。
  */
 public class UUIDUtil {
@@ -23,9 +23,7 @@ public class UUIDUtil {
    * @param uuid UUIDオブジェクト
    * @return UUIDのバイナリ表現（byte[16]）
    */
-  /**
-   * UUID -> 16バイト配列
-   */
+  /** UUID -> 16バイト配列 */
   public static byte[] fromUUID(UUID uuid) {
     if (uuid == null) {
       throw new IllegalArgumentException("UUIDはnullにできません");
@@ -65,10 +63,10 @@ public class UUIDUtil {
 
   /**
    * URLセーフな Base64 文字列をバイナリデータ（byte[]）にデコードします。
-   * <p>
-   * 例：UUIDのBase64文字列（パディングなし）を元のbyte[16]形式に変換します。
-   * <p>
-   * 不正なBase64文字列が渡された場合は、詳細なメッセージを含む IllegalArgumentException をスローします。
+   *
+   * <p>例：UUIDのBase64文字列（パディングなし）を元のbyte[16]形式に変換します。
+   *
+   * <p>不正なBase64文字列が渡された場合は、詳細なメッセージを含む IllegalArgumentException をスローします。
    *
    * @param base64 デコード対象のBase64文字列（URLセーフ、パディングなし）
    * @return デコードされたバイナリデータ（通常は UUID を表す byte[16]）
@@ -92,13 +90,13 @@ public class UUIDUtil {
     }
   }
 
-  //========================
+  // ========================
   // 「UUIDとしての」Base64 ⇄ byte[16]/UUID
-  //========================
+  // ========================
 
   /**
-   * Base64文字列（URLセーフ/通常のどちらでも可）を UUIDバイナリ（byte[16]）にデコードします。<br> 16バイトでない場合は
-   * IllegalArgumentException を投げます。
+   * Base64文字列（URLセーフ/通常のどちらでも可）を UUIDバイナリ（byte[16]）にデコードします。<br>
+   * 16バイトでない場合は IllegalArgumentException を投げます。
    *
    * @param base64 Base64文字列（URLセーフ推奨、パディングなしでも可）
    * @return UUIDを表す byte[16]
@@ -143,25 +141,21 @@ public class UUIDUtil {
     return toUUID(fromBase64(base64));
   }
 
-  //========================
+  // ========================
   // Helpers
-  //========================
+  // ========================
 
-  /**
-   * Base64の長さを4の倍数にするために '=' を補う（URLセーフのとき用）。
-   */
+  /** Base64の長さを4の倍数にするために '=' を補う（URLセーフのとき用）。 */
   private static String padIfNeeded(String s) {
     int mod = s.length() % 4;
     return mod == 0 ? s : s + "=".repeat(4 - mod);
   }
 
-  //========================
+  // ========================
   // 動作確認用
-  //========================
+  // ========================
 
-  /**
-   * 動作確認用のmainメソッド。 Base64文字列からUUID形式を表示します。
-   */
+  /** 動作確認用のmainメソッド。 Base64文字列からUUID形式を表示します。 */
   public static void main(String[] args) {
     String base64Id = "GdgYbbFeRU6A70yPTVUN2A"; // 例: Webで受け取ったID
     UUID uuid = fromBase64ToUUID(base64Id);

@@ -9,5 +9,4 @@ public class InvalidIdFormatException extends RuntimeException {
   public InvalidIdFormatException(String message, Throwable cause) {
     super(message, cause);
   }
-
 }

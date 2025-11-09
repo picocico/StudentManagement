@@ -10,12 +10,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest // プロファイル指定なし（= test を明示的に有効化しない）
 class DebugControllerProfileOffTest {
 
-  @Autowired
-  org.springframework.context.ApplicationContext ctx;
+  @Autowired org.springframework.context.ApplicationContext ctx;
 
   @Test
   void debugController_isNotLoaded_whenProfileIsNotTest() {
     assertThat(ctx.getBeansOfType(DebugStudentController.class)).isEmpty();
   }
 }
-

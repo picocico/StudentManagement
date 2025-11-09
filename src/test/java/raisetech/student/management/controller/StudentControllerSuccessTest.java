@@ -39,24 +39,30 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * 受講生IDで詳細を取得した際に、受講生情報とコース一覧が期待通りに返却されることを検証します。
-   * <p>
-   * Endpoint: {@code GET /api/students/{studentId}}
-   * <br>Status: {@code 200 OK}
+   *
+   * <p>Endpoint: {@code GET /api/students/{studentId}} <br>
+   * Status: {@code 200 OK}
+   *
    * <p>Given:
+   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(base64Id)} が 16バイトID を返す</li>
-   *   <li>{@code service.findStudentById(studentId)} が既存の受講生を返す</li>
-   *   <li>{@code service.searchCoursesByStudentId(studentId)} が2件のコースを返す</li>
-   *   <li>{@code converter.toDetailDto(student, courses)} が期待DTOを返す</li>
+   *   <li>{@code converter.decodeBase64(base64Id)} が 16バイトID を返す
+   *   <li>{@code service.findStudentById(studentId)} が既存の受講生を返す
+   *   <li>{@code service.searchCoursesByStudentId(studentId)} が2件のコースを返す
+   *   <li>{@code converter.toDetailDto(student, courses)} が期待DTOを返す
    * </ul>
+   * <p>
    * When:
+   *
    * <ul>
-   *   <li>MockMvc で {@code GET /api/students/{studentId}} を実行</li>
+   *   <li>MockMvc で {@code GET /api/students/{studentId}} を実行
    * </ul>
+   * <p>
    * Then:
+   *
    * <ul>
-   *   <li>HTTP 200 が返る</li>
-   *   <li>student配下の各フィールドと courses の中身（件数／日付／null終端）が一致する</li>
+   *   <li>HTTP 200 が返る
+   *   <li>student配下の各フィールドと courses の中身（件数／日付／null終端）が一致する
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -68,10 +74,11 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     when(converter.decodeBase64(base64Id)).thenReturn(studentId);
     when(service.findStudentById(studentId)).thenReturn(student);
     when(service.searchCoursesByStudentId(studentId)).thenReturn(courses);
-    when(converter.toDetailDto(student, courses)).thenReturn(
-        new StudentDetailDto(studentDto, List.of(courseDto1, courseDto2)));
+    when(converter.toDetailDto(student, courses))
+        .thenReturn(new StudentDetailDto(studentDto, List.of(courseDto1, courseDto2)));
 
-    mockMvc.perform(get("/api/students/{studentId}", base64Id))
+    mockMvc
+        .perform(get("/api/students/{studentId}", base64Id))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.student.studentId").value(base64Id))
         .andExpect(jsonPath("$.student.fullName").value(fullName))
@@ -93,24 +100,30 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * 受講コースが存在しない受講生IDで詳細を取得した場合、コース配列が空で返却されることを検証します。
-   * <p>
-   * Endpoint: {@code GET /api/students/{studentId}}
-   * <br>Status: {@code 200 OK}
+   *
+   * <p>Endpoint: {@code GET /api/students/{studentId}} <br>
+   * Status: {@code 200 OK}
+   *
    * <p>Given:
+   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(base64Id)} が 16バイトID を返す</li>
-   *   <li>{@code service.findStudentById(studentId)} が既存の受講生を返す</li>
-   *   <li>{@code service.searchCoursesByStudentId(studentId)} が空リストを返す</li>
-   *   <li>{@code converter.toDetailDto(student, emptyList)} が期待DTOを返す</li>
+   *   <li>{@code converter.decodeBase64(base64Id)} が 16バイトID を返す
+   *   <li>{@code service.findStudentById(studentId)} が既存の受講生を返す
+   *   <li>{@code service.searchCoursesByStudentId(studentId)} が空リストを返す
+   *   <li>{@code converter.toDetailDto(student, emptyList)} が期待DTOを返す
    * </ul>
+   * <p>
    * When:
+   *
    * <ul>
-   *   <li>MockMvc で {@code GET /api/students/{studentId}} を実行</li>
+   *   <li>MockMvc で {@code GET /api/students/{studentId}} を実行
    * </ul>
+   * <p>
    * Then:
+   *
    * <ul>
-   *   <li>HTTP 200 が返る</li>
-   *   <li>{@code $.courses.length()==0} を検証する</li>
+   *   <li>HTTP 200 が返る
+   *   <li>{@code $.courses.length()==0} を検証する
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -125,7 +138,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     when(converter.toDetailDto(student, Collections.emptyList()))
         .thenReturn(new StudentDetailDto(studentDto, List.of()));
 
-    mockMvc.perform(get("/api/students/{studentId}", base64Id))
+    mockMvc
+        .perform(get("/api/students/{studentId}", base64Id))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.student.fullName").value(fullName))
         .andExpect(jsonPath("$.courses.length()").value(0));
@@ -133,23 +147,29 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * ふりがなで検索した場合に一致する受講生リストが返却されることを検証します。
-   * <p>
-   * Endpoint: {@code GET /api/students}
-   * <br>Params: {@code furigana={指定値}}, {@code includeDeleted=false}, {@code deletedOnly=false}
-   * <br>Status: {@code 200 OK}
+   *
+   * <p>Endpoint: {@code GET /api/students} <br>
+   * Params: {@code furigana={指定値}}, {@code includeDeleted=false}, {@code deletedOnly=false} <br>
+   * Status: {@code 200 OK}
+   *
    * <p>Given:
+   *
    * <ul>
-   *   <li>service.getStudentList(furigana, false, false) が1件の結果を返す</li>
+   *   <li>service.getStudentList(furigana, false, false) が1件の結果を返す
    * </ul>
+   * <p>
    * When:
+   *
    * <ul>
-   *   <li>MockMvcでGET（クエリ: furigana 等）を実行</li>
+   *   <li>MockMvcでGET（クエリ: furigana 等）を実行
    * </ul>
+   * <p>
    * Then:
+   *
    * <ul>
-   *   <li>配列長が1である</li>
-   *   <li>先頭要素の氏名およびコース名が期待通りである</li>
-   *   <li>service.getStudentList が期待する引数で1回呼ばれる</li>
+   *   <li>配列長が1である
+   *   <li>先頭要素の氏名およびコース名が期待通りである
+   *   <li>service.getStudentList が期待する引数で1回呼ばれる
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -162,10 +182,12 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     when(service.getStudentList(furigana, false, false)).thenReturn(List.of(detailDto));
 
     // then: MockMvc で GETリクエストを送信
-    mockMvc.perform(get("/api/students")
-            .param("furigana", furigana)
-            .param("includeDeleted", "false")
-            .param("deletedOnly", "false"))
+    mockMvc
+        .perform(
+            get("/api/students")
+                .param("furigana", furigana)
+                .param("includeDeleted", "false")
+                .param("deletedOnly", "false"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].student.fullName").value(fullName))
@@ -177,23 +199,28 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * 論理削除を含めて検索した場合に未削除・削除済の両方が返却されることを検証します。
-   * <p>
-   * Endpoint: {@code GET /api/students}
-   * <br>Params: {@code includeDeleted=true}
-   * <br>Status: {@code 200 OK}
+   *
+   * <p>Endpoint: {@code GET /api/students} <br>
+   * Params: {@code includeDeleted=true} <br> Status: {@code 200 OK}
+   *
    * <p>Given:
+   *
    * <ul>
-   *   <li>service.getStudentList(null, true, false) が2件（未削除1・削除済1）を返す</li>
+   *   <li>service.getStudentList(null, true, false) が2件（未削除1・削除済1）を返す
    * </ul>
+   * <p>
    * When:
+   *
    * <ul>
-   *   <li>MockMvcでGET（includeDeleted=true）を実行</li>
+   *   <li>MockMvcでGET（includeDeleted=true）を実行
    * </ul>
+   * <p>
    * Then:
+   *
    * <ul>
-   *   <li>配列長が2である</li>
-   *   <li>各要素の deleted フラグとコース配列の内容が期待通りである</li>
-   *   <li>service.getStudentList が期待する引数で1回呼ばれる</li>
+   *   <li>配列長が2である
+   *   <li>各要素の deleted フラグとコース配列の内容が期待通りである
+   *   <li>service.getStudentList が期待する引数で1回呼ばれる
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -204,7 +231,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     when(service.getStudentList(null, true, false)).thenReturn(List.of(detailDto1, detailDto2));
 
-    mockMvc.perform(get("/api/students").param("includeDeleted", "true"))
+    mockMvc
+        .perform(get("/api/students").param("includeDeleted", "true"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(2))
         .andExpect(jsonPath("$[0].student.fullName").value("山田 太郎"))
@@ -222,23 +250,28 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * 論理削除のみで検索した場合に削除済の受講生のみが返却されることを検証します。
-   * <p>
-   * Endpoint: {@code GET /api/students}
-   * <br>Params: {@code deletedOnly=true}
-   * <br>Status: {@code 200 OK}
+   *
+   * <p>Endpoint: {@code GET /api/students} <br>
+   * Params: {@code deletedOnly=true} <br> Status: {@code 200 OK}
+   *
    * <p>Given:
+   *
    * <ul>
-   *   <li>service.getStudentList(null, false, true) が削除済1件を返す</li>
+   *   <li>service.getStudentList(null, false, true) が削除済1件を返す
    * </ul>
+   * <p>
    * When:
+   *
    * <ul>
-   *   <li>MockMvcでGET（deletedOnly=true）を実行</li>
+   *   <li>MockMvcでGET（deletedOnly=true）を実行
    * </ul>
+   * <p>
    * Then:
+   *
    * <ul>
-   *   <li>配列長が1である</li>
-   *   <li>要素の deleted フラグが true であり、コース配列が期待通りである</li>
-   *   <li>service.getStudentList が期待する引数で1回呼ばれる</li>
+   *   <li>配列長が1である
+   *   <li>要素の deleted フラグが true であり、コース配列が期待通りである
+   *   <li>service.getStudentList が期待する引数で1回呼ばれる
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -249,7 +282,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     when(service.getStudentList(null, false, true)).thenReturn(List.of(detailDto2));
 
-    mockMvc.perform(get("/api/students").param("deletedOnly", "true"))
+    mockMvc
+        .perform(get("/api/students").param("deletedOnly", "true"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].student.fullName").value("削除済 太郎"))
@@ -265,10 +299,11 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * 新規受講生を登録した際に、ステータス201と登録済みの受講生情報（Dtoレスポンス）が返却されることを検証します。
    *
    * <p>主な検証内容：
+   *
    * <ul>
-   *   <li>HTTPステータスコードが 201 Created であること</li>
-   *   <li>レスポンスボディに登録された受講生情報（StudentDetailDto）が正しく含まれていること</li>
-   *   <li>受講生の基本情報およびコース情報が期待通りであること</li>
+   *   <li>HTTPステータスコードが 201 Created であること
+   *   <li>レスポンスボディに登録された受講生情報（StudentDetailDto）が正しく含まれていること
+   *   <li>受講生の基本情報およびコース情報が期待通りであること
    * </ul>
    *
    * <p>対象エンドポイント：POST /api/students
@@ -277,28 +312,29 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   public void registerStudent_新規受講生登録時_ステータス201と登録済Dtoレスポンスが返ること()
       throws Exception {
 
-    String body = """
-        {
-          "student": {
-            "fullName": "テスト　花子",
-            "furigana": "てすと　はなこ",
-            "nickname": "ハナちゃん",
-            "email": "test@example.com",
-            "location": "大阪",
-            "age": 30,
-            "gender": "FEMALE",
-            "remarks": "コース追加予定",
-            "deleted": false
-          },
-          "courses": [
+    String body =
+        """
             {
-              "courseName": "Javaコース",
-              "startDate": "2024-03-01",
-              "endDate": "2024-09-30"
+              "student": {
+                "fullName": "テスト　花子",
+                "furigana": "てすと　はなこ",
+                "nickname": "ハナちゃん",
+                "email": "test@example.com",
+                "location": "大阪",
+                "age": 30,
+                "gender": "FEMALE",
+                "remarks": "コース追加予定",
+                "deleted": false
+              },
+              "courses": [
+                {
+                  "courseName": "Javaコース",
+                  "startDate": "2024-03-01",
+                  "endDate": "2024-09-30"
+                }
+              ]
             }
-          ]
-        }
-        """;
+            """;
 
     // ★ courses は startDate など必須が入っている方を使う
     var req = TestRequests.validRegistrationRequest();
@@ -342,11 +378,13 @@ class StudentControllerSuccessTest extends ControllerTestBase {
       assertThat(root.path("courses").isArray()).isTrue();
     }
 
-    mockMvc.perform(post("/api/students")
-            .contentType(MediaType.APPLICATION_JSON)
-            .accept(MediaType.APPLICATION_JSON)
-            .characterEncoding("UTF-8")
-            .content(body))
+    mockMvc
+        .perform(
+            post("/api/students")
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .characterEncoding("UTF-8")
+                .content(body))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.student.studentId").value(base64Id))
         .andExpect(jsonPath("$.student.fullName").value(fullName))
@@ -372,24 +410,31 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * 受講生情報を更新した際に 200 と更新済みの詳細DTOが返ることを検証します。
-   * <p>
-   * Endpoint: {@code PUT /api/students/{studentId}}
-   * <br>Status: {@code 200 OK}
+   *
+   * <p>Endpoint: {@code PUT /api/students/{studentId}} <br>
+   * Status: {@code 200 OK}
+   *
    * <p>Given:
+   *
    * <ul>
-   *   <li>有効な {@link StudentRegistrationRequest}（student + 1件のcourse）</li>
-   *   <li>{@code converter.toEntity}, {@code converter.toEntityList}, {@code service.updateStudentWithCourses} の正常スタブ</li>
-   *   <li>{@code converter.toDetailDto(entity, courses, base64Id)} が期待DTOを返す</li>
+   *   <li>有効な {@link StudentRegistrationRequest}（student + 1件のcourse）
+   *   <li>{@code converter.toEntity}, {@code converter.toEntityList}, {@code
+   *       service.updateStudentWithCourses} の正常スタブ
+   *   <li>{@code converter.toDetailDto(entity, courses, base64Id)} が期待DTOを返す
    * </ul>
+   * <p>
    * When:
+   *
    * <ul>
-   *   <li>MockMvcでPUTを実行</li>
+   *   <li>MockMvcでPUTを実行
    * </ul>
+   * <p>
    * Then:
+   *
    * <ul>
-   *   <li>HTTP 200 が返る</li>
-   *   <li>student配下の各フィールドが期待どおり</li>
-   *   <li>必要なモックが期待引数で呼ばれる</li>
+   *   <li>HTTP 200 が返る
+   *   <li>student配下の各フィールドが期待どおり
+   *   <li>必要なモックが期待引数で呼ばれる
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -405,19 +450,23 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     // コントローラの戻りを固定：DTOを直接返す設計なら toDetailDto のみでOK
     StudentDetailDto expected = new StudentDetailDto(studentDto, List.of(courseDto));
 
-    when(converter.toDetailDto(any(Student.class), anyList(), eq(base64Id)// コントローラがレスポンスIDに使うBase64
-    )).thenReturn(expected);
+    when(converter.toDetailDto(
+        any(Student.class), anyList(), eq(base64Id) // コントローラがレスポンスIDに使うBase64
+    ))
+        .thenReturn(expected);
     when(converter.toEntity(studentDto)).thenReturn(student);
-    when(converter.toEntityList(eq(List.of(courseDto)),
-        argThat(arr -> Arrays.equals(arr, studentId)))).thenReturn(courses);
+    when(converter.toEntityList(
+        eq(List.of(courseDto)), argThat(arr -> Arrays.equals(arr, studentId))))
+        .thenReturn(courses);
     // （任意・安全策）サービスが戻り値を返す設計なら
-    when(service.updateStudentWithCourses(same(student), anyList()))
-        .thenReturn(student);
+    when(service.updateStudentWithCourses(same(student), anyList())).thenReturn(student);
 
     // Act & Assert
-    mockMvc.perform(put("/api/students/{studentId}", base64Id)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(json(req)))
+    mockMvc
+        .perform(
+            put("/api/students/{studentId}", base64Id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(req)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.student.studentId").value(base64Id))
         .andExpect(jsonPath("$.student.fullName").value(fullName))
@@ -431,7 +480,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
         .andExpect(jsonPath("$.student.deleted").value(false));
 
     // （任意）呼び出し検証
-    verify(converter).decodeUuidOrThrow(base64Id);
+    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
     verify(converter).toEntity(studentDto);
     verify(converter).toEntityList(anyList(), argThat(arr -> Arrays.equals(arr, studentId)));
     // verify も3引数に
@@ -442,17 +491,21 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * 部分更新（置換モード）で基本情報とコース差分を反映し、200が返ることを検証します。
-   * <p>
-   * Endpoint: {@code PATCH /api/students/{studentId}}
-   * <br>Status: {@code 200 OK}
+   *
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}} <br>
+   * Status: {@code 200 OK}
+   *
    * <p>Given:
+   *
    * <ul>
-   *   <li>既存受講生の取得・マージ・部分更新が正常</li>
-   *   <li>更新後の再取得・コース再検索・DTO化が正常</li>
+   *   <li>既存受講生の取得・マージ・部分更新が正常
+   *   <li>更新後の再取得・コース再検索・DTO化が正常
    * </ul>
+   * <p>
    * Then:
+   *
    * <ul>
-   *   <li>HTTP 200 が返る</li>
+   *   <li>HTTP 200 が返る
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -482,27 +535,33 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     when(service.searchCoursesByStudentId(studentId)).thenReturn(updatedCourses);
     when(converter.toDetailDto(updated, updatedCourses)).thenReturn(out);
 
-    mockMvc.perform(patch("/api/students/{studentId}", base64Id)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(json(req)))
+    mockMvc
+        .perform(
+            patch("/api/students/{studentId}", base64Id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(req)))
         .andExpect(status().isOk());
   }
 
   /**
    * 部分更新で courses が空でも基本情報のみ更新され 200 が返ることを検証します（置換モード）。
-   * <p>
-   * Endpoint: {@code PATCH /api/students/{studentId}}
-   * <br>Status: {@code 200 OK}
+   *
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}} <br>
+   * Status: {@code 200 OK}
+   *
    * <p>Given:
+   *
    * <ul>
-   *   <li>courses=[] を送信</li>
-   *   <li>既存受講生の取得とマージ、情報のみ更新が正常</li>
+   *   <li>courses=[] を送信
+   *   <li>既存受講生の取得とマージ、情報のみ更新が正常
    * </ul>
+   * <p>
    * Then:
+   *
    * <ul>
-   *   <li>HTTP 200 が返り、氏名等が更新される</li>
-   *   <li>{@code service.updateStudentInfoOnly(existing)} が呼ばれる</li>
-   *   <li>{@code toEntityList} は呼ばれない</li>
+   *   <li>HTTP 200 が返り、氏名等が更新される
+   *   <li>{@code service.updateStudentInfoOnly(existing)} が呼ばれる
+   *   <li>{@code toEntityList} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -511,12 +570,13 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   public void partialUpdateStudent_coursesがnullや空でも基本情報だけ更新され_200を返すこと()
       throws Exception {
     // 入力（courses: 空配列）
-    String body = """
-        {
-          "student": { "name": "新しい名前" },
-          "courses": []
-        }
-        """;
+    String body =
+        """
+            {
+              "student": { "fullName": "新しい名前" },
+              "courses": []
+            }
+            """;
 
     // --- Mock 準備 ---
     when(converter.decodeBase64(base64Id)).thenReturn(studentId);
@@ -531,8 +591,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     doNothing().when(converter).mergeStudent(existing, merged);
 
     // courses 変換は空リストを返す
-    when(converter.toEntityList(Collections.emptyList(), studentId)).thenReturn(
-        Collections.emptyList());
+    when(converter.toEntityList(Collections.emptyList(), studentId))
+        .thenReturn(Collections.emptyList());
 
     // コース再取得は空を返す想定
     when(service.searchCoursesByStudentId(studentId)).thenReturn(Collections.emptyList());
@@ -545,17 +605,19 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     StudentDto respStudent = new StudentDto();
     respStudent.setFullName("新しい名前"); // ※JSONでは $.student.name を見ている前提
     StudentDetailDto resp = new StudentDetailDto(respStudent, Collections.emptyList());
-    when(converter.toDetailDto(updated, Collections.emptyList())).thenReturn(resp);
+    when(converter.toDetailDto(updated, Collections.emptyList(), base64Id)).thenReturn(resp);
 
     // --- 実行 & 検証 ---
-    mockMvc.perform(patch("/api/students/{studentId}", base64Id)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(body))
+    mockMvc
+        .perform(
+            patch("/api/students/{studentId}", base64Id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.student.fullName").value("新しい名前"));
 
     // 期待：サービスは動いている（NoInteractions ではない）
-    verify(converter).decodeBase64(base64Id);
+    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
     verify(service, times(2)).findStudentById(studentId);
     verify(converter, never()).toEntityList(anyList(), eq(studentId));
 
@@ -568,13 +630,13 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * 論理削除が成功した場合に 204 No Content が返ることを検証します。
-   * <p>
-   * Endpoint: {@code DELETE /api/students/{studentId}}
-   * <br>Status: {@code 204 NO_CONTENT}
-   * Then:
+   *
+   * <p>Endpoint: {@code DELETE /api/students/{studentId}} <br>
+   * Status: {@code 204 NO_CONTENT} Then:
+   *
    * <ul>
-   *   <li>レスポンスボディが空である</li>
-   *   <li>{@code service.softDeleteStudent(studentId)} が1回呼ばれる</li>
+   *   <li>レスポンスボディが空である
+   *   <li>{@code service.softDeleteStudent(studentId)} が1回呼ばれる
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -584,7 +646,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     when(converter.decodeBase64(base64Id)).thenReturn(studentId);
 
-    mockMvc.perform(delete("/api/students/{studentId}", base64Id))
+    mockMvc
+        .perform(delete("/api/students/{studentId}", base64Id))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
 
@@ -595,13 +658,13 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
   /**
    * 論理削除済みの受講生を復元した場合に 204 No Content が返ることを検証します。
-   * <p>
-   * Endpoint: {@code PATCH /api/students/{studentId}/restore}
-   * <br>Status: {@code 204 NO_CONTENT}
-   * Then:
+   *
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}/restore} <br>
+   * Status: {@code 204 NO_CONTENT} Then:
+   *
    * <ul>
-   *   <li>レスポンスボディが空である</li>
-   *   <li>{@code service.restoreStudent(studentId)} が1回呼ばれる</li>
+   *   <li>レスポンスボディが空である
+   *   <li>{@code service.restoreStudent(studentId)} が1回呼ばれる
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -611,7 +674,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     when(converter.decodeBase64(base64Id)).thenReturn(studentId);
 
-    mockMvc.perform(patch("/api/students/{studentId}/restore", base64Id))
+    mockMvc
+        .perform(patch("/api/students/{studentId}/restore", base64Id))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
 
