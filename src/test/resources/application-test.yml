@@ -11,7 +11,7 @@ logging:
   level:
     root: WARN
     org.springframework.web: WARN
-    raisetech.student.management: INFO
+    raisetech.student.management: WARN
 
 # MyBatis のSQLログを見たい場合（必要な時だけ）
 mybatis:

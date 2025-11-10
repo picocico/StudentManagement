@@ -10,7 +10,19 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * テスト（"test" プロファイル）実行時専用のSpring Security設定クラス。
  *
- * <p>この設定は、特定のデバッグ用エンドポイントへのアクセスを、 メインのセキュリティ設定（認証・認可）よりも優先して許可するために使用されます。
+ * <p>この設定は、特定のデバッグ用エンドポイントへのアクセスを、
+ * メインのセキュリティ設定（認証・認可）よりも優先して許可するために使用されます。
+ *
+ * <p><b>【 @WebMvcTest における意図的なセキュリティ無効化 】</b>
+ * {@code @WebMvcTest} (コントローラー層の単体テスト) を実行する際、 認証・認可のロジックがテストの妨げになることがあります（例：401/403の発生）。
+ *
+ * <p>{@code @Order(0)} と {@code securityMatcher("/**")} を指定することで、
+ * メインの {@code SecurityConfig} よりも先にこの設定が適用され、"test" プロファイルが
+ * 有効な場合は<b>すべてのエンドポイントに対する認証・認可を無効化</b>します。
+ *
+ * <p>これにより、{@link raisetech.student.management.controller.StudentController} や
+ * {@link raisetech.student.management.controller.admin.AdminStudentController} の
+ * 単体テストが、セキュリティ設定を意識することなく（モック化することなく） 実行できることを意図しています。
  */
 @Profile("test")
 @Configuration

@@ -65,18 +65,52 @@
 
 ### JSONスキーマ（概念）
 
+APIはエラー発生時、以下の共通フォーマットでJSONレスポンスを返却します。
+
+**基本形 (E003, E404, E500 など):**
+`errors` 配列を含まないシンプルな形式です。
+
 ```json
 {
   "status": 400,
   "code": "E003",
   "error": "EMPTY_OBJECT",
-  "message": "更新対象のフィールドがありません",
+  "message": "更新対象のフィールドがありません"
+}
+```
+
+**バリデーションエラー形 (E001 のみ):**
+入力値検証に失敗した場合のみ、errors 配列にフィールドごとの詳細が含まれます。
+
+```json
+{
+  "status": 400,
+  "code": "E001",
+  "error": "VALIDATION_FAILED",
+  "message": "入力値に不備があります",
   "errors": [
     {
       "field": "student.fullName",
-      "code": "NotBlank",
       "message": "氏名は必須です"
+    },
+    {
+      "field": "student.email",
+      "message": "メールアドレス形式が不正です。"
     }
   ]
-  /* "details" は互換用の別名（原則出力しない） */
 }
+```
+
+**フィールド仕様:**
+
+- status: HTTPステータスコード (数値)
+
+- code: 独自定義のエラーコード (文字列, 例: "E001")
+
+- error: エラー種別 (文字列, 例: "VALIDATION_FAILED")
+
+- message: エラーの詳細メッセージ (文字列)
+
+- errors: (オプション) バリデーションエラーの詳細 (配列)。code が "E001" の場合のみ原則として出力されます。
+
+details (非推奨エイリアス) および errorType, errorCode (旧キー) は一切出力されません。
