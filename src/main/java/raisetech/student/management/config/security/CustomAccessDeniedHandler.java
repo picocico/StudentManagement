@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import org.springframework.http.MediaType;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,15 +17,14 @@ import lombok.extern.slf4j.Slf4j;
 import raisetech.student.management.exception.dto.ErrorResponse;
 
 /**
- * Spring Securityの認証（Authentication）失敗時に呼び出されるカスタムエントリーポイント。
+ * Spring Securityの認可（Authorization）失敗時に呼び出されるカスタムハンドラ。
  *
- * <p>未認証のユーザー（認証トークンがない、または無効なトークンを持つ）が保護されたリソースに アクセスしようとした場合（HTTP 401
- * Unauthorized）に、クライアントへJSON形式の エラーレスポンスを返却します。
+ * <p>必要な権限を持たないリソースへのアクセスが拒否された場合（HTTP 403 Forbidden）に、 クライアントへJSON形式のエラーレスポンスを返却します。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint {
+public class CustomAccessDeniedHandler implements AccessDeniedHandler {
 
   /**
    * エラーレスポンスオブジェクトをJSON文字列にシリアライズするためのObjectMapper。 Lombokの{@code @RequiredArgsConstructor}
@@ -34,28 +33,28 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
   private final ObjectMapper objectMapper;
 
   /**
-   * 認証が要求される（未認証アクセス）場合に実行される処理。
+   * 認可が拒否された場合に実行される処理。
    *
-   * <p>HTTPステータス401 (Unauthorized) と、詳細なエラー情報を含むJSONボディをレスポンスとして返します。
+   * <p>HTTPステータス403 (Forbidden) と、詳細なエラー情報を含むJSONボディをレスポンスとして返します。
    *
-   * @param request 認証が失敗したリクエスト
+   * @param request 認可が拒否されたリクエスト
    * @param response クライアントへのレスポンス
-   * @param ex 発生した {@link AuthenticationException}
+   * @param ex 発生した {@link AccessDeniedException}
    * @throws IOException レスポンスへの書き込み中にI/Oエラーが発生した場合
    */
   @Override
-  public void commence(
-      HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
+  public void handle(
+      HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
       throws IOException {
     // クライアントに返却するエラーレスポンスのボディを生成
     var body =
-        ErrorResponse.of(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED", "E401", "認証が必要です。");
+        ErrorResponse.of(
+            HttpServletResponse.SC_FORBIDDEN, "FORBIDDEN", "E403", "アクセスが拒否されました。管理者権限が必要です。");
 
     // レスポンスのステータス、コンテントタイプ、エンコーディングを設定
-    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-
     // ObjectMapperを使用してレスポンスボディにJSONを書き込む
     objectMapper.writeValue(response.getWriter(), body);
   }

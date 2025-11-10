@@ -1,29 +1,30 @@
 package raisetech.student.management.service;
 
-import java.util.Base64;
-import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.util.Base64;
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -35,17 +36,13 @@ import raisetech.student.management.repository.StudentRepository;
 @ExtendWith(MockitoExtension.class)
 class StudentServiceImplTest {
 
-  @Mock
-  private StudentRepository studentRepository;
+  @Mock private StudentRepository studentRepository;
 
-  @Mock
-  private StudentCourseRepository courseRepository;
+  @Mock private StudentCourseRepository courseRepository;
 
-  @Mock
-  private StudentConverter converter;
+  @Mock private StudentConverter converter;
 
-  @InjectMocks
-  private StudentServiceImpl service;
+  @InjectMocks private StudentServiceImpl service;
 
   private static final String BASE64_ID = "3Jz8kUv2Rgq7Y+DnX3+aRQ==";
 
@@ -68,8 +65,7 @@ class StudentServiceImplTest {
     // コースを1件追加してcoursesを初期化
     StudentCourse course = new StudentCourse();
     course.setStudentId(studentId);
-    course.setCourseId(new byte[16]);  // 任意のダミーUUID（16バイト）
-
+    course.setCourseId(new byte[16]); // 任意のダミーUUID（16バイト）
   }
 
   @Test
@@ -101,7 +97,7 @@ class StudentServiceImplTest {
 
     // 検証 メソッドの呼び出しが順序通り行えているか？
     InOrder inOrder = inOrder(studentRepository, courseRepository);
-    //studentRepository.updateStudent(student)メソッドが呼び出されているかどうか？
+    // studentRepository.updateStudent(student)メソッドが呼び出されているかどうか？
     inOrder.verify(studentRepository).updateStudent(student);
     // studentId に紐づく受講コースを 一括削除する処理が実行されたかどうか？
     inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
@@ -124,7 +120,7 @@ class StudentServiceImplTest {
 
     // 検証
     InOrder inOrder = inOrder(studentRepository, courseRepository);
-    //studentRepository.updateStudent(student)メソッドが呼び出されているかどうか？
+    // studentRepository.updateStudent(student)メソッドが呼び出されているかどうか？
     inOrder.verify(studentRepository).updateStudent(student);
     // studentId に紐づく受講コースを 一括削除する処理が実行されたかどうか？
     inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
@@ -183,12 +179,11 @@ class StudentServiceImplTest {
     // searchAllCourses() の戻り値を差し替え
     doReturn(mockCourses).when(spyService).searchAllCourses();
 
-    when(converter.toDetailDtoList(mockStudents, mockCourses))
-        .thenReturn(expectedDtoList);
+    when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
 
     // 実行
-    List<StudentDetailDto> result = spyService.getStudentList(furigana, includeDeleted,
-        deletedOnly);
+    List<StudentDetailDto> result =
+        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
@@ -198,7 +193,6 @@ class StudentServiceImplTest {
     inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
     inOrder.verify(spyService).searchAllCourses();
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
-
   }
 
   @Test
@@ -219,12 +213,11 @@ class StudentServiceImplTest {
     // searchAllCourses() の戻り値を差し替え
     doReturn(mockCourses).when(spyService).searchAllCourses();
 
-    when(converter.toDetailDtoList(mockStudents, mockCourses))
-        .thenReturn(expectedDtoList);
+    when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
 
     // 実行
-    List<StudentDetailDto> result = spyService.getStudentList(furigana, includeDeleted,
-        deletedOnly);
+    List<StudentDetailDto> result =
+        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
@@ -234,7 +227,6 @@ class StudentServiceImplTest {
     inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
     inOrder.verify(spyService).searchAllCourses();
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
-
   }
 
   @Test
@@ -255,12 +247,11 @@ class StudentServiceImplTest {
     // searchAllCourses() の戻り値を差し替え
     doReturn(mockCourses).when(spyService).searchAllCourses();
 
-    when(converter.toDetailDtoList(mockStudents, mockCourses))
-        .thenReturn(expectedDtoList);
+    when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
 
     // 実行
-    List<StudentDetailDto> result = spyService.getStudentList(furigana, includeDeleted,
-        deletedOnly);
+    List<StudentDetailDto> result =
+        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
@@ -270,7 +261,6 @@ class StudentServiceImplTest {
     inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
     inOrder.verify(spyService).searchAllCourses();
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
-
   }
 
   @Test
@@ -300,7 +290,6 @@ class StudentServiceImplTest {
     // 検証
     assertThat(result).isEqualTo(student);
     verify(studentRepository).findById(studentId);
-
   }
 
   @Test
@@ -315,7 +304,6 @@ class StudentServiceImplTest {
         // 検証
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("受講生ID " + BASE64_ID + " が見つかりません。");
-
   }
 
   @Test
@@ -341,7 +329,6 @@ class StudentServiceImplTest {
     // 検証
     assertThat(actualCourses).isEqualTo(expectedCourses);
     verify(courseRepository).findCoursesByStudentId(studentId); // 呼び出されたかも検証
-
   }
 
   @Test
@@ -381,7 +368,6 @@ class StudentServiceImplTest {
         // 検証
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Student not found for ID: " + BASE64_ID);
-
   }
 
   @Test
@@ -400,7 +386,6 @@ class StudentServiceImplTest {
     // 検証
     verify(student).softDelete();
     verify(studentRepository).updateStudent(student);
-
   }
 
   @Test
@@ -477,10 +462,5 @@ class StudentServiceImplTest {
     inOrder.verify(studentRepository).forceDeleteStudent(studentId);
     // 想定外の呼び出しがないか検証（すでに渡したmockを対象に）
     inOrder.verifyNoMoreInteractions();
-
   }
 }
-
-
-
-

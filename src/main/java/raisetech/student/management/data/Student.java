@@ -1,17 +1,16 @@
 package raisetech.student.management.data;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 /**
  * 受講生の情報を保持するエンティティクラス。
- * <p>
- * このクラスはデータベースの「students」テーブルに対応し、
- * 基本情報（氏名、ふりがな、メールアドレス等）に加えて
- * 論理削除のためのフラグと削除日時も保持します。
+ *
+ * <p>このクラスはデータベースの「students」テーブルに対応し、 基本情報（氏名、ふりがな、メールアドレス等）に加えて 論理削除のためのフラグと削除日時も保持します。
  */
 @Schema(description = "受講生エンティティ（データベース保存用の学生情報）")
 @Data
@@ -20,8 +19,10 @@ import lombok.AllArgsConstructor;
 public class Student {
 
   /** 学生ID（BINARY型、UUIDの16バイト配列） */
-  @Schema(description = "学生ID（UUIDをBINARY形式で格納した16バイト配列）",
-      format = "byte", example = "MTIzNDU2Nzg5MGFiY2RlZg==")
+  @Schema(
+      description = "学生ID（UUIDをBINARY形式で格納した16バイト配列）",
+      format = "byte",
+      example = "MTIzNDU2Nzg5MGFiY2RlZg==")
   private byte[] studentId;
 
   /** 氏名 */
@@ -61,19 +62,17 @@ public class Student {
   private LocalDateTime createdAt;
 
   /** 論理削除された日時（削除されていない場合は null） */
-  @Schema(description = "削除日時（論理削除時のみ値が入る）",
-      example = "2025-06-01 12:30:00", nullable = true)
+  @Schema(description = "削除日時（論理削除時のみ値が入る）", example = "2025-06-01 12:30:00", nullable = true)
   private LocalDateTime deletedAt;
 
   /** 削除フラグ（true：削除済み、false：有効） */
-  @Schema(description = "論理削除フラグ。trueの場合、削除された状態を表します。",
-      example = "false")
+  @Schema(description = "論理削除フラグ。trueの場合、削除された状態を表します。", example = "false")
   private Boolean deleted;
 
   /**
    * この受講生を論理削除します。
-   * <p>
-   * 削除フラグを true に設定し、削除日時を現在時刻に更新します。
+   *
+   * <p>削除フラグを true に設定し、削除日時を現在時刻に更新します。
    */
   public void softDelete() {
     this.deleted = true;
@@ -82,16 +81,11 @@ public class Student {
 
   /**
    * この受講生を復元します。
-   * <p>
-   * 削除フラグを false に設定し、削除日時を null にリセットします。
+   *
+   * <p>削除フラグを false に設定し、削除日時を null にリセットします。
    */
   public void restore() {
     this.deleted = false;
     this.deletedAt = null;
   }
 }
-
-
-
-
-

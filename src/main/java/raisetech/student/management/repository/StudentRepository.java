@@ -1,14 +1,16 @@
 package raisetech.student.management.repository;
 
 import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
 import raisetech.student.management.data.Student;
 
 /**
  * 受講生情報に関するデータベース操作を行うMyBatisリポジトリインターフェースです。
- * <p>
- * 受講生の登録、更新、検索、削除などを提供し、XMLマッパーファイルでSQLを制御します。
+ *
+ * <p>受講生の登録、更新、検索、削除などを提供し、XMLマッパーファイルでSQLを制御します。
  */
 @Mapper
 public interface StudentRepository {
@@ -16,12 +18,15 @@ public interface StudentRepository {
   /**
    * 動的な検索条件（ふりがな、削除状態）に基づいて受講生情報を検索します。
    *
-   * @param furigana        ふりがなによる部分一致検索条件（nullまたは空文字は無視）
-   * @param includeDeleted  論理削除された受講生も含めるかどうか
-   * @param deletedOnly     論理削除された受講生のみ取得するかどうか
+   * @param furigana ふりがなによる部分一致検索条件（nullまたは空文字は無視）
+   * @param includeDeleted 論理削除された受講生も含めるかどうか
+   * @param deletedOnly 論理削除された受講生のみ取得するかどうか
    * @return 条件に一致する受講生情報のリスト
    */
-  List<Student> searchStudents(@Param("furigana") String furigana, @Param("includeDeleted") boolean includeDeleted, @Param("deletedOnly") boolean deletedOnly);
+  List<Student> searchStudents(
+      @Param("furigana") String furigana,
+      @Param("includeDeleted") boolean includeDeleted,
+      @Param("deletedOnly") boolean deletedOnly);
 
   /**
    * 受講生IDで受講生情報を取得します。
@@ -52,7 +57,3 @@ public interface StudentRepository {
    */
   void forceDeleteStudent(@Param("studentId") byte[] studentId);
 }
-
-
-
-
