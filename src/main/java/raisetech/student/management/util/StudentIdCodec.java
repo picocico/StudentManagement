@@ -5,7 +5,13 @@ import java.util.Base64;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-@Component("idCodec") // 既存のBean名を維持したい場合は名前を固定。不要なら外してOK
+/**
+ * UUID/BINARY(16) と URL-safe Base64 の相互変換コンポーネント。
+ *
+ * <p>{@code @Component("idCodec")} として Bean 名を固定しており、
+ * 既存の {@code @Qualifier("idCodec")} や XML 設定との互換性を保つために名前を明示しています。
+ */
+@Component("idCodec")
 public class StudentIdCodec implements IdCodec {
 
   @Override

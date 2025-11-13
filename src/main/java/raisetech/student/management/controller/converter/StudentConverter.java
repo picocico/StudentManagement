@@ -196,12 +196,15 @@ public class StudentConverter {
     byte[] courseId =
         Optional.ofNullable(dto.getCourseId())
             .filter(id -> !id.isBlank())
-            .map(this::decodeBase64)
-            .orElseGet(this::generateRandomBytes);
+            .map(idCodec::decodeUuidBytesOrThrow)// ★ 16バイトチェック付き
+            .orElseGet(idCodec::generateNewIdBytes);
+
+    // studentId: パスから渡されるIDなので、必ず UUID 16バイトであることを保証する
+    byte[] studentId = idCodec.decodeUuidBytesOrThrow(studentIdBase64);
 
     return new StudentCourse(
         courseId,
-        decodeBase64(studentIdBase64),
+        studentId,
         dto.getCourseName(),
         dto.getStartDate(),
         dto.getEndDate(),
@@ -222,17 +225,20 @@ public class StudentConverter {
   public List<StudentCourse> toEntityList(List<StudentCourseDto> dtoList, byte[] studentId) {
     return dtoList.stream()
         .map(
-            dto ->
-                new StudentCourse(
-                    Optional.ofNullable(dto.getCourseId())
-                        .filter(id -> !id.isBlank())
-                        .map(this::decodeBase64)
-                        .orElseGet(this::generateRandomBytes),
-                    studentId,
-                    dto.getCourseName(),
-                    dto.getStartDate(),
-                    dto.getEndDate(),
-                    null))
+            dto -> {
+              byte[] courseId =
+                  Optional.ofNullable(dto.getCourseId())
+                      .filter(id -> !id.isBlank())
+                      .map(idCodec::decodeUuidBytesOrThrow)
+                      .orElseGet(idCodec::generateNewIdBytes);
+              return new StudentCourse(
+                  courseId,
+                  studentId,
+                  dto.getCourseName(),
+                  dto.getStartDate(),
+                  dto.getEndDate(),
+                  null);
+            })
         .collect(Collectors.toList());
   }
 

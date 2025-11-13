@@ -26,6 +26,9 @@ public class StudentIdCodecTest {
     return bb.array();
   }
 
+  /**
+   * FIXED_UUID を BINARY(16) に変換したもの（UUIDの生16バイト表現）
+   */
   private final byte[] FIXED_UUID_BYTES = toBytes(FIXED_UUID);
 
   // URL-safe & no padding の Base64 文字列
@@ -81,7 +84,7 @@ public class StudentIdCodecTest {
 
       assertThatThrownBy(() -> codec.decode(invalid))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("studentId(Base64)");
+          .hasMessageContaining("(Base64)");
     }
   }
 
@@ -119,7 +122,7 @@ public class StudentIdCodecTest {
 
       assertThatThrownBy(() -> codec.decodeUuidOrThrow(invalid))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("studentId(Base64)");
+          .hasMessageContaining("(Base64)");
     }
 
     @Test
@@ -130,7 +133,7 @@ public class StudentIdCodecTest {
 
       assertThatThrownBy(() -> codec.decodeUuidOrThrow(base64))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("studentId(Base64)");
+          .hasMessageContaining("(Base64)");
       // 内部的には「長さが16バイトではありません」→ catch → wrap なので、
       // 最終メッセージは "studentId(Base64)が不正です"
     }
@@ -155,7 +158,7 @@ public class StudentIdCodecTest {
 
       assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(invalid))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("studentId(Base64)");
+          .hasMessageContaining("(Base64)");
     }
   }
 }

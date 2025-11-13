@@ -37,24 +37,31 @@ class StudentConverterTest {
     return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
   }
 
-  // テスト全体で使用する固定データ（Base64, バイト配列など）
+  /**
+   * テスト内で `new byte[16]` を使っている箇所は、 「UUIDの具体的な値には依存せず、長さが16バイトであれば良い」ケースです。
+   * 値そのものはテストの関心外であるため、ゼロ埋め16バイトを利用しています。
+   */
+  // 16バイトの固定データ（学生A用のテストID）
   // 通常はUUIDUtilのモックと組み合わせて使用
   private final byte[] FIXED_UUID_BYTES = new byte[]{
       (byte) 0x12, (byte) 0x34, (byte) 0x56, (byte) 0x78,
       (byte) 0x9a, (byte) 0xbc, (byte) 0xde, (byte) 0xf0,
       (byte) 0x12, (byte) 0x34, (byte) 0x56, (byte) 0x78,
       (byte) 0x9a, (byte) 0xbc, (byte) 0xde, (byte) 0xf0
-  }; // 16バイトの固定値
+  };
+
+  // 16バイトの固定値
   private final String FIXED_BASE64_ID = b64(FIXED_UUID_BYTES);
 
+  // 新規採番用の16バイトID（generateNewIdBytes の戻り値を固定する用途）
   private final byte[] NEW_RANDOM_BYTES = new byte[]{
       (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04,
       (byte) 0x05, (byte) 0x06, (byte) 0x07, (byte) 0x08,
       (byte) 0x09, (byte) 0x0A, (byte) 0x0B, (byte) 0x0C,
       (byte) 0x0D, (byte) 0x0E, (byte) 0x0F, (byte) 0x10
-  };// 新規採番用の固定値
+  };
 
-  // 学生B 用の固定ID
+  // 16バイトの固定UUID（学生B用のテストID）
   private final byte[] FIXED_UUID_BYTES_B = new byte[]{
       (byte) 0xaa, (byte) 0xbb, (byte) 0xcc, (byte) 0xdd,
       (byte) 0xee, (byte) 0xff, (byte) 0x11, (byte) 0x22,
@@ -272,9 +279,9 @@ class StudentConverterTest {
       // 新規Course ID
       when(idCodec.generateNewIdBytes()).thenReturn(NEW_RANDOM_BYTES);
 
-      // Student IDのデコード結果
+      // Student IDのデコード結果（UUID 16バイトとして扱う）
       byte[] fixedStudentBytes = new byte[16]; // 紐付け用 学生IDのバイト配列
-      when(idCodec.decode(studentIdBase64)).thenReturn(fixedStudentBytes);
+      when(idCodec.decodeUuidBytesOrThrow(studentIdBase64)).thenReturn(fixedStudentBytes);
 
       // --- When (変換実行) ---
       // 正しいメソッドと引数 (DTO, Base64 Student ID) で呼び出し
@@ -293,181 +300,278 @@ class StudentConverterTest {
       assertThat(result.getStartDate()).isEqualTo(LocalDate.of(2025, 4, 1));
       assertThat(result.getEndDate()).isEqualTo(LocalDate.of(2025, 9, 30));
     }
-  }
 
-  // ------------------------------------------------------------
+    @Test
+    void toEntityList_StudentCourseDto_CourseIDあり_既存IDが正しくデコードされて使用されること() {
+      // --- Given ---
+      byte[] studentIdBytes = FIXED_UUID_BYTES; // 紐付け先の受講生ID（UUIDの16バイト）
+
+      List<StudentCourseDto> dtoList = getStudentCourseDtos();
+
+      // IdCodec による CourseId の復号結果をモック
+      // Base64 → UUID 16バイト
+      when(idCodec.decodeUuidBytesOrThrow(FIXED_BASE64_ID)).thenReturn(FIXED_UUID_BYTES);
+      when(idCodec.decodeUuidBytesOrThrow(FIXED_BASE64_ID_B)).thenReturn(FIXED_UUID_BYTES_B);
+
+      // --- When ---
+      List<StudentCourse> result = converter.toEntityList(dtoList, studentIdBytes);
+
+      // --- Then ---
+      assertThat(result).hasSize(2);
+
+      // コース名で取り出して検証（順序にあまり依存したくない場合）
+      StudentCourse courseJava = result.stream()
+          .filter(c -> c.getCourseName().equals("Javaコース"))
+          .findFirst()
+          .orElseThrow();
+
+      StudentCourse courseSql = result.stream()
+          .filter(c -> c.getCourseName().equals("SQLコース"))
+          .findFirst()
+          .orElseThrow();
+
+      // 1. CourseId がそれぞれ正しくデコードされていること
+      assertThat(courseJava.getCourseId()).containsExactly(FIXED_UUID_BYTES);
+      assertThat(courseSql.getCourseId()).containsExactly(FIXED_UUID_BYTES_B);
+
+      // 2. どちらのコースも同じ studentId に紐づいていること
+      assertThat(courseJava.getStudentId()).containsExactly(studentIdBytes);
+      assertThat(courseSql.getStudentId()).containsExactly(studentIdBytes);
+
+      // 3. 他の項目移送（ここではコース名だけ軽く確認）
+      assertThat(courseJava.getCourseName()).isEqualTo("Javaコース");
+      assertThat(courseSql.getCourseName()).isEqualTo("SQLコース");
+    }
+
+    private List<StudentCourseDto> getStudentCourseDtos() {
+      LocalDate start = LocalDate.of(2025, 4, 1);
+
+      // 2つのコースDTO（どちらも CourseId が指定されている）
+      StudentCourseDto dto1 = new StudentCourseDto(
+          FIXED_BASE64_ID,          // ★ 既存の CourseId（Base64）
+          "Javaコース",
+          start,
+          start.plusMonths(6)
+      );
+      StudentCourseDto dto2 = new StudentCourseDto(
+          FIXED_BASE64_ID_B,        // ★ 別の CourseId（Base64）
+          "SQLコース",
+          start,
+          start.plusMonths(3)
+      );
+      return List.of(dto1, dto2);
+    }
+
+    @Test
+    void toEntityList_StudentCourseDto_CourseIDなし_StudentCourseが新規IDで生成されること() {
+      // --- Given ---
+      byte[] studentIdBytes = FIXED_UUID_BYTES; // 紐付け先の受講生ID（UUIDの16バイト）
+
+      LocalDate start = LocalDate.of(2025, 4, 1);
+      LocalDate end = LocalDate.of(2025, 9, 30);
+
+      // CourseId が null の DTO を1件だけ用意
+      StudentCourseDto dto = new StudentCourseDto(
+          null,                 // ★ CourseId なし
+          "Javaコース",
+          start,
+          end
+      );
+      List<StudentCourseDto> dtoList = List.of(dto);
+
+      // 新規 Course ID は IdCodec の generateNewIdBytes に委譲される
+      when(idCodec.generateNewIdBytes()).thenReturn(NEW_RANDOM_BYTES);
+
+      // --- When ---
+      List<StudentCourse> result = converter.toEntityList(dtoList, studentIdBytes);
+
+      // --- Then ---
+      assertThat(result).hasSize(1);
+      StudentCourse course = result.getFirst();
+
+      // 1. 新しいIDがセットされていること
+      assertThat(course.getCourseId()).containsExactly(NEW_RANDOM_BYTES);
+      // 2. 渡した studentId がそのまま紐づいていること
+      assertThat(course.getStudentId()).containsExactly(studentIdBytes);
+      // 3. 他のフィールドの項目移送
+      assertThat(course.getCourseName()).isEqualTo("Javaコース");
+      assertThat(course.getStartDate()).isEqualTo(start);
+      assertThat(course.getEndDate()).isEqualTo(end);
+    }
+
+    // ------------------------------------------------------------
 //  リスト/集約変換メソッドのテスト
 // ------------------------------------------------------------
-  @Nested
-  class AggregationConversionTest {
+    @Nested
+    class AggregationConversionTest {
 
-    @Test
-    void toDetailDtoList_正常系_学生とコースが正しく紐づけられDTOリストに変換されること() {
-      // StudentエンティティとStudentCourseエンティティのリストを用意し、
-      // StudentIdでグルーピングされることを確認
+      @Test
+      void toDetailDtoList_正常系_学生とコースが正しく紐づけられDTOリストに変換されること() {
+        // StudentエンティティとStudentCourseエンティティのリストを用意し、
+        // StudentIdでグルーピングされることを確認
 
-      // --- Given (入力データの準備) ---
-      LocalDate S = LocalDate.of(2025, 4, 1);
-      Student studentA = new Student(
-          FIXED_UUID_BYTES,
-          "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-          "Tokyo", 25, "Male", "備考", null, null, null
-      );
+        // --- Given (入力データの準備) ---
+        LocalDate S = LocalDate.of(2025, 4, 1);
+        Student studentA = new Student(
+            FIXED_UUID_BYTES,
+            "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
+            "Tokyo", 25, "Male", "備考", null, null, null
+        );
 
-      // 2. 学生B (ID: FIXED_UUID_BYTES_B / Base64: FIXED_BASE64_ID_B)
-      Student studentB = new Student(
-          FIXED_UUID_BYTES_B, "田中 花子", "タナカ ハナコ", "Hana",
-          "hana@example.com", "Osaka", 30, "Female", "備考", null, null, null
-      );
+        // 2. 学生B (ID: FIXED_UUID_BYTES_B / Base64: FIXED_BASE64_ID_B)
+        Student studentB = new Student(
+            FIXED_UUID_BYTES_B, "田中 花子", "タナカ ハナコ", "Hana",
+            "hana@example.com", "Osaka", 30, "Female", "備考", null, null, null
+        );
 
-      // 3. コースA (学生Aに紐づくコース)
-      StudentCourse courseA1 = new StudentCourse(
-          // コースID自体の値は本テストの関心外なので、ゼロ埋め16バイトで十分
-          new byte[16], FIXED_UUID_BYTES, "Javaコース",
-          S, S.plusMonths(6), null
-      );
+        // 3. コースA (学生Aに紐づくコース)
+        StudentCourse courseA1 = new StudentCourse(
+            // コースID自体の値は本テストの関心外なので、ゼロ埋め16バイトで十分
+            new byte[16], FIXED_UUID_BYTES, "Javaコース",
+            S, S.plusMonths(6), null
+        );
 
-      // 4. コースB (学生Bに紐づくコース)
-      StudentCourse courseB1 = new StudentCourse(
-          new byte[16], FIXED_UUID_BYTES_B, "Pythonコース",
-          S, S.plusMonths(3), null
-      );
-      StudentCourse courseB2 = new StudentCourse(
-          new byte[16], FIXED_UUID_BYTES_B, "SQLコース",
-          S, S.plusMonths(1), null
-      );
+        // 4. コースB (学生Bに紐づくコース)
+        StudentCourse courseB1 = new StudentCourse(
+            new byte[16], FIXED_UUID_BYTES_B, "Pythonコース",
+            S, S.plusMonths(3), null
+        );
+        StudentCourse courseB2 = new StudentCourse(
+            new byte[16], FIXED_UUID_BYTES_B, "SQLコース",
+            S, S.plusMonths(1), null
+        );
 
-      // 入力リストの作成
-      List<Student> students = List.of(studentA, studentB);
-      List<StudentCourse> courses = List.of(courseA1, courseB1, courseB2);
+        // 入力リストの作成
+        List<Student> students = List.of(studentA, studentB);
+        List<StudentCourse> courses = List.of(courseA1, courseB1, courseB2);
 
-      // 学生IDのBase64化は IdCodec に委譲される
-      when(idCodec.encodeId(FIXED_UUID_BYTES)).thenReturn(FIXED_BASE64_ID);
-      when(idCodec.encodeId(FIXED_UUID_BYTES_B)).thenReturn(FIXED_BASE64_ID_B);
+        // 学生IDのBase64化は IdCodec に委譲される
+        when(idCodec.encodeId(FIXED_UUID_BYTES)).thenReturn(FIXED_BASE64_ID);
+        when(idCodec.encodeId(FIXED_UUID_BYTES_B)).thenReturn(FIXED_BASE64_ID_B);
 
-      // --- When (変換実行) ---
-      List<StudentDetailDto> result =
-          converter.toDetailDtoList(students, courses);
+        // --- When (変換実行) ---
+        List<StudentDetailDto> result =
+            converter.toDetailDtoList(students, courses);
 
-      // --- Then (検証) ---
-      // 1. DTOリストのサイズが学生の数と一致すること
-      assertThat(result).hasSize(2);
+        // --- Then (検証) ---
+        // 1. DTOリストのサイズが学生の数と一致すること
+        assertThat(result).hasSize(2);
 
-      // 2. 学生AのDTOを確認 (リストの最初の要素と仮定)
-      StudentDetailDto dtoA = result.stream()
-          .filter(d -> d.getStudent().getFullName().equals("山田 太郎"))
-          .findFirst().orElseThrow();
-      assertThat(dtoA.getStudent().getStudentId()).isEqualTo(FIXED_BASE64_ID);
-      assertThat(dtoA.getCourses()).hasSize(1); // Javaコースのみ
+        // 2. 学生AのDTOを確認 (リストの最初の要素と仮定)
+        StudentDetailDto dtoA = result.stream()
+            .filter(d -> d.getStudent().getFullName().equals("山田 太郎"))
+            .findFirst().orElseThrow();
+        assertThat(dtoA.getStudent().getStudentId()).isEqualTo(FIXED_BASE64_ID);
+        assertThat(dtoA.getCourses()).hasSize(1); // Javaコースのみ
 
-      // 3. 学生BのDTOを確認 (リストの2番目の要素と仮定)
-      StudentDetailDto dtoB = result.stream()
-          .filter(d -> d.getStudent().getFullName().equals("田中 花子"))
-          .findFirst().orElseThrow();
-      assertThat(dtoB.getStudent().getStudentId()).isEqualTo(FIXED_BASE64_ID_B);
-      assertThat(dtoB.getCourses()).hasSize(2); // PythonとSQLの2コース
+        // 3. 学生BのDTOを確認 (リストの2番目の要素と仮定)
+        StudentDetailDto dtoB = result.stream()
+            .filter(d -> d.getStudent().getFullName().equals("田中 花子"))
+            .findFirst().orElseThrow();
+        assertThat(dtoB.getStudent().getStudentId()).isEqualTo(FIXED_BASE64_ID_B);
+        assertThat(dtoB.getCourses()).hasSize(2); // PythonとSQLの2コース
 
-      // 4. コース名が正しく含まれていることを確認（学生B）
-      List<String> NamesB = dtoB.getCourses().stream()
-          .map(StudentCourseDto::getCourseName)
-          .toList();
-      assertThat(NamesB).containsExactlyInAnyOrder("Pythonコース", "SQLコース");
-    }
+        // 4. コース名が正しく含まれていることを確認（学生B）
+        List<String> NamesB = dtoB.getCourses().stream()
+            .map(StudentCourseDto::getCourseName)
+            .toList();
+        assertThat(NamesB).containsExactlyInAnyOrder("Pythonコース", "SQLコース");
+      }
 
-    @Test
-    void toDetailDtoList_正常系_紐づくコースがない学生も正しくDTOに含まれること() {
-      // コースリストが空のケースをテスト
+      @Test
+      void toDetailDtoList_正常系_紐づくコースがない学生も正しくDTOに含まれること() {
+        // コースリストが空のケースをテスト
 
-      // --- Given (入力データの準備) ---
-      LocalDate S = LocalDate.of(2025, 4, 1);
-      Student studentA = new Student(
-          FIXED_UUID_BYTES,
-          "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-          "Tokyo", 25, "Male", "備考", null, null, null
-      );
-      // 2. 学生B (ID: FIXED_UUID_BYTES_B / Base64: FIXED_BASE64_ID_B)
-      Student studentB = new Student(
-          FIXED_UUID_BYTES_B, "田中 花子", "タナカ ハナコ", "Hana",
-          "hana@example.com", "Osaka", 30, "Female", "備考", null, null, null
-      );
-      // 3. コースA (学生Aに紐づくコース)
-      StudentCourse courseA1 = new StudentCourse(
-          new byte[16], FIXED_UUID_BYTES, "Javaコース",
-          S, S.plusMonths(6), null
-      );
+        // --- Given (入力データの準備) ---
+        LocalDate S = LocalDate.of(2025, 4, 1);
+        Student studentA = new Student(
+            FIXED_UUID_BYTES,
+            "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
+            "Tokyo", 25, "Male", "備考", null, null, null
+        );
+        // 2. 学生B (ID: FIXED_UUID_BYTES_B / Base64: FIXED_BASE64_ID_B)
+        Student studentB = new Student(
+            FIXED_UUID_BYTES_B, "田中 花子", "タナカ ハナコ", "Hana",
+            "hana@example.com", "Osaka", 30, "Female", "備考", null, null, null
+        );
+        // 3. コースA (学生Aに紐づくコース)
+        StudentCourse courseA1 = new StudentCourse(
+            new byte[16], FIXED_UUID_BYTES, "Javaコース",
+            S, S.plusMonths(6), null
+        );
 
-      // 入力リストの作成
-      List<Student> students = List.of(studentA, studentB);
-      List<StudentCourse> courses = List.of(courseA1); // コースA1のみ
+        // 入力リストの作成
+        List<Student> students = List.of(studentA, studentB);
+        List<StudentCourse> courses = List.of(courseA1); // コースA1のみ
 
-      when(idCodec.encodeId(any())).thenReturn("IGNORED"); // コースIDなど、テストの関心外
-      // そのうえで、「学生ID」だけは上書きして本物の期待値を返す
-      when(idCodec.encodeId(FIXED_UUID_BYTES)).thenReturn(FIXED_BASE64_ID);
-      when(idCodec.encodeId(FIXED_UUID_BYTES_B)).thenReturn(FIXED_BASE64_ID_B);
+        when(idCodec.encodeId(any())).thenReturn("IGNORED"); // コースIDなど、テストの関心外
+        // そのうえで、「学生ID」だけは上書きして本物の期待値を返す
+        when(idCodec.encodeId(FIXED_UUID_BYTES)).thenReturn(FIXED_BASE64_ID);
+        when(idCodec.encodeId(FIXED_UUID_BYTES_B)).thenReturn(FIXED_BASE64_ID_B);
 
-      // --- When (変換実行) ---
-      List<StudentDetailDto> result =
-          converter.toDetailDtoList(students, courses);
+        // --- When (変換実行) ---
+        List<StudentDetailDto> result =
+            converter.toDetailDtoList(students, courses);
 
-      // --- Then (検証) ---
-      // 1. DTOリストのサイズが学生の数と一致すること
-      assertThat(result).hasSize(2);
+        // --- Then (検証) ---
+        // 1. DTOリストのサイズが学生の数と一致すること
+        assertThat(result).hasSize(2);
 
-      // 2. 学生AのDTOを確認 (リストの最初の要素と仮定)
-      StudentDetailDto dtoA = result.stream()
-          .filter(d -> d.getStudent().getFullName().equals("山田 太郎"))
-          .findFirst().orElseThrow();
-      assertThat(dtoA.getStudent().getStudentId()).isEqualTo(FIXED_BASE64_ID);
-      assertThat(dtoA.getCourses()).hasSize(1); // Javaコースのみ
+        // 2. 学生AのDTOを確認 (リストの最初の要素と仮定)
+        StudentDetailDto dtoA = result.stream()
+            .filter(d -> d.getStudent().getFullName().equals("山田 太郎"))
+            .findFirst().orElseThrow();
+        assertThat(dtoA.getStudent().getStudentId()).isEqualTo(FIXED_BASE64_ID);
+        assertThat(dtoA.getCourses()).hasSize(1); // Javaコースのみ
 
-      // 3. 学生BのDTOを確認 (リストの2番目の要素と仮定)
-      StudentDetailDto dtoB = result.stream()
-          .filter(d -> d.getStudent().getFullName().equals("田中 花子"))
-          .findFirst().orElseThrow();
-      assertThat(dtoB.getStudent().getStudentId()).isEqualTo(FIXED_BASE64_ID_B);
-      assertThat(dtoB.getCourses()).isEmpty();
-    }
+        // 3. 学生BのDTOを確認 (リストの2番目の要素と仮定)
+        StudentDetailDto dtoB = result.stream()
+            .filter(d -> d.getStudent().getFullName().equals("田中 花子"))
+            .findFirst().orElseThrow();
+        assertThat(dtoB.getStudent().getStudentId()).isEqualTo(FIXED_BASE64_ID_B);
+        assertThat(dtoB.getCourses()).isEmpty();
+      }
 
-    @Test
-    void mergeStudent_部分更新_Nullでないフィールドのみが既存データに上書きされること() {
-      // mergeStudent(Student existing, Student update) のテスト
-      // 既存のデータ（DBから取得した想定）
-      Student existing = new Student(
-          FIXED_UUID_BYTES,
-          "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-          "Tokyo", 25, "Male", "元の備考", null, null, null
-      );
+      @Test
+      void mergeStudent_部分更新_Nullでないフィールドのみが既存データに上書きされること() {
+        // mergeStudent(Student existing, Student update) のテスト
+        // 既存のデータ（DBから取得した想定）
+        Student existing = new Student(
+            FIXED_UUID_BYTES,
+            "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
+            "Tokyo", 25, "Male", "元の備考", null, null, null
+        );
 
-      // 部分更新用のデータ（リクエストボディの想定）
-      Student update = new Student(
-          null, // IDはマージ対象外
-          "田中 花子", // 氏名は更新
-          null, // フリガナはnullなのでスキップ
-          "Hana", // ニックネームは更新
-          null, // Emailはnullなのでスキップ
-          "Osaka", // Locationは更新
-          30, // Ageは更新
-          null, // Genderはnullなのでスキップ
-          "緊急連絡事項", // 備考は更新
-          null, null, null // その他のフィールドもnull
-      );
+        // 部分更新用のデータ（リクエストボディの想定）
+        Student update = new Student(
+            null, // IDはマージ対象外
+            "田中 花子", // 氏名は更新
+            null, // フリガナはnullなのでスキップ
+            "Hana", // ニックネームは更新
+            null, // Emailはnullなのでスキップ
+            "Osaka", // Locationは更新
+            30, // Ageは更新
+            null, // Genderはnullなのでスキップ
+            "緊急連絡事項", // 備考は更新
+            null, null, null // その他のフィールドもnull
+        );
 
-      // 実行
-      converter.mergeStudent(existing, update);
+        // 実行
+        converter.mergeStudent(existing, update);
 
-      // 検証
-      // 1. 更新されたフィールドの確認
-      assertThat(existing.getFullName()).isEqualTo("田中 花子");
-      assertThat(existing.getNickname()).isEqualTo("Hana");
-      assertThat(existing.getLocation()).isEqualTo("Osaka");
-      assertThat(existing.getAge()).isEqualTo(30);
-      assertThat(existing.getRemarks()).isEqualTo("緊急連絡事項");
+        // 検証
+        // 1. 更新されたフィールドの確認
+        assertThat(existing.getFullName()).isEqualTo("田中 花子");
+        assertThat(existing.getNickname()).isEqualTo("Hana");
+        assertThat(existing.getLocation()).isEqualTo("Osaka");
+        assertThat(existing.getAge()).isEqualTo(30);
+        assertThat(existing.getRemarks()).isEqualTo("緊急連絡事項");
 
-      // 2. nullのためスキップされ、元の値を維持したフィールドの確認
-      assertThat(existing.getFurigana()).isEqualTo("ヤマダ タロウ"); // スキップ
-      assertThat(existing.getEmail()).isEqualTo("taro@example.com"); // スキップ
-      assertThat(existing.getGender()).isEqualTo("Male"); // スキップ
+        // 2. nullのためスキップされ、元の値を維持したフィールドの確認
+        assertThat(existing.getFurigana()).isEqualTo("ヤマダ タロウ"); // スキップ
+        assertThat(existing.getEmail()).isEqualTo("taro@example.com"); // スキップ
+        assertThat(existing.getGender()).isEqualTo("Male"); // スキップ
+      }
     }
   }
 }
-
