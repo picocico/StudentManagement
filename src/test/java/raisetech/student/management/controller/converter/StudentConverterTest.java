@@ -2,9 +2,8 @@ package raisetech.student.management.controller.converter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -13,9 +12,8 @@ import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
-import org.mockito.Mockito;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -23,9 +21,13 @@ import raisetech.student.management.dto.StudentCourseDto;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentDto;
 import raisetech.student.management.exception.InvalidIdFormatException;
+import raisetech.student.management.util.IdCodec;
 
 @ExtendWith(MockitoExtension.class)
 class StudentConverterTest {
+
+  @Mock
+  IdCodec idCodec;
 
   // テスト対象クラス（SUT: System Under Test）。モックを注入
   @InjectMocks
@@ -72,6 +74,9 @@ class StudentConverterTest {
       // テストコードを実装 (FIXED_UUID_BYTES, FIXED_BASE64_IDを使用)
       // 固定値の16バイトのUUIDデータ
       // 期待されるURL-safe Base64文字列（paddingなし）
+      // IdCodec に委譲されること＋戻り値がそのまま返ることを確認
+      when(idCodec.encodeId(FIXED_UUID_BYTES)).thenReturn(FIXED_BASE64_ID);
+
       String result = converter.encodeBase64(FIXED_UUID_BYTES);
       // 期待値と結果が完全に一致することを確認
       // FIXED_UUID_BYTESのBase64エンコード値
@@ -85,15 +90,18 @@ class StudentConverterTest {
       byte[] invalidLengthBytes = new byte[]{0x01, 0x02, 0x03, 0x04};
 
       // 特定の例外（IllegalArgumentException）がスローされることを確認
+      // （このチェックは Converter 側で行っているので、IdCodec のモックは不要）
       assertThatThrownBy(() -> converter.encodeBase64(invalidLengthBytes))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("UUIDの形式が不正です");
+          .hasMessageContaining("UUIDの形式");
     }
 
     @Test
     void decodeBase64ToBytes_正常系_有効なBase64文字列を正しくバイト配列にデコードできること() {
       // テストコードを実装
       // 期待される元の16バイトのデータ
+      when(idCodec.decode(FIXED_BASE64_ID)).thenReturn(FIXED_UUID_BYTES);
+
       byte[] resultBytes = converter.decodeBase64ToBytes(FIXED_BASE64_ID);
       // バイト配列の内容が一致することを確認
       assertThat(resultBytes).containsExactly(FIXED_UUID_BYTES);
@@ -102,8 +110,11 @@ class StudentConverterTest {
     @Test
     void decodeBase64ToBytes_異常系_不正なBase64が入力された場合にInvalidIdFormatExceptionがスローされること() {
       // テストコードを実装 (InvalidIdFormatException, 「（Base64）」)
-      String invalid = FIXED_BASE64_ID.substring(0, FIXED_BASE64_ID.length() - 1) + "!";
-      // InvalidIdFormatExceptionがスローされ、かつメッセージに「（Base64）」を含むことを確認
+      String invalid = "invalid!!";
+      // IdCodec が IllegalArgumentException を投げた場合に、
+      // Converter が InvalidIdFormatException にラップすることを確認
+      when(idCodec.decode(invalid)).thenThrow(new IllegalArgumentException("dummy"));
+
       assertThatThrownBy(() -> converter.decodeBase64ToBytes(invalid))
           .isInstanceOf(InvalidIdFormatException.class)
           .hasMessageContaining("（Base64）");
@@ -112,19 +123,19 @@ class StudentConverterTest {
     @Test
     void decodeIdOrThrow_異常系_Base64デコード後に許容文字外を含む場合に例外がスローされること() {
       // テストコードを実装 (InvalidIdFormatException, 「（UUID）」)
-      // 1. Base64デコードは成功するが、許容文字外（#など）を含む生データを準備
+      // Base64デコードは成功するが、許容文字外（#など）を含む生データを準備
       String illegalTextId = "Test#ID_01";
-      // 2. その生データをBase64エンコードし、入力文字列とする
-      //    （Java標準のURL-safe, paddingなしでエンコード）
-      String validBase64 = Base64.getUrlEncoder().withoutPadding()
-          .encodeToString(illegalTextId.getBytes(StandardCharsets.UTF_8));
-      // validBase64 は例えば "VGVzdCM=?" のような値になるはず（正しくデコードできる形式）
+      byte[] decodedBytes = illegalTextId.getBytes(StandardCharsets.UTF_8);
+      String encoded = "dummyBase64";
+
+      // decodeBase64ToBytes 内で呼ばれる IdCodec#decode の戻り値として設定
+      when(idCodec.decode(encoded)).thenReturn(decodedBytes);
 
       // --- 実行と検証 ---
       // 期待されるのは、デコード後のパターンチェック失敗による「（UUID）」メッセージの例外
       assertThatThrownBy(() ->
           // 例外をスローするメソッド呼び出しのみをラムダ式に入れる
-          converter.decodeIdOrThrow(validBase64))
+          converter.decodeIdOrThrow(encoded))
           // ラムダ式と assertThatThrownBy の引数が終了する！
           .isInstanceOf(InvalidIdFormatException.class)
           // ここが重要：パターンチェック失敗（UUID相当の不正と見なす）のメッセージを確認
@@ -148,23 +159,24 @@ class StudentConverterTest {
           "Tokyo", 25, "Male", "備考", false
       );
 
-      // decodeBase64()の戻り値をモック（内部依存のテスト）
-      // decodeBase64ToBytesの実装をテストするため、decodeBase64(String)の動作を再現
-      // MockitoでdecodeBase64ToBytesをスパイ/モックして、FIXED_UUID_BYTESを返すように設定
-
-      // StudentConverterをSpyとして使う（decodeBase64メソッドを呼ぶため）
-      StudentConverter spy = Mockito.spy(converter);
-      doReturn(FIXED_UUID_BYTES).when(spy).decodeBase64(FIXED_BASE64_ID);
+      // IDデコードは IdCodec に委譲される
+      when(idCodec.decodeUuidBytesOrThrow(FIXED_BASE64_ID)).thenReturn(FIXED_UUID_BYTES);
 
       // 変換実行
-      Student result = spy.toEntity(inputDto);
+      Student result = converter.toEntity(inputDto);
 
       // 検証
       // 1. IDが正しくデコードされているか
       assertThat(result.getStudentId()).containsExactly(FIXED_UUID_BYTES);
       // 2. 他のフィールドが正しくマッピングされているか
       assertThat(result.getFullName()).isEqualTo("山田 太郎");
+      assertThat(result.getFurigana()).isEqualTo("ヤマダ タロウ");
+      assertThat(result.getNickname()).isEqualTo("Taro");
+      assertThat(result.getEmail()).isEqualTo("taro@example.com");
+      assertThat(result.getLocation()).isEqualTo("Tokyo");
       assertThat(result.getAge()).isEqualTo(25);
+      assertThat(result.getGender()).isEqualTo("Male");
+      assertThat(result.getRemarks()).isEqualTo("備考");
       assertThat(result.getDeleted()).isFalse();
     }
 
@@ -178,18 +190,17 @@ class StudentConverterTest {
           "Tokyo", 25, "Male", "備考", false
       );
 
-      // StudentConverterをSpyとして使う
-      StudentConverter spy = Mockito.spy(converter);
-      doReturn(NEW_RANDOM_BYTES).when(spy).generateRandomBytes();
+      // 新規ID生成は IdCodec に委譲される
+      when(idCodec.generateNewIdBytes()).thenReturn(NEW_RANDOM_BYTES);
 
       // 変換実行
-      Student result = spy.toEntity(inputDto);
+      Student result = converter.toEntity(inputDto);
 
       // 検証
       // 1. 新しいIDがセットされているか
       assertThat(result.getStudentId()).containsExactly(NEW_RANDOM_BYTES);
-      // 2. generateRandomBytes()が一度だけ呼ばれたことを確認
-      verify(spy, times(1)).generateRandomBytes();
+      // 2. 正しくマッピングされているか
+      assertThat(result.getFullName()).isEqualTo("山田 太郎");
     }
 
     @Test
@@ -201,20 +212,13 @@ class StudentConverterTest {
           "Tokyo", 25, "Male", "備考", null, null, false
       );
 
-      // --- Mocking (encodeBase64の動作を定義) ---
-      // 内部で呼ばれる encodeBase64(FIXED_UUID_BYTES) が FIXED_BASE64_ID を返すように設定
-      StudentConverter spy = Mockito.spy(new StudentConverter());
-
       // --- When (変換実行) ---
       // toDto を実行し、結果を StudentDto で受け取る
-      StudentDto dto = spy.toDto(input); // ★ Spy 経由で呼ぶ
+      when(idCodec.encodeId(FIXED_UUID_BYTES)).thenReturn(FIXED_BASE64_ID);
+
+      StudentDto dto = converter.toDto(input);
 
       // --- Then (検証) ---
-      // encodeBase64 に渡された引数をキャプチャして検証
-      ArgumentCaptor<byte[]> captor = ArgumentCaptor.forClass(byte[].class);
-      verify(spy, times(1)).encodeBase64(captor.capture()); // ★ capture は verify の引数で使う
-      assertThat(captor.getValue()).containsExactly(FIXED_UUID_BYTES);
-
       // DTO 内容の検証
       // 1. IDが正しくエンコードされているか
       assertThat(dto.getStudentId()).isEqualTo(FIXED_BASE64_ID);
@@ -247,7 +251,7 @@ class StudentConverterTest {
       // toDtoメソッドは内部でencodeBase64を呼び出し、ID長が16バイトでないため例外が発生する
       assertThatThrownBy(() -> converter.toDto(input))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("UUIDの形式が不正です");
+          .hasMessageContaining("UUIDの形式");
     }
 
     @Test
@@ -265,32 +269,29 @@ class StudentConverterTest {
       );
 
       // --- Mocking (新規ID生成の動作を定義) ---
-      // StudentConverterをSpyとして使う
-      StudentConverter spy = Mockito.spy(converter);
-      // generateRandomBytes()が新規ID (NEW_RANDOM_BYTES) を返すように設定
-      doReturn(NEW_RANDOM_BYTES).when(spy).generateRandomBytes();
+      // 新規Course ID
+      when(idCodec.generateNewIdBytes()).thenReturn(NEW_RANDOM_BYTES);
 
-      // ★ toEntity内部で decodeBase64 が呼ばれるため、Student IDの復号結果も定義
+      // Student IDのデコード結果
       byte[] fixedStudentBytes = new byte[16]; // 紐付け用 学生IDのバイト配列
-      doReturn(fixedStudentBytes).when(spy).decodeBase64(studentIdBase64);
+      when(idCodec.decode(studentIdBase64)).thenReturn(fixedStudentBytes);
 
       // --- When (変換実行) ---
       // 正しいメソッドと引数 (DTO, Base64 Student ID) で呼び出し
       // 戻り値の型は StudentCourse (エンティティ)
-      StudentCourse result = spy.toEntity(inputDto, studentIdBase64);
+      StudentCourse result = converter.toEntity(inputDto, studentIdBase64);
 
       // --- Then (検証) ---
       // 1. 新しいIDがセットされているか
       // resultEntity は StudentCourse (エンティティ) なので、IDはバイト配列
       // resultEntity.getCourseId() は byte[] 型なので isEqualTo を使用
       assertThat(result.getCourseId()).containsExactly(NEW_RANDOM_BYTES);
-      // 2. 他のフィールドが正しくマッピングされているか
-      assertThat(result.getCourseName()).isEqualTo("Javaコース");
-      // 3. Student IDが正しく紐づいているか
-      // resultEntity は StudentCourse (エンティティ) なので getStudentId() を使用
+      // 2. Student IDが正しく紐づいているか
       assertThat(result.getStudentId()).containsExactly(fixedStudentBytes);
-      // 4. generateRandomBytes()が一度だけ呼ばれたことを確認
-      verify(spy, times(1)).generateRandomBytes();
+      // 3.　他のフィールドが正しくマッピングされているか
+      assertThat(result.getCourseName()).isEqualTo("Javaコース");
+      assertThat(result.getStartDate()).isEqualTo(LocalDate.of(2025, 4, 1));
+      assertThat(result.getEndDate()).isEqualTo(LocalDate.of(2025, 9, 30));
     }
   }
 
@@ -321,6 +322,7 @@ class StudentConverterTest {
 
       // 3. コースA (学生Aに紐づくコース)
       StudentCourse courseA1 = new StudentCourse(
+          // コースID自体の値は本テストの関心外なので、ゼロ埋め16バイトで十分
           new byte[16], FIXED_UUID_BYTES, "Javaコース",
           S, S.plusMonths(6), null
       );
@@ -338,6 +340,10 @@ class StudentConverterTest {
       // 入力リストの作成
       List<Student> students = List.of(studentA, studentB);
       List<StudentCourse> courses = List.of(courseA1, courseB1, courseB2);
+
+      // 学生IDのBase64化は IdCodec に委譲される
+      when(idCodec.encodeId(FIXED_UUID_BYTES)).thenReturn(FIXED_BASE64_ID);
+      when(idCodec.encodeId(FIXED_UUID_BYTES_B)).thenReturn(FIXED_BASE64_ID_B);
 
       // --- When (変換実行) ---
       List<StudentDetailDto> result =
@@ -393,6 +399,11 @@ class StudentConverterTest {
       // 入力リストの作成
       List<Student> students = List.of(studentA, studentB);
       List<StudentCourse> courses = List.of(courseA1); // コースA1のみ
+
+      when(idCodec.encodeId(any())).thenReturn("IGNORED"); // コースIDなど、テストの関心外
+      // そのうえで、「学生ID」だけは上書きして本物の期待値を返す
+      when(idCodec.encodeId(FIXED_UUID_BYTES)).thenReturn(FIXED_BASE64_ID);
+      when(idCodec.encodeId(FIXED_UUID_BYTES_B)).thenReturn(FIXED_BASE64_ID_B);
 
       // --- When (変換実行) ---
       List<StudentDetailDto> result =

@@ -262,7 +262,7 @@ abstract class ControllerTestBase {
 
     // 3) ここで「共通の基本スタブ」を再設定（各テストで上書きしてOK）（UUID/IDを “VALID_UUID” に統一）
     // 例：成功系／500系で使う固定ID
-    when(converter.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
+    when(idCodec.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
 
     when(idCodec.decodeUuidBytesOrThrow(eq(base64Id))).thenReturn(studentId); // ダミーのBINARY(16)
     when(idCodec.decodeUuidOrThrow(eq(base64Id))).thenReturn(UUID.fromString(VALID_UUID));

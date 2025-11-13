@@ -152,7 +152,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
               }
             });
 
-    when(converter.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
+    when(idCodec.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
     when(converter.toEntity(studentDto)).thenReturn(student);
     when(converter.toEntityList(eq(List.of()), argThat(arr -> Arrays.equals(arr, studentId))))
         .thenReturn(List.of());
@@ -206,7 +206,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     req.setCourses(List.of(courseDto)); // null ではなく、1件以上を入れて通過
 
     // 変換系のモック（ここまでは正常に進む）
-    when(converter.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
+    when(idCodec.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
     when(converter.toEntity(studentDto)).thenReturn(student);
     when(converter.toEntityList(
         eq(List.of(courseDto)), argThat(arr -> Arrays.equals(arr, studentId))))
@@ -330,7 +330,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     // append 未指定 → デフォルト false（置換ルート）で「想定外例外」を発生させる
     doThrow(new RuntimeException("Unexpected failure"))
         .when(service)
-        .replaceCourses(eq(studentId), ArgumentMatchers.<StudentCourse>anyList());
+        .replaceCourses(eq(studentId), ArgumentMatchers.anyList());
 
     mockMvc
         .perform(

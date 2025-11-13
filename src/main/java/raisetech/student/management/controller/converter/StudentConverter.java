@@ -1,17 +1,13 @@
 package raisetech.student.management.controller.converter;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import org.springframework.stereotype.Component;
-
 import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.domain.StudentDetail;
@@ -19,7 +15,7 @@ import raisetech.student.management.dto.StudentCourseDto;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentDto;
 import raisetech.student.management.exception.InvalidIdFormatException;
-import raisetech.student.management.util.UUIDUtil;
+import raisetech.student.management.util.IdCodec;
 
 /**
  * 受講生・コースのエンティティ、DTO、ドメインモデル間の相互変換を担うコンバータ。
@@ -41,7 +37,11 @@ import raisetech.student.management.util.UUIDUtil;
 public class StudentConverter {
   // 既存のメソッド…（toDetailDto, toEntity など）
 
-  /** 文字列IDとして許容する文字（英数・ドット・アンダースコア・ハイフン） */
+  private final IdCodec idCodec;
+
+  /**
+   * 文字列IDとして許容する文字（英数・ドット・アンダースコア・ハイフン）
+   */
   private static final Pattern ID_TEXT_PATTERN = Pattern.compile("^[0-9A-Za-z._\\-]+$");
 
   // ------------------------------------------------------------
@@ -65,7 +65,7 @@ public class StudentConverter {
       throw new IllegalArgumentException("UUIDの形式が不正です");
     }
     // UUIDUtil は URL-safe & no padding 前提の実装
-    return UUIDUtil.toBase64(bytes); // URL-safe & no padding 前提のユーティリティ
+    return idCodec.encodeId(bytes); // URL-safe & no padding 前提のユーティリティ
   }
 
   /**
@@ -79,8 +79,11 @@ public class StudentConverter {
    */
   public byte[] decodeBase64ToBytes(String encoded) {
     try {
-      return java.util.Base64.getUrlDecoder().decode(encoded);
+      return idCodec.decode(encoded);
     } catch (IllegalArgumentException e) {
+      // IdCodec 側は IllegalArgumentException を投げる前提にしておいて、
+      // ここで「ドメイン例外」にラップすることで、
+      // 既存の InvalidIdFormatException を維持
       // Base64として不正 → （Base64）
       throw new InvalidIdFormatException("IDの形式が不正です（Base64）", e);
     }
@@ -99,73 +102,23 @@ public class StudentConverter {
   }
 
   /**
-   * 文字列ID（英数・ドット・アンダースコア・ハイフンのみ許容）としてデコードします。
-   *
-   * <p>主にパス変数のような「UUID以外の文字列ID」ケースで使用します。 Base64として不正な場合は「（Base64）」、許容文字外を含む場合は「（UUID）」として扱います。
-   *
-   * @param encoded URL-safe Base64（paddingなし）文字列
-   * @return 復号後の文字列ID
-   * @throws InvalidIdFormatException Base64不正（「（Base64）」）または文字列IDとして不正（「（UUID）」）
-   */
-  @SuppressWarnings("unused")
-  public String decodeIdOrThrow(String encoded) {
-    final byte[] bytes = decodeBase64ToBytes(encoded); // Base64不正はここで例外化
-    final String id = new String(bytes, StandardCharsets.UTF_8);
-
-    if (!ID_TEXT_PATTERN.matcher(id).matches()) {
-      // 仕様上は文字列IDの想定だが、明らかに不正 → UUID相当の不正に寄せる
-      throw new InvalidIdFormatException("IDの形式が不正です（UUID）");
-    }
-    return id;
-  }
-
-  /**
-   * UUIDを期待する箇所向けのデコード。
-   *
-   * <ul>
-   *   <li>Base64化された「UUID文字列表現」（36文字）
-   *   <li>Base64化された「UUIDの生16バイト」
-   * </ul>
-   *
-   * の両方に対応します。
-   *
-   * @return 復号した {@link UUID}
-   * @throws InvalidIdFormatException Base64不正（「（Base64）」）またはUUID不正（「（UUID）」）
-   */
-  @SuppressWarnings("unused")
-  public UUID decodeUuidOrThrow(String base64) {
-    try {
-      // URL-safe Base64 を想定（-/_）。必要なら標準Base64もフォールバック
-      byte[] bytes;
-      try {
-        bytes = Base64.getUrlDecoder().decode(pad(base64));
-      } catch (IllegalArgumentException ex) {
-        // URL-safe で失敗したら通常Base64でも試す
-        bytes = Base64.getDecoder().decode(pad(base64));
-      }
-      if (bytes.length != 16) {
-        throw new IllegalArgumentException("Base64デコード結果の長さが16バイトではありません");
-      }
-      return UUIDUtil.toUUID(bytes); // あなたの既存ユーティリティ
-    } catch (IllegalArgumentException e) {
-      // → GlobalExceptionHandler で 400（E006: INVALID_FORMAT 等）にマップ
-      throw new IllegalArgumentException("studentId(Base64)が不正です", e);
-    }
-  }
-
-  // パディング無し運用の場合の保険（長さ%4に応じて'='を付与）
-  private static String pad(String s) {
-    int m = s.length() % 4;
-    return (m == 0) ? s : s + "====".substring(m);
-  }
-
-  /**
    * ランダムなUUIDを生成し、その生16バイトを返します。
    *
    * @return ランダムUUIDの {@code byte[16]}
    */
   public byte[] generateRandomBytes() {
-    return UUIDUtil.fromUUID(UUID.randomUUID());
+    return idCodec.generateNewIdBytes();
+  }
+
+  public String decodeIdOrThrow(String encoded) {
+    final byte[] bytes = decodeBase64ToBytes(encoded); // ← ここが IdCodec 経由になる
+
+    final String id = new String(bytes, StandardCharsets.UTF_8);
+
+    if (!ID_TEXT_PATTERN.matcher(id).matches()) {
+      throw new InvalidIdFormatException("IDの形式が不正です（UUID）");
+    }
+    return id;
   }
 
   // ------------------------------------------------------------
@@ -185,8 +138,8 @@ public class StudentConverter {
     byte[] studentId =
         Optional.ofNullable(dto.getStudentId())
             .filter(id -> !id.isBlank())
-            .map(this::decodeBase64)
-            .orElseGet(this::generateRandomBytes);
+            .map(idCodec::decodeUuidBytesOrThrow)
+            .orElseGet(idCodec::generateNewIdBytes);
 
     return new Student(
         studentId,
@@ -233,7 +186,7 @@ public class StudentConverter {
    *
    * <p>{@code dto.courseId} が未指定なら新規採番し、{@code studentIdBase64} は必ず Base64 復号して紐付けます。
    *
-   * @param dto コースDTO（IDは Base64 文字列）
+   * @param dto             コースDTO（IDは Base64 文字列）
    * @param studentIdBase64 受講生ID（Base64 文字列）
    * @return コースエンティティ（IDは生16バイト）
    * @throws InvalidIdFormatException Base64が不正な場合（「（Base64）」）
@@ -253,22 +206,7 @@ public class StudentConverter {
         dto.getStartDate(),
         dto.getEndDate(),
         null // createdAt（DB側）
-        );
-  }
-
-  /**
-   * {@link StudentCourse} エンティティから {@link StudentCourseDto} に変換します。
-   *
-   * @param entity コースエンティティ
-   * @return コースDTO（IDは Base64 文字列）
-   * @throws IllegalArgumentException IDバイト長が16以外の場合
-   */
-  public StudentCourseDto toDto(StudentCourse entity) {
-    return new StudentCourseDto(
-        encodeBase64(entity.getCourseId()),
-        entity.getCourseName(),
-        entity.getStartDate(),
-        entity.getEndDate());
+    );
   }
 
   /**
@@ -276,7 +214,7 @@ public class StudentConverter {
    *
    * <p>各 {@code dto.courseId} が未指定なら新規採番し、{@code studentId} を紐付けます。
    *
-   * @param dtoList コースDTO一覧
+   * @param dtoList   コースDTO一覧
    * @param studentId 紐付け先の受講生ID（生16バイト）
    * @return コースエンティティ一覧
    * @throws InvalidIdFormatException Base64不正なIDが含まれる場合（「（Base64）」）
@@ -296,6 +234,21 @@ public class StudentConverter {
                     dto.getEndDate(),
                     null))
         .collect(Collectors.toList());
+  }
+
+  /**
+   * {@link StudentCourse} エンティティから {@link StudentCourseDto} に変換します。
+   *
+   * @param entity コースエンティティ
+   * @return コースDTO（IDは Base64 文字列）
+   * @throws IllegalArgumentException IDバイト長が16以外の場合
+   */
+  public StudentCourseDto toDto(StudentCourse entity) {
+    return new StudentCourseDto(
+        encodeBase64(entity.getCourseId()),
+        entity.getCourseName(),
+        entity.getStartDate(),
+        entity.getEndDate());
   }
 
   /**
@@ -334,8 +287,8 @@ public class StudentConverter {
    *
    * <p>パスで受け取った Base64 ID（理論上DB返却と同一）を最終的に反映したい場合に使用します。
    *
-   * @param student 受講生エンティティ
-   * @param courses コースエンティティ一覧
+   * @param student          受講生エンティティ
+   * @param courses          コースエンティティ一覧
    * @param base64IdOverride 上書きしたい Base64 学生ID
    * @return 詳細DTO（{@code base64IdOverride} が非nullなら学生IDを上書き）
    */
@@ -371,7 +324,7 @@ public class StudentConverter {
    * <p>コースは受講生ID（Base64）でグルーピングします。
    *
    * @param students 受講生エンティティ一覧
-   * @param courses 全コースエンティティ一覧
+   * @param courses  全コースエンティティ一覧
    * @return 詳細DTO一覧
    * @throws IllegalArgumentException いずれかのIDが16バイト以外の場合
    */
@@ -398,7 +351,7 @@ public class StudentConverter {
    * 既存の受講生データに、新しいデータの null でないフィールドを上書きします（部分更新）。
    *
    * @param existing 現在の受講生エンティティ（更新対象）
-   * @param update 部分更新用の受講生エンティティ（nullでないフィールドのみ採用）
+   * @param update   部分更新用の受講生エンティティ（nullでないフィールドのみ採用）
    */
   public void mergeStudent(Student existing, Student update) {
     if (update.getFullName() != null) {
