@@ -2,45 +2,72 @@ package raisetech.student.management.util;
 
 import java.util.UUID;
 
+/**
+ * UUID/BINARY(16) ベースの ID を URL-safe Base64 文字列と相互変換するためのインターフェースです。
+ *
+ * <p>実装クラス（例: {@code StudentIdCodec}）は、UUID 由来の 16 バイト配列と
+ * {@code Base64.getUrlEncoder().withoutPadding()} による URL-safe Base64 文字列との変換を担当します。
+ */
 public interface IdCodec {
 
   /**
    * URL-safe Base64 文字列から UUID を復元します。
    *
-   * <p>Base64として不正、または UUID 16バイトに復元できない場合は
+   * <p>Base64 として不正、または UUID の 16 バイト表現に復元できない場合は
    * {@link IllegalArgumentException} をスローします。
+   *
+   * @param base64 URL-safe Base64 形式の UUID 文字列
+   * @return 復元された UUID
+   * @throws IllegalArgumentException 文字列が Base64 として不正、または UUID の 16 バイト表現にならない場合
    */
   UUID decodeUuidOrThrow(String base64);
 
   /**
-   * URL-safe Base64 文字列から UUID 由来の16バイト配列を復元します。
+   * URL-safe Base64 文字列から UUID 由来の 16 バイト配列を復元します。
    *
-   * <p>Base64として不正、または 16バイト以外の長さになった場合は
+   * <p>Base64 として不正、または 16 バイト以外の長さになった場合は
    * {@link IllegalArgumentException} をスローします。
    *
-   * <p>DB の PK（学生ID・コースIDなど UUID/BINARY(16) 前提のID）向けです。
+   * <p>DB の主キー（学生 ID・コース ID など UUID/BINARY(16) 前提の ID）向けです。
+   *
+   * @param base64 URL-safe Base64 形式の ID 文字列
+   * @return 復元された 16 バイトの配列
+   * @throws IllegalArgumentException Base64 として不正、または 16 バイト長にならない場合
    */
   byte[] decodeUuidBytesOrThrow(String base64);
 
   /**
-   * UUID 由来の16バイト配列を URL-safe Base64 文字列にエンコードします。
+   * UUID 由来の 16 バイト配列を URL-safe Base64 文字列にエンコードします。
    *
-   * <p>16バイト以外が渡された場合は {@link IllegalArgumentException} をスローします。
+   * <p>引数が {@code null} の場合は {@code null} を返します。
+   * それ以外で 16 バイト以外の長さの配列が渡された場合は {@link IllegalArgumentException} をスローします。
+   *
+   * @param id UUID を表す 16 バイト配列（または {@code null}）
+   * @return URL-safe Base64 文字列、または入力が {@code null} の場合は {@code null}
+   * @throws IllegalArgumentException 引数が 16 バイト以外の長さの配列である場合
    */
   String encodeId(byte[] id);
 
   /**
    * URL-safe Base64 文字列を単純にバイト配列へデコードします。
    *
-   * <p>長さチェックは行いません。Base64として不正な場合のみ
-   * {@link IllegalArgumentException} をスローします。
+   * <p>引数が {@code null} の場合は {@code null} を返します。
+   * 長さチェックは行いません。Base64 として不正な場合のみ {@link IllegalArgumentException} をスローします。
    *
-   * <p>UUID 固定長を要求しない汎用的なID（文字列ID など）の復号に利用します。
+   * <p>UUID 固定長を要求しない汎用的な ID（任意長の文字列 ID など）の復号に利用します。
+   *
+   * @param id URL-safe Base64 文字列（または {@code null}）
+   * @return デコードされたバイト配列、または入力が {@code null} の場合は {@code null}
+   * @throws IllegalArgumentException 文字列が Base64 として不正な場合
    */
   byte[] decode(String id);
 
   /**
-   * 新規ID（UUID由来の16バイト配列）を生成します。
+   * 新規 ID（UUID 由来の 16 バイト配列）を生成します。
+   *
+   * <p>戻り値の配列は必ず長さ 16 であり、{@link UUID#randomUUID()} 相当のランダム値に基づくことを想定します。
+   *
+   * @return 新規に生成された 16 バイトの UUID バイト配列
    */
   byte[] generateNewIdBytes();
 }

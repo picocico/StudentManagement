@@ -17,7 +17,10 @@ public class StudentIdCodecTest {
   private final UUID FIXED_UUID = UUID.fromString("12345678-9abc-def0-1234-56789abcdef0");
 
   /**
-   * UUID → byte[16] に変換するユーティリティ（テスト用）<br> 本番側では UUIDUtil.fromUUID(...) が同じことをしている想定
+   * UUID を 16 バイトの配列（BINARY(16)）に変換するテスト用ユーティリティです。
+   *
+   * <p>本番コード側でも、UUID を {@code BINARY(16)} に変換するユーティリティ
+   * （例: {@code IdCodec} や同等のコンポーネント）が同じ変換を担うことを想定しています。
    */
   private static byte[] toBytes(UUID uuid) {
     ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
@@ -86,6 +89,13 @@ public class StudentIdCodecTest {
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("(Base64)");
     }
+
+    @Test
+    void decode_正常系_nullの場合はnullを返すこと() {
+      byte[] result = codec.decode(null);
+
+      assertThat(result).isNull();
+    }
   }
 
   // ------------------------------------------------------------
@@ -134,8 +144,9 @@ public class StudentIdCodecTest {
       assertThatThrownBy(() -> codec.decodeUuidOrThrow(base64))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("(Base64)");
-      // 内部的には「長さが16バイトではありません」→ catch → wrap なので、
-      // 最終メッセージは "studentId(Base64)が不正です"
+      // 内部的には「長さが16バイトではありません」などの例外を catch して
+      // 「studentId(Base64)が不正です」のようなメッセージにラップされる想定。
+      // テストでは "(Base64)" を含んでいることだけを検証する。
     }
   }
 
@@ -157,6 +168,17 @@ public class StudentIdCodecTest {
       String invalid = "NG!!";
 
       assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(invalid))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("(Base64)");
+    }
+
+    @Test
+    void decodeUuidBytesOrThrow_異常系_デコード後の長さが16バイトでない場合もIllegalArgumentExceptionがスローされること() {
+      // 8バイトのデータを Base64 化して渡す（あえて 16 バイトではない）
+      byte[] eightBytes = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+      String base64 = Base64.getUrlEncoder().withoutPadding().encodeToString(eightBytes);
+
+      assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(base64))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("(Base64)");
     }

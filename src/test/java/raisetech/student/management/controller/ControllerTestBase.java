@@ -147,20 +147,27 @@ abstract class ControllerTestBase {
   }
 
   /**
-   * 各テスト実行前に{@code MockMvc}を共通初期化を行います。
+   * 各テスト実行前に Controller テスト用の共通データとモックスタブを初期化します。
    *
    * <p>Given:
    *
    * <ul>
-   *   <li>固定のUUID/16バイトID/base64Idの生成
-   *   <li>受講生・コースのダミーデータおよびDTOの用意
-   *   <li>モックの完全リセットと、共通スタブ（decodeUuidOrThrow, encodeBase64）の再設定
+   *   <li>固定の UUID／16 バイト ID／Base64 ID（{@link #VALID_UUID} とその派生値）の生成</li>  // ←★ココを変更: UUID/ID の関係を明示
+   *   <li>受講生・コースのダミーエンティティおよび DTO の用意</li>
+   *   <li>モックの完全リセットと、ID 変換・DTO 変換の共通スタブ再設定
+   *     <ul>
+   *       <li>{@link IdCodec#decodeUuidBytesOrThrow(String)} による 16 バイト ID デコード</li>   // ←★ココを変更: decodeUuidBytesOrThrow を明示
+   *       <li>{@link IdCodec#decodeUuidOrThrow(String)} による {@link java.util.UUID} へのデコード</li> // ←★追加
+   *       <li>{@link StudentConverter#encodeBase64(byte[])} による 16 バイト ID → Base64 のエンコード</li> // ←★追加
+   *       <li>{@link #stubConverterHappyPath()} および {@link #stubServiceHappyPath()} による「ハッピーパス」スタブ</li> // ←★ココを変更: 共通スタブの実体を列挙
+   *     </ul>
+   *   </li>
    * </ul>
-   * <p>
-   * Then:
+   *
+   * <p>Then:
    *
    * <ul>
-   *   <li>以降の各テストが同一前提で安定して実行できる状態になる
+   *   <li>以降の各テストが同一前提（固定 ID・同一ダミーデータ・同一モック挙動）で安定して実行できる状態になる</li> // ←★少し説明を具体化
    * </ul>
    */
   @BeforeEach
@@ -257,16 +264,11 @@ abstract class ControllerTestBase {
     student2.setDeleted(true);
     detailDto2 = new StudentDetailDto(student2, List.of(courseDto1, courseDto2));
 
-    // 2) 完全リセット（呼び出し履歴＋スタブの両方クリア）
-    Mockito.reset(converter, service /* , 他のモック */);
-
-    // 3) ここで「共通の基本スタブ」を再設定（各テストで上書きしてOK）（UUID/IDを “VALID_UUID” に統一）
+    // 2) ここで「共通の基本スタブ」を再設定（各テストで上書きしてOK）（UUID/IDを “VALID_UUID” に統一）
     // 例：成功系／500系で使う固定ID
-    when(idCodec.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
-
-    when(idCodec.decodeUuidBytesOrThrow(eq(base64Id))).thenReturn(studentId); // ダミーのBINARY(16)
     when(idCodec.decodeUuidOrThrow(eq(base64Id))).thenReturn(UUID.fromString(VALID_UUID));
-
+    when(idCodec.decodeUuidBytesOrThrow(eq(base64Id))).thenReturn(studentId); // ダミーのBINARY(16)
+    
     // encodeBase64 の共通スタブが必要なら、VALID_UUID から作った bytes に合わせる
     when(converter.encodeBase64(argThat(arr -> Arrays.equals(arr, studentId))))
         .thenReturn(base64Id);
@@ -315,16 +317,29 @@ abstract class ControllerTestBase {
   // --------------------
 
   /**
-   * エラーレスポンスの互換検証ユーティリティ。
+   * エラーレスポンスの標準フォーマットを検証するためのユーティリティです。
    *
-   * <p>errorType/error、errorCode/code（int/文字列）等の差異を吸収して期待値を検証します。
+   * <p>現在のエラーレスポンス仕様は次のとおりです。
    *
-   * @param result                         MockMvcの実行結果
-   * @param expectedHttp                   期待するHTTPステータス
-   * @param expectedType                   期待するエラータイプ（例: {@code TYPE_MISMATCH}）
-   * @param expectedCodeSubstring          エラーコードに含まれるべき部分文字列（例: {@code "E404"}）
-   * @param expectedMessageSubstringOrNull メッセージに含まれるべき部分文字列（不要ならnull）
-   * @throws Exception レスポンス読み取りに失敗した場合
+   * <ul>
+   *   <li>{@code status}: HTTP ステータスコード（数値）</li>
+   *   <li>{@code error}: エラー種別（例: {@code "TYPE_MISMATCH"}, {@code "NOT_FOUND"}）</li>
+   *   <li>{@code code}: アプリケーションエラーコード（例: {@code "E001"}, {@code "E404"}）</li>
+   *   <li>{@code message}: 人間向けメッセージ文字列</li>
+   * </ul>
+   *
+   * <p>このメソッドでは上記のフィールドに加えて、旧フォーマットで使用していた
+   * {@code errorType} および {@code errorCode} フィールドがレスポンスに
+   * 含まれていないことも合わせて検証します。 // ←★ココを変更: 「差異吸収」→「旧キーが無いことも検証」
+   *
+   * @param result                         MockMvc の実行結果
+   * @param expectedHttp                   期待する HTTP ステータスコード
+   * @param expectedType                   期待するエラー種別（例: {@code "TYPE_MISMATCH"}）
+   * @param expectedCodeSubstring          {@code code} に含まれているべき部分文字列 （例: {@code "E404"}） //
+   *                                       ←★ココ少し具体化
+   * @param expectedMessageSubstringOrNull {@code message} に含まれているべき部分文字列。 メッセージ検証が不要な場合は
+   *                                       {@code null} を指定する // ←★説明を現挙動に合わせて補足
+   * @throws Exception レスポンスの読み取りや JSON パースに失敗した場合
    */
   protected void assertErrorCompat(
       MvcResult result,
@@ -366,31 +381,24 @@ abstract class ControllerTestBase {
   /**
    * Converter の「共通ハッピーパス」スタブを設定します。
    *
-   * <p>Controller の単体テストで、変換レイヤーの振る舞いを安定化させるための 最低限のダミー挙動（成功シナリオ）を一括で登録します。
-   * 個々のテストで上書き（再スタブ）して構いません。
+   * <p>Controller の単体テストで、変換レイヤーの振る舞いを安定化させるための
+   * 最低限のダミー挙動（成功シナリオ）を一括で登録します。 個々のテストで上書き（再スタブ）して構いません。
    *
    * <h4>設定内容</h4>
    *
    * <ul>
-   *   <li>{@code decodeBase64(String)}: 任意入力 → ダミー16進配列（{@code byte[]{1,2,3}}）
-   *   <li>{@code toEntity(...)}: 任意入力（null 可）→ 空の {@code Student} を返却
-   *   <li>{@code mergeStudent(...)}: void メソッド → 何もしない（素通し）
-   *   <li>{@code toEntityList(...)}: 任意入力 → 空リスト
-   *   <li>{@code toDetailDto(...)}: 最小限の {@code StudentDetailDto}（または mock）を返却
+   *   <li>{@code toEntity(...)}: 任意入力（null 可）→ 空の {@link Student} を返却</li>
+   *   <li>{@code mergeStudent(...)}: void メソッド → 何もしない（素通し）</li>
+   *   <li>{@code toEntityList(...)}: 任意入力 → 空リストを返却</li>
+   *   <li>{@code toDetailDto(...)}: 最小限の {@link StudentDetailDto}（または mock）を返却</li>
    * </ul>
    *
    * <h4>意図</h4>
-   * <p>
-   * 変換の正当性そのものはこのテストでは検証対象外とし、 Controller の分岐やエラーハンドリングだけに焦点を当てます。
-   *
-   * <h4>注意</h4>
-   * <p>
-   * {@code StudentDetailDto} にデフォルトコンストラクタが無い場合は mock 返却にフォールバックします。
+   * <p>変換の正当性そのものはこのテストでは検証対象外とし、
+   * Controller の分岐やエラーハンドリングだけに焦点を当てます。
    */
   // 共通（ハッピーパス）スタブを流し込む
   protected void stubConverterHappyPath() {
-    // Controller で decodeBase64 を呼ぶケースに対応
-    when(converter.decodeBase64(anyString())).thenReturn(new byte[]{1, 2, 3});
 
     // toEntity(null 可)。必要最低限の空オブジェクトでOK
     when(converter.toEntity(any())).thenAnswer(inv -> new Student());
@@ -449,21 +457,10 @@ abstract class ControllerTestBase {
   /**
    * 「想定外の実行時例外（500/E999 相当）」を能動的に発火させるための補助。
    *
-   * <p>早い段階（例：{@code decodeBase64(...)}）で {@link RuntimeException} を投げるようにスタブし、
-   * 後続のサービス呼び出しへ到達しない経路を作ります。
-   *
-   * <h4>用途</h4>
-   *
-   * <ul>
-   *   <li>GlobalExceptionHandler の 500 系ハンドリング（メッセージ／コード／ログ）の検証
-   *   <li>{@code NeverWantedButInvoked} 回避（サービスが呼ばれないことの保証）
-   * </ul>
-   *
-   * <h4>使い方</h4>
-   * <p>
-   * 対象テストメソッドの冒頭で本メソッドを呼び出してから、通常通り MockMvc を実行します。
+   * <p>早い段階（例：{@code idCodec.decodeUuidBytesOrThrow(...)}）で
+   * {@link RuntimeException} を投げるようにスタブし、 後続のサービス呼び出しへ到達しない経路を作ります。
    */
   protected void makeConverterThrowEarly() {
-    when(converter.decodeBase64(anyString())).thenThrow(new RuntimeException("boom"));
+    when(idCodec.decodeUuidBytesOrThrow(anyString())).thenThrow(new RuntimeException("boom"));
   }
 }

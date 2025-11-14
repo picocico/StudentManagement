@@ -3,6 +3,7 @@ package raisetech.student.management.controller.converter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
@@ -23,26 +24,56 @@ import raisetech.student.management.dto.StudentDto;
 import raisetech.student.management.exception.InvalidIdFormatException;
 import raisetech.student.management.util.IdCodec;
 
+/**
+ * {@link StudentConverter} の単体テストクラス。
+ *
+ * <p>主な検証対象は次の通りです。
+ * <ul>
+ *   <li>ID 変換（UUID 由来の byte[16] と Base64 文字列の相互変換）</li>
+ *   <li>Student / StudentCourse と各種 DTO 間の項目移送</li>
+ *   <li>集約変換（Student ＋ StudentCourse → StudentDetailDto）</li>
+ *   <li>部分更新マージ処理（{@link StudentConverter#mergeStudent(Student, Student)}）</li>
+ * </ul>
+ *
+ * <p>{@link IdCodec} はモック化し、UUID の具体的な値や Base64 実装詳細に依存しない形で
+ * コンバータの責務のみを検証します。
+ */
 @ExtendWith(MockitoExtension.class)
 class StudentConverterTest {
 
+  /**
+   * ID 変換処理を委譲するユーティリティのモック。
+   *
+   * <p>UUID 16 バイトと Base64 文字列の相互変換ロジックは本クラスの関心外とし、
+   * その戻り値／例外を固定することで {@link StudentConverter} の挙動を検証します。
+   */
   @Mock
   IdCodec idCodec;
 
-  // テスト対象クラス（SUT: System Under Test）。モックを注入
+  /**
+   * テスト対象となるコンバータ。
+   *
+   * <p>{@link IdCodec} モックが自動的にインジェクションされます。
+   */
   @InjectMocks
   private StudentConverter converter;
 
+  /**
+   * テスト内で簡易に Base64URL 文字列を生成するためのユーティリティ。
+   *
+   * @param b エンコード対象バイト配列
+   * @return URL セーフかつパディング無しの Base64 文字列
+   */
   private static String b64(byte[] b) {
     return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
   }
 
   /**
-   * テスト内で `new byte[16]` を使っている箇所は、 「UUIDの具体的な値には依存せず、長さが16バイトであれば良い」ケースです。
-   * 値そのものはテストの関心外であるため、ゼロ埋め16バイトを利用しています。
+   * テスト共通で利用する 16 バイト固定 ID（学生 A 用）。
+   *
+   * <p>UUID の具体的な値そのものには依存せず、「常に 16 バイトである」ことのみを前提に
+   * コンバータの挙動を検証するための固定データです。
    */
-  // 16バイトの固定データ（学生A用のテストID）
-  // 通常はUUIDUtilのモックと組み合わせて使用
   private final byte[] FIXED_UUID_BYTES = new byte[]{
       (byte) 0x12, (byte) 0x34, (byte) 0x56, (byte) 0x78,
       (byte) 0x9a, (byte) 0xbc, (byte) 0xde, (byte) 0xf0,
@@ -50,10 +81,17 @@ class StudentConverterTest {
       (byte) 0x9a, (byte) 0xbc, (byte) 0xde, (byte) 0xf0
   };
 
-  // 16バイトの固定値
+  /**
+   * {@link #FIXED_UUID_BYTES} を Base64URL 形式にした固定 ID 文字列。
+   */
   private final String FIXED_BASE64_ID = b64(FIXED_UUID_BYTES);
 
-  // 新規採番用の16バイトID（generateNewIdBytes の戻り値を固定する用途）
+  /**
+   * 新規採番を想定した 16 バイトの固定 ID。
+   *
+   * <p>{@link IdCodec#generateNewIdBytes()} の戻り値として利用し、
+   * 「ランダムだが 16 バイトである」という前提をテストに与えます。
+   */
   private final byte[] NEW_RANDOM_BYTES = new byte[]{
       (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04,
       (byte) 0x05, (byte) 0x06, (byte) 0x07, (byte) 0x08,
@@ -61,21 +99,35 @@ class StudentConverterTest {
       (byte) 0x0D, (byte) 0x0E, (byte) 0x0F, (byte) 0x10
   };
 
-  // 16バイトの固定UUID（学生B用のテストID）
+  /**
+   * 学生 B 用の 16 バイト固定 ID。
+   */
   private final byte[] FIXED_UUID_BYTES_B = new byte[]{
       (byte) 0xaa, (byte) 0xbb, (byte) 0xcc, (byte) 0xdd,
       (byte) 0xee, (byte) 0xff, (byte) 0x11, (byte) 0x22,
       (byte) 0xaa, (byte) 0xbb, (byte) 0xcc, (byte) 0xdd,
       (byte) 0xee, (byte) 0xff, (byte) 0x11, (byte) 0x22
   };
+
+  /**
+   * {@link #FIXED_UUID_BYTES_B} を Base64URL 形式にした固定 ID 文字列。
+   */
   private final String FIXED_BASE64_ID_B = b64(FIXED_UUID_BYTES_B); // 仮のBase64 ID B
 
   // ------------------------------------------------------------
-// ID変換メソッドのテスト
-// ------------------------------------------------------------
+  // ID変換メソッドのテスト
+  // ------------------------------------------------------------
+
+  /**
+   * ID 変換系メソッド（Base64 ⇔ byte[]、文字列 ID デコード）のテストグループ。
+   */
   @Nested
   class IdConversionTest {
 
+    /**
+     * {@link StudentConverter#encodeBase64(byte[])} が 16 バイトの UUID バイト配列を正しく Base64 文字列へ変換し、
+     * {@link IdCodec#encodeId(byte[])} へ委譲されていることを検証します。
+     */
     @Test
     void encodeBase64_正常系_16バイトのUUIDバイト配列を正しくエンコードできること() {
       // テストコードを実装 (FIXED_UUID_BYTES, FIXED_BASE64_IDを使用)
@@ -90,11 +142,19 @@ class StudentConverterTest {
       assertThat(result).isEqualTo(FIXED_BASE64_ID);
     }
 
+    /**
+     * {@link StudentConverter#encodeBase64(byte[])} に 16 バイト以外の配列が渡された場合、 内部で利用する
+     * {@link IdCodec#encodeId(byte[])} から {@link IllegalArgumentException} が そのまま伝播することを検証します。
+     */
     @Test
     void encodeBase64_異常系_16バイト以外の長さが入力された場合に例外が発生すること() {
       // テストコードを実装 (IllegalArgumentException)
       // 不正な長さのデータ（例: 4バイト）
       byte[] invalidLengthBytes = new byte[]{0x01, 0x02, 0x03, 0x04};
+
+      // 16バイトチェックは IdCodec 側の責務とし、Converter は例外をそのまま伝播する
+      when(idCodec.encodeId(invalidLengthBytes))
+          .thenThrow(new IllegalArgumentException("UUIDの形式が不正です"));
 
       // 特定の例外（IllegalArgumentException）がスローされることを確認
       // （このチェックは Converter 側で行っているので、IdCodec のモックは不要）
@@ -103,6 +163,10 @@ class StudentConverterTest {
           .hasMessageContaining("UUIDの形式");
     }
 
+    /**
+     * {@link StudentConverter#decodeBase64ToBytes(String)} が 正常な Base64 文字列を正しくバイト配列へ復元し、
+     * {@link IdCodec#decode(String)} に委譲していることを検証します。
+     */
     @Test
     void decodeBase64ToBytes_正常系_有効なBase64文字列を正しくバイト配列にデコードできること() {
       // テストコードを実装
@@ -114,6 +178,10 @@ class StudentConverterTest {
       assertThat(resultBytes).containsExactly(FIXED_UUID_BYTES);
     }
 
+    /**
+     * {@link StudentConverter#decodeBase64ToBytes(String)} に不正な Base64 文字列が渡された場合、
+     * {@link InvalidIdFormatException}（「（Base64）」）がスローされることを検証します。
+     */
     @Test
     void decodeBase64ToBytes_異常系_不正なBase64が入力された場合にInvalidIdFormatExceptionがスローされること() {
       // テストコードを実装 (InvalidIdFormatException, 「（Base64）」)
@@ -127,6 +195,11 @@ class StudentConverterTest {
           .hasMessageContaining("（Base64）");
     }
 
+    /**
+     * {@link StudentConverter#decodeIdOrThrow(String)} において、 Base64
+     * デコード後の文字列が許容パターン外の文字（英数・ドット・アンダースコア・ハイフン以外）を含む場合に、
+     * {@link InvalidIdFormatException}（「（ID文字列）」）がスローされることを検証します。
+     */
     @Test
     void decodeIdOrThrow_異常系_Base64デコード後に許容文字外を含む場合に例外がスローされること() {
       // テストコードを実装 (InvalidIdFormatException, 「（UUID）」)
@@ -146,20 +219,36 @@ class StudentConverterTest {
           // ラムダ式と assertThatThrownBy の引数が終了する！
           .isInstanceOf(InvalidIdFormatException.class)
           // ここが重要：パターンチェック失敗（UUID相当の不正と見なす）のメッセージを確認
-          .hasMessageContaining("（UUID）");
+          .hasMessageContaining("（ID文字列）");
     }
   }
 
   // ------------------------------------------------------------
 //　DTO ⇔ エンティティ 変換メソッドのテスト
 // ------------------------------------------------------------
+
+  /**
+   * DTO とエンティティ間の変換ロジックを検証するテストグループ。
+   *
+   * <p>主に以下を対象とします。
+   * <ul>
+   *   <li>{@link StudentDto} ⇔ {@link Student}</li>
+   *   <li>{@link StudentCourseDto} ⇔ {@link StudentCourse}</li>
+   *   <li>リスト変換・新規 ID 採番の挙動</li>
+   *   <li>集約 DTO／部分更新マージ処理</li>
+   * </ul>
+   */
   @Nested
   class DtoEntityConversionTest {
 
+    /**
+     * {@link StudentConverter#toEntity(StudentDto)} が、 ID 付きの {@link StudentDto} を正しく
+     * {@link Student} へ変換し、 ID デコードを {@link IdCodec#decodeUuidBytesOrThrow(String)}
+     * に委譲していることを検証します。
+     */
     @Test
     void toEntity_StudentDto_IDあり_全フィールドが正しくマッピングされIDがデコードされること() {
-      // SpyとdoReturn(FIXED_UUID_BYTES).when(spy).decodeBase64(anyString()) を使用
-      // 入力DTOの準備
+      // IdCodec のモックで ID デコード結果を固定し、項目移送を検証する
       StudentDto inputDto = new StudentDto(
           FIXED_BASE64_ID,
           "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
@@ -187,9 +276,12 @@ class StudentConverterTest {
       assertThat(result.getDeleted()).isFalse();
     }
 
+    /**
+     * {@link StudentConverter#toEntity(StudentDto)} において、 ID が未指定の場合（null）のときに
+     * {@link IdCodec#generateNewIdBytes()} が呼び出され、 新規 ID が採番されることを検証します。
+     */
     @Test
     void toEntity_StudentDto_IDなし_新規にランダムIDが生成されること() {
-      // SpyとdoReturn(NEW_RANDOM_BYTES).when(spy).generateRandomBytes() を使用
       // IDがnullまたは空文字のDTOを準備
       StudentDto inputDto = new StudentDto(
           null, // IDなし
@@ -210,9 +302,13 @@ class StudentConverterTest {
       assertThat(result.getFullName()).isEqualTo("山田 太郎");
     }
 
+    /**
+     * {@link StudentConverter#toDto(Student)} が {@link Student} の全フィールドを {@link StudentDto}
+     * へ正しくコピーし、 ID 部分のエンコードに {@link IdCodec#encodeId(byte[])} を利用していることを検証します。
+     */
     @Test
     void toDto_Student_正常系_全フィールドが正しくマッピングされIDがエンコードされること() {
-      // SpyとdoReturn(FIXED_BASE64_ID).when(spy).encodeBase64(any()) を使用
+      // IDありのDTOを準備
       Student input = new Student(
           FIXED_UUID_BYTES,
           "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
@@ -241,6 +337,11 @@ class StudentConverterTest {
       assertThat(dto.getDeleted()).isFalse();
     }
 
+    /**
+     * {@link StudentConverter#toDto(Student)} において、学生 ID が 16 バイト未満の場合、 内部で呼び出される
+     * {@link IdCodec#encodeId(byte[])} が {@link IllegalArgumentException} を投げ、
+     * その例外がコンバータからも伝播することを検証します。
+     */
     @Test
     void toDto_Student_異常系_ID長が16バイトでない場合にIllegalArgumentExceptionがスローされること() {
       // 💡 異常系データ: 15バイトのIDを持つバイト配列を作成
@@ -255,12 +356,23 @@ class StudentConverterTest {
           "Tokyo", 20, "Male", "備考", null, null, false
       );
 
+      // ★ IdCodec が長さ不正を検知して IllegalArgumentException を投げるようにスタブ
+      when(idCodec.encodeId(invalid))
+          .thenThrow(new IllegalArgumentException("UUIDの形式が不正です"));
+
       // toDtoメソッドは内部でencodeBase64を呼び出し、ID長が16バイトでないため例外が発生する
       assertThatThrownBy(() -> converter.toDto(input))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("UUIDの形式");
+
+      // ★ ちゃんと IdCodec が呼ばれていることも確認しておくと安心
+      verify(idCodec).encodeId(invalid);
     }
 
+    /**
+     * {@link StudentConverter#toEntity(StudentCourseDto, String)} において、 コース ID
+     * が未指定（null）の場合、新規採番された ID が利用されることを検証します。
+     */
     @Test
     void toEntity_StudentCourseDto_CourseIDなし_StudentCourseが新規IDで生成されること() {
       // Course IDの新規採番ロジックをテスト
@@ -301,6 +413,10 @@ class StudentConverterTest {
       assertThat(result.getEndDate()).isEqualTo(LocalDate.of(2025, 9, 30));
     }
 
+    /**
+     * {@link StudentConverter#toEntityList(List, byte[])} において、 各 {@link StudentCourseDto} に既存のコース
+     * ID が指定されている場合、 それぞれが正しくデコードされて {@link StudentCourse} に反映されることを検証します。
+     */
     @Test
     void toEntityList_StudentCourseDto_CourseIDあり_既存IDが正しくデコードされて使用されること() {
       // --- Given ---
@@ -343,6 +459,11 @@ class StudentConverterTest {
       assertThat(courseSql.getCourseName()).isEqualTo("SQLコース");
     }
 
+    /**
+     * コース DTO を 2 件生成するヘルパーメソッド。
+     *
+     * @return 固定 ID／コース名を持つ {@link StudentCourseDto} のリスト
+     */
     private List<StudentCourseDto> getStudentCourseDtos() {
       LocalDate start = LocalDate.of(2025, 4, 1);
 
@@ -362,6 +483,10 @@ class StudentConverterTest {
       return List.of(dto1, dto2);
     }
 
+    /**
+     * {@link StudentConverter#toEntityList(List, byte[])} において、 コース ID が未指定の DTO を渡した場合、新規 ID
+     * 採番が行われることを検証します。
+     */
     @Test
     void toEntityList_StudentCourseDto_CourseIDなし_StudentCourseが新規IDで生成されること() {
       // --- Given ---
@@ -387,7 +512,7 @@ class StudentConverterTest {
 
       // --- Then ---
       assertThat(result).hasSize(1);
-      StudentCourse course = result.getFirst();
+      StudentCourse course = result.get(0);
 
       // 1. 新しいIDがセットされていること
       assertThat(course.getCourseId()).containsExactly(NEW_RANDOM_BYTES);
@@ -402,9 +527,17 @@ class StudentConverterTest {
     // ------------------------------------------------------------
 //  リスト/集約変換メソッドのテスト
 // ------------------------------------------------------------
+
+    /**
+     * 受講生・コース一覧からの集約生成および 部分更新マージ処理を検証するテストグループ。
+     */
     @Nested
     class AggregationConversionTest {
 
+      /**
+       * {@link StudentConverter#toDetailDtoList(List, List)} が、 学生とコースを学生 ID で正しくグルーピングし、 期待どおりの
+       * {@link StudentDetailDto} 一覧を生成することを検証します。
+       */
       @Test
       void toDetailDtoList_正常系_学生とコースが正しく紐づけられDTOリストに変換されること() {
         // StudentエンティティとStudentCourseエンティティのリストを用意し、
@@ -478,6 +611,10 @@ class StudentConverterTest {
         assertThat(NamesB).containsExactlyInAnyOrder("Pythonコース", "SQLコース");
       }
 
+      /**
+       * {@link StudentConverter#toDetailDtoList(List, List)} において、 コースに紐づかない学生が存在する場合でも、
+       * その学生がコース一覧空の {@link StudentDetailDto} として 正しく含まれることを検証します。
+       */
       @Test
       void toDetailDtoList_正常系_紐づくコースがない学生も正しくDTOに含まれること() {
         // コースリストが空のケースをテスト
@@ -532,6 +669,10 @@ class StudentConverterTest {
         assertThat(dtoB.getCourses()).isEmpty();
       }
 
+      /**
+       * {@link StudentConverter#mergeStudent(Student, Student)} が、 部分更新用エンティティ中の「null
+       * でないフィールドのみ」を既存エンティティへ上書きすることを検証します。
+       */
       @Test
       void mergeStudent_部分更新_Nullでないフィールドのみが既存データに上書きされること() {
         // mergeStudent(Student existing, Student update) のテスト

@@ -25,12 +25,12 @@ import raisetech.student.management.util.IdCodec;
  * <ul>
  *   <li>DBの主キーは {@code byte[16]}（UUIDの生バイト）を前提とします。
  *   <li>APIの入出力は URL-safe Base64（paddingなし）文字列を基本とします。
- *   <li>不正な Base64 は {@link InvalidIdFormatException}（「（Base64）」メッセージ）を投げます。
- *   <li>UUIDとして不正な場合は {@link InvalidIdFormatException}（「（UUID）」メッセージ）を投げます。
- * </ul>
  *
- * <p>このクラスのメソッドは、コントローラ／サービス層から再利用できるよう 例外をドメイン指向の {@code InvalidIdFormatException} に揃えています。
- * グローバル例外ハンドラ側でメッセージに応じてエラーコード（E006/E004等）を割り当ててください。
+ * <p>このクラスでは、文字列ID用のメソッド（{@link #decodeBase64ToBytes(String)} や
+ * {@link #decodeIdOrThrow(String)}）では {@link InvalidIdFormatException} にラップして返し、
+ * UUID/BINARY(16) 前提のメソッド（{@link #toEntity(StudentDto)} や
+ * {@link #toEntityList(List, byte[])}）では {@link IdCodec} からの
+ * {@link IllegalArgumentException} をそのまま伝播させます。
  */
 @Component
 @RequiredArgsConstructor
@@ -51,20 +51,18 @@ public class StudentConverter {
   /**
    * URLセーフな Base64 文字列にエンコードします（paddingなし）。
    *
-   * <p>エンコード対象は UUID の {@code byte[16]} を前提とし、それ以外の長さは例外とします。 これにより、誤ったIDがレスポンスへ出力されることを防止します。
+   * <p>長さチェック（16バイトかどうか）は {@link IdCodec#encodeId(byte[])} が責務を負います。
+   * このメソッドでは null をそのまま null として返すことに専念します。
    *
    * @param bytes エンコード対象のバイナリ（通常は UUID の生16バイト）
    * @return URLセーフ Base64（paddingなし）の文字列。{@code bytes} が {@code null} の場合は {@code null}
-   * @throws IllegalArgumentException 長さが16バイト以外の場合
+   * @throws IllegalArgumentException {@code bytes} が16バイト以外の場合（IdCodec側で判定）
    */
   public String encodeBase64(byte[] bytes) {
     if (bytes == null) {
       return null;
     }
-    if (bytes.length != 16) {
-      throw new IllegalArgumentException("UUIDの形式が不正です");
-    }
-    // UUIDUtil は URL-safe & no padding 前提の実装
+    // 長さチェックは IdCodec#encodeId に委譲する
     return idCodec.encodeId(bytes); // URL-safe & no padding 前提のユーティリティ
   }
 
@@ -110,13 +108,23 @@ public class StudentConverter {
     return idCodec.generateNewIdBytes();
   }
 
+  /**
+   * URL-safe Base64 文字列をデコードし、UTF-8 文字列として扱う ID を復元します。
+   *
+   * <p>復元された文字列は {@code [0-9A-Za-z._-]} のみを許容し、それ以外の文字を含む場合は
+   * {@link InvalidIdFormatException} をスローします。
+   *
+   * @param encoded URL-safe Base64 形式の文字列ID
+   * @return 復元されたテキスト ID
+   * @throws InvalidIdFormatException Base64 として不正、または許容されない文字を含む場合
+   */
   public String decodeIdOrThrow(String encoded) {
     final byte[] bytes = decodeBase64ToBytes(encoded); // ← ここが IdCodec 経由になる
 
     final String id = new String(bytes, StandardCharsets.UTF_8);
 
     if (!ID_TEXT_PATTERN.matcher(id).matches()) {
-      throw new InvalidIdFormatException("IDの形式が不正です（UUID）");
+      throw new InvalidIdFormatException("IDの形式が不正です（ID文字列）");
     }
     return id;
   }

@@ -29,6 +29,9 @@ public class StudentIdCodec implements IdCodec {
   @Override
   public byte[] decode(String base64) {
     // Base64 → byte[] の単純なデコード（長さチェックはここではしない想定）
+    if (base64 == null) {
+      return null;
+    }
     try {
       return Base64.getUrlDecoder().decode(base64);
     } catch (IllegalArgumentException e) {

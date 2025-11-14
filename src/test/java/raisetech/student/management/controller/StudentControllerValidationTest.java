@@ -26,17 +26,26 @@ import raisetech.student.management.exception.InvalidIdFormatException;
 class StudentControllerValidationTest extends ControllerTestBase {
 
   /**
-   * バリデーションエラーがある状態で受講生を登録しようとしたときに、 適切なHTTPステータスとエラーレスポンスが返却されることを検証します。
+   * バリデーションエラーがある状態で受講生を登録しようとしたときに、 適切な HTTP ステータスとエラーレスポンスが返却されることを検証します。
    *
-   * <p>主な検証内容：
+   * <p>Endpoint: {@code POST /api/students}<br>
+   * Status: {@code 400 BAD_REQUEST}
    *
+   * <p>When:
    * <ul>
-   *   <li>ステータスコードが 400 Bad Request であること
-   *   <li>レスポンスボディに errorCode が "E001" として含まれること
-   *   <li>エラー詳細（errors）が配列として含まれていること
+   *   <li>必須項目が未入力・形式不正の JSON を送信する
    * </ul>
    *
-   * @throws Exception HTTP通信の模擬処理中に例外が発生した場合
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータスコードが 400 である</li>
+   *   <li>レスポンスボディの {@code code} が {@code "E001"} である</li>
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
+   *   <li>{@code message} が「入力値に不備があります」を含む</li>
+   *   <li>{@code errors} 配列が存在し、1 件以上の要素を持つ</li>
+   * </ul>
+   *
+   * @throws Exception HTTP 通信の模擬処理中に例外が発生した場合
    */
   @Test
   public void registerStudent_バリデーションエラー発生時に適切なHTTPステータスとエラーレスポンスが返ること()
@@ -71,28 +80,30 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * {@code includeDeleted=true} と {@code deletedOnly=true} を同時指定した場合に 400エラー（不正リクエスト）が返ることを検証します。
+   * {@code includeDeleted=true} と {@code deletedOnly=true} を同時指定した場合に
+   * 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
-   * <p>Endpoint: {@code GET /api/students} <br>
-   * Params: {@code includeDeleted=true}, {@code deletedOnly=true} <br> Status:
+   * <p>Endpoint: {@code GET /api/students}<br>
+   * Params: {@code includeDeleted=true}, {@code deletedOnly=true}<br> Status:
    * {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>service.getStudentList(null, true, true) が {@code IllegalArgumentException} を送出
+   *   <li>{@code service.getStudentList(null, true, true)} が
+   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * When:
    *
+   * <p>When:
    * <ul>
-   *   <li>MockMvcでGET（両方true）を実行
+   *   <li>MockMvc で上記パラメータを指定して GET を実行する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>ステータス400で、メッセージに同時指定不可の旨が含まれる
+   *   <li>HTTP ステータス 400 が返る</li>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code message} に「同時指定できません」の文言が含まれる</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -118,22 +129,23 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * {@code includeDeleted} に文字列など不正な型を指定した場合に 型不一致エラー（E004/400）が返ることを検証します。
+   * {@code includeDeleted} に文字列など不正な型を指定した場合に、 型不一致エラー（E004/TYPE_MISMATCH/400）が返ることを検証します。
    *
-   * <p>Endpoint: {@code GET /api/students} <br>
-   * Params: {@code includeDeleted=abc} <br> Status: {@code 400 BAD_REQUEST}
+   * <p>Endpoint: {@code GET /api/students}<br>
+   * Params: {@code includeDeleted=abc}<br> Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
-   *
    * <ul>
-   *   <li>MockMvcでGET（includeDeleted に不正な値）を実行
+   *   <li>{@code includeDeleted} に {@code "abc"} を指定して GET を実行する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>status=400, errorType=TYPE_MISMATCH, errorCode=E004 を検証
-   *   <li>message に {@code includeDeleted} が含まれる
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E004"} である</li>
+   *   <li>{@code error} が {@code "TYPE_MISMATCH"} である</li>
+   *   <li>{@code message} に {@code "includeDeleted"} が含まれる</li>
+   *   <li>{@code code} が文字列型、{@code status} が数値型である</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -154,22 +166,23 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * {@code deletedOnly} に文字列など不正な型を指定した場合に 型不一致エラー（E004/400）が返ることを検証します。
+   * {@code deletedOnly} に文字列など不正な型を指定した場合に、 型不一致エラー（E004/TYPE_MISMATCH/400）が返ることを検証します。
    *
-   * <p>Endpoint: {@code GET /api/students} <br>
-   * Params: {@code deletedOnly=xyz} <br> Status: {@code 400 BAD_REQUEST}
+   * <p>Endpoint: {@code GET /api/students}<br>
+   * Params: {@code deletedOnly=xyz}<br> Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
-   *
    * <ul>
-   *   <li>MockMvcでGET（deletedOnly に不正な値）を実行
+   *   <li>{@code deletedOnly} に {@code "xyz"} を指定して GET を実行する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>status=400, errorType=TYPE_MISMATCH, errorCode=E004 を検証
-   *   <li>message に {@code deletedOnly} が含まれる
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E004"} である</li>
+   *   <li>{@code error} が {@code "TYPE_MISMATCH"} である</li>
+   *   <li>{@code message} に {@code "deletedOnly"} が含まれる</li>
+   *   <li>{@code code} が文字列型、{@code status} が数値型である</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -190,27 +203,28 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * Base64形式でないIDを指定した場合に、型不一致エラー（E004/TYPE_MISMATCH/400）が返却されることを検証します。
+   * Base64 形式でない ID を指定した場合に、 400（E006/INVALID_REQUEST）が返却されることを検証します。
    *
-   * <p>Endpoint: {@code GET /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code GET /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(invalid)} が {@code IllegalArgumentException} を送出
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalid)} が
+   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * When:
    *
+   * <p>When:
    * <ul>
-   *   <li>MockMvc で {@code GET /api/students/{invalid}} を実行
+   *   <li>パス変数 {@code studentId} に Base64 として不正な文字列を指定し GET を実行する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>status=400, code=E004, error=TYPE_MISMATCH を検証する
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code message} に {@code "Base64"} が含まれる</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -220,7 +234,8 @@ class StudentControllerValidationTest extends ControllerTestBase {
       throws Exception {
 
     String invalid = "@@invalid@@";
-    when(converter.decodeBase64(invalid)).thenThrow(new IllegalArgumentException("Base64 error"));
+    when(idCodec.decodeUuidBytesOrThrow(invalid)).thenThrow(
+        new IllegalArgumentException("Base64 error"));
 
     mockMvc
         .perform(get("/api/students/{studentId}", invalid))
@@ -233,27 +248,29 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * Base64デコード後のバイト長がUUIDの16バイトと異なる場合に、E006/INVALID_REQUEST/400 が返却されることを検証します。
+   * Base64 としては正しいが、デコード後のバイト長が UUID（16 バイト）と異なる ID を指定した場合に、
+   * 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
-   * <p>Endpoint: {@code GET /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code GET /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(base64Id)} が長さ不正により {@code IllegalArgumentException} を送出
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が
+   *       バイト長不正により {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * When:
    *
+   * <p>When:
    * <ul>
-   *   <li>MockMvc で {@code GET /api/students/{studentId}} を実行
+   *   <li>上記 Base64 文字列を {@code studentId} に指定して GET を実行する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>status=400, code=E006, error=INVALID_REQUEST を検証する
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code message} に {@code "UUID"} が含まれる</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -262,7 +279,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
   public void getStudentDetail_デコード後のバイト長がUUIDと異なる場合_400エラーが返ること()
       throws Exception {
 
-    when(converter.decodeBase64(base64Id)).thenThrow(
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenThrow(
         new IllegalArgumentException("UUIDの形式が不正です"));
 
     mockMvc
@@ -276,22 +293,23 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * バリデーションエラーが発生した更新要求に対して 400（E001/VALIDATION_FAILED）が返ることを検証します。
+   * 更新要求の JSON にバリデーションエラーがある場合に、 400（E001/VALIDATION_FAILED）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PUT /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code PUT /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
-   *
    * <ul>
-   *   <li>必須項目が欠落／不正のJSONを送信
+   *   <li>必須項目が欠落・形式不正な {@code student} を含む JSON を送信する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>status=400, errorCode=E001, errors配列あり
-   *   <li>converter と service は呼ばれない
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E001"} である</li>
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
+   *   <li>{@code errors} および {@code details} 配列が存在する</li>
+   *   <li>バリデーション段階で失敗するため {@code converter} および {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -338,28 +356,29 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * Base64形式が不正なIDで更新要求した場合に 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * Base64 形式が不正な ID で更新要求した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PUT /api/students/{invalidId}} <br>
+   * <p>Endpoint: {@code PUT /api/students/{invalidId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeUuidOrThrow(invalidId)} が {@code InvalidIdFormatException} を送出
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalidId)} が
+   *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * When:
    *
+   * <p>When:
    * <ul>
-   *   <li>MockMvcでPUTを実行
+   *   <li>パス変数 {@code invalidId} を指定して PUT を実行する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>status=400, code=E006, error=INVALID_REQUEST を検証
-   *   <li>service は呼ばれない
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code message} に {@code "Base64"} が含まれる</li>
+   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -399,23 +418,29 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * UUID長（16バイト）でないID（Base64は正しい）で更新要求した場合に 400（E006）が返ることを検証します。
+   * Base64 としては正しいが UUID 長（16 バイト）ではない ID で更新要求した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PUT /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code PUT /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeUuidOrThrow(idWithWrongLength)} が {@code InvalidIdFormatException}
-   *       を送出
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(idWithWrongLength)} が
+   *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>When:
    * <ul>
-   *   <li>status=400, code=E006, error=INVALID_REQUEST を検証
-   *   <li>service は呼ばれない
+   *   <li>UUID 長と異なる Base64 文字列を {@code studentId} に指定して PUT を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code message} に {@code "UUID"} が含まれる</li>
+   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -457,21 +482,22 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 更新要求のボディが空の場合に 400（E003/MISSING_PARAMETER）が返ることを検証します。
+   * 更新要求のボディが空の場合に、400（E003/MISSING_PARAMETER）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PUT /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code PUT /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
-   *
    * <ul>
-   *   <li>空ボディでPUTを実行
+   *   <li>空文字列のボディで PUT を実行する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>errorCode=E003, errorType=MISSING_PARAMETER, code=400 を検証
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E003"} である</li>
+   *   <li>{@code error} が {@code "MISSING_PARAMETER"} である</li>
+   *   <li>{@code message} に「リクエストボディ」を含む</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -496,22 +522,25 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 更新要求で {@code student} が {@code null} の場合に 400（E001/VALIDATION_FAILED）が返ることを検証します。
+   * 更新要求で {@code student} が {@code null} の場合に、 400（E001/VALIDATION_FAILED）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PUT /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code PUT /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
-   *
    * <ul>
-   *   <li>{@code {"student":null,"courses":[]}} を送信
+   *   <li>{@code {"student":null,"courses":[]} } をボディとして PUT を実行する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>details[0].field=student を含むバリデーションエラーを検証
-   *   <li>converter と service は呼ばれない
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E001"} である</li>
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
+   *   <li>{@code message} に「入力値」が含まれる</li>
+   *   <li>{@code errors} および {@code details} 配列が存在する</li>
+   *   <li>{@code errors[*].field} に {@code "student"} を含む</li>
+   *   <li>バリデーションで失敗するため {@code converter} および {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -547,22 +576,24 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 更新要求で {@code courses} が {@code null} の場合に 400（E001/VALIDATION_FAILED）が返ることを検証します。
+   * 更新要求で {@code courses} が {@code null} の場合に、 400（E001/VALIDATION_FAILED）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PUT /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code PUT /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
-   *
    * <ul>
-   *   <li>courses=null を含むJSONでPUTを実行
+   *   <li>{@code student} は正しいが {@code courses=null} の JSON を送信する</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>Then:
    * <ul>
-   *   <li>details[*].field に {@code courses} を含む
-   *   <li>converter と service は呼ばれない
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E001"} である</li>
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
+   *   <li>{@code message} に「入力値」が含まれる</li>
+   *   <li>{@code errors[*].field} に {@code "courses"} を含む</li>
+   *   <li>バリデーションで失敗するため {@code converter} および {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -594,22 +625,27 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 部分更新でBase64形式が不正なIDの場合に 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * 部分更新で Base64 形式が不正な ID を指定した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PATCH /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(base64Id)} が {@code IllegalArgumentException} を送出
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が
+   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>When:
    * <ul>
-   *   <li>status=400, code=E006, error=INVALID_REQUEST を検証
-   *   <li>service は呼ばれない
+   *   <li>上記 ID を指定して PATCH を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -640,22 +676,27 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 部分更新でUUID長が不正なIDの場合に 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * 部分更新で UUID 長が不正な ID を指定した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PATCH /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(invalidId)} が {@code IllegalArgumentException} を送出
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalidId)} が
+   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>When:
    * <ul>
-   *   <li>status=400, code=E006, error=INVALID_REQUEST を検証
-   *   <li>service は呼ばれない
+   *   <li>UUID 長と異なる Base64 文字列を {@code studentId} に指定して PATCH を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -687,14 +728,23 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 部分更新のボディが空の場合に 400（E003/MISSING_PARAMETER）が返ることを検証します。
+   * 部分更新のリクエストボディが空の場合に、 400（E003/MISSING_PARAMETER）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PATCH /api/students/{studentId}} <br>
-   * Status: {@code 400 BAD_REQUEST} Then:
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}}<br>
+   * Status: {@code 400 BAD_REQUEST}
    *
+   * <p>When:
    * <ul>
-   *   <li>errorCode=E003, errorType=MISSING_PARAMETER を検証
-   *   <li>converter と service は呼ばれない
+   *   <li>空ボディで PATCH を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E003"} である</li>
+   *   <li>{@code error} が {@code "MISSING_PARAMETER"} である</li>
+   *   <li>{@code message} に「リクエストボディ」が含まれる</li>
+   *   <li>{@code converter} および {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -718,14 +768,22 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 部分更新で空オブジェクトを送った場合に 400（E003/MISSING_PARAMETER）が返ることを検証します。
+   * 部分更新で空 JSON オブジェクト（{@code {}}）を送った場合に、 400（E003/EMPTY_OBJECT）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PATCH /api/students/{studentId}} <br>
-   * Status: {@code 400 BAD_REQUEST} Then:
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}}<br>
+   * Status: {@code 400 BAD_REQUEST}
    *
+   * <p>When:
    * <ul>
-   *   <li>errorCode=E003, errorType=MISSING_PARAMETER を検証
-   *   <li>converter と service は呼ばれない
+   *   <li>ボディに {@code {}} を指定して PATCH を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>{@code error} が {@code "EMPTY_OBJECT"} である</li>
+   *   <li>{@code code} が {@code "E003"} である</li>
+   *   <li>{@code message} に「更新対象のフィールドがありません」が含まれる</li>
+   *   <li>{@code converter} および {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -749,14 +807,25 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 部分更新で {@code student} が {@code null} の場合に 400（E001/VALIDATION_FAILED）が返ることを検証します。
+   * 部分更新で {@code student} が {@code null} の場合に、 400（E001/VALIDATION_FAILED）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PATCH /api/students/{studentId}} <br>
-   * Status: {@code 400 BAD_REQUEST} Then:
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}}<br>
+   * Status: {@code 400 BAD_REQUEST}
    *
+   * <p>When:
    * <ul>
-   *   <li>details[0].field=student を検証
-   *   <li>converter と service は呼ばれない
+   *   <li>{@code {"student":null,"courses":[]} } をボディとして PATCH を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>{@code status} が {@code 400} である</li>
+   *   <li>{@code code} が {@code "E001"} である</li>
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
+   *   <li>{@code message} に「入力値」が含まれる</li>
+   *   <li>{@code errors} および {@code details} 配列が存在する</li>
+   *   <li>バリデーションエラーの詳細に {@code field="student"} を含む</li>
+   *   <li>{@code converter} および {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -782,22 +851,27 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 論理削除でBase64形式が不正なIDを指定した場合に 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * 論理削除で Base64 形式が不正な ID を指定した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
-   * <p>Endpoint: {@code DELETE /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code DELETE /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(invalid)} が {@code IllegalArgumentException} を送出
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalid)} が
+   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>When:
    * <ul>
-   *   <li>status=400, code=E006, error=INVALID_REQUEST を検証
-   *   <li>service は呼ばれない
+   *   <li>Base64 として不正な {@code invalid} を {@code studentId} に指定して DELETE を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -806,7 +880,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
   public void deleteStudent_studentIdのBase64形式が不正な場合_400を返すこと() throws Exception {
 
     String invalid = "invalid_base64";
-    when(converter.decodeBase64(invalid)).thenThrow(
+    when(idCodec.decodeUuidBytesOrThrow(invalid)).thenThrow(
         new IllegalArgumentException("UUIDの形式が不正です"));
 
     mockMvc
@@ -815,27 +889,32 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_REQUEST"));
 
-    verify(converter).decodeBase64(invalid);
+    verify(idCodec).decodeUuidBytesOrThrow(invalid);
     verifyNoInteractions(service);
   }
 
   /**
-   * 復元でBase64形式が不正なIDを指定した場合に 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * 復元で Base64 形式が不正な ID を指定した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PATCH /api/students/{studentId}/restore} <br>
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}/restore}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(invalid)} が {@code IllegalArgumentException} を送出
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalid)} が
+   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
-   * <p>
-   * Then:
    *
+   * <p>When:
    * <ul>
-   *   <li>status=400, code=E006, error=INVALID_REQUEST を検証
-   *   <li>service は呼ばれない
+   *   <li>Base64 として不正な {@code invalid} を {@code studentId} に指定して PATCH を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>{@code code} が {@code "E006"} である</li>
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -844,7 +923,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
   public void restoreStudent_Base64形式が不正の場合_400を返すこと() throws Exception {
 
     String invalid = "invalid_base64";
-    when(converter.decodeBase64(invalid)).thenThrow(
+    when(idCodec.decodeUuidBytesOrThrow(invalid)).thenThrow(
         new IllegalArgumentException("UUIDの形式が不正です"));
 
     mockMvc
@@ -853,7 +932,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_REQUEST"));
 
-    verify(converter).decodeBase64(invalid);
+    verify(idCodec).decodeUuidBytesOrThrow(invalid);
     verifyNoInteractions(service);
   }
 }

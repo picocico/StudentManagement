@@ -24,7 +24,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.http.MediaType;
@@ -44,30 +43,30 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * Status: {@code 404 NOT_FOUND}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeBase64(base64Id)} が 16バイトID を返す
-   *   <li>{@code service.findStudentById(studentId)} が {@code ResourceNotFoundException} を送出
-   * </ul>
-   * <p>
-   * When:
-   *
-   * <ul>
-   *   <li>MockMvc で {@code GET /api/students/{studentId}} を実行
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=404, code=E404, error=NOT_FOUND を検証する
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が 16バイトの受講生IDを返す
+   *   <li>{@code service.findStudentById(studentId)} が {@link ResourceNotFoundException} を送出する
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>When:
+   * <ul>
+   *   <li> MockMvc で {@code GET /api/students/{studentId}} を実行する
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 404 が返る
+   *   <li>レスポンスボディの {@code status} が 404、{@code code} が {@code "E404"} である
+   *   <li>{@code error} が {@code "NOT_FOUND"} である
+   *   <li>{@code message} に {@code "IDが見つかりません"} を含むことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void getStudentDetail_存在しないIDを指定した場合_404エラーが返ること() throws Exception {
 
-    when(converter.decodeBase64(base64Id)).thenReturn(studentId);
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     when(service.findStudentById(studentId)).thenThrow(
         new ResourceNotFoundException("IDが見つかりません"));
 
@@ -82,24 +81,25 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   }
 
   /**
-   * studentId を指定せずにコレクションのルートを叩いた場合、404（NOT_FOUND）が返ることを検証します。
+   * studentId を指定せずに受講生詳細のルートを叩いた場合、404（NOT_FOUND）が返ることを検証します。
    *
-   * <p>Endpoint: {@code GET /api/students/}（パス変数未指定） <br>
+   * <p>Endpoint: {@code GET /api/students/}（パス変数なし） <br>
    * Status: {@code 404 NOT_FOUND}
    *
    * <p>When:
-   *
    * <ul>
-   *   <li>MockMvc で {@code GET /api/students/} を実行
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=404, code=E404, error=NOT_FOUND を検証する
+   *   <li>MockMvc で {@code GET /api/students/} を実行する（{@code {studentId}} を指定しない）
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 404 が返る
+   *   <li>レスポンスボディの {@code status} が 404、{@code code} が {@code "E404"} である
+   *   <li>{@code error} が {@code "NOT_FOUND"} である
+   *   <li>{@code message} に {@code "URLは存在しません"} を含むことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void getStudentDetail_studentIdが空文字の場合_404エラーが返ること() throws Exception {
@@ -117,29 +117,32 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   /**
    * 存在しない受講生IDで更新した場合に 404（E404/NOT_FOUND）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PUT /api/students/{studentId}} <br>
+   * <p>Endpoint: {@code PUT /api/students/{studentId}}<br>
    * Status: {@code 404 NOT_FOUND}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code converter.decodeUuidOrThrow(base64Id)} は有効IDを返す
-   *   <li>{@code service.updateStudentWithCourses(...)} が {@code ResourceNotFoundException} を送出
-   * </ul>
-   * <p>
-   * When:
-   *
-   * <ul>
-   *   <li>MockMvcでPUTを実行
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=404, code=E404, error=NOT_FOUND を検証
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が 16 バイトの受講生IDを返す</li>
+   *   <li>受講生・コース変換 {@code converter.toEntity(...)} および
+   *       {@code converter.toEntityList(...)} は正常に完了する</li>
+   *   <li>{@code service.updateStudentWithCourses(...)} が
+   *       {@link ResourceNotFoundException} を送出する</li>
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>When:
+   * <ul>
+   *   <li>MockMvc で {@code PUT /api/students/{studentId}} を実行する</li>
+   * </ul>
+   *
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 404 が返る</li>
+   *   <li>レスポンスボディの {@code status} が 404、{@code code} が {@code "E404"} である</li>
+   *   <li>{@code error} が {@code "NOT_FOUND"} である</li>
+   *   <li>{@code message} に {@code "IDが見つかりません"} を含むことを検証する</li>
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   void updateStudent_存在しない受講生IDを指定した場合_404を返すこと() throws Exception {
@@ -152,7 +155,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
               }
             });
 
-    when(idCodec.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     when(converter.toEntity(studentDto)).thenReturn(student);
     when(converter.toEntityList(eq(List.of()), argThat(arr -> Arrays.equals(arr, studentId))))
         .thenReturn(List.of());
@@ -174,6 +177,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E404"))
         .andExpect(jsonPath("$.error").value("NOT_FOUND")) // ← NOT_FOUND ではない
         .andExpect(jsonPath("$.message").value(containsString("IDが見つかりません")));
+
+    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
   }
 
   /**
@@ -183,20 +188,20 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * Status: {@code 500 INTERNAL_SERVER_ERROR}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>前段の変換は成功する
-   *   <li>{@code service.updateStudentWithCourses(...)} が実行時例外を送出
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=500, code=E999, error=INTERNAL_SERVER_ERROR を検証
-   *   <li>{@code encodeBase64} / 3引数版 {@code toDetailDto} は呼ばれない
+   *   <li>受講生IDのデコード（{@code idCodec}）および DTO → エンティティ変換は成功する
+   *   <li>{@code service.updateStudentWithCourses(...)} が実行時例外を送出する
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 500 が返る
+   *   <li>レスポンスボディの {@code status} が 500、{@code code} が {@code "E999"} である
+   *   <li>{@code error} が {@code "INTERNAL_SERVER_ERROR"} である
+   *   <li>想定外例外発生のため、{@code converter.encodeBase64(...)} および 3 引数版 {@code toDetailDto(...)} は呼び出されないことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   void updateStudent_想定外の例外が発生した場合_500を返すこと() throws Exception {
@@ -206,7 +211,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     req.setCourses(List.of(courseDto)); // null ではなく、1件以上を入れて通過
 
     // 変換系のモック（ここまでは正常に進む）
-    when(idCodec.decodeUuidOrThrow(base64Id)).thenReturn(UUID.fromString(VALID_UUID));
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     when(converter.toEntity(studentDto)).thenReturn(student);
     when(converter.toEntityList(
         eq(List.of(courseDto)), argThat(arr -> Arrays.equals(arr, studentId))))
@@ -262,18 +267,19 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * Status: {@code 404 NOT_FOUND}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code service.findStudentById(studentId)} が {@code ResourceNotFoundException} を送出
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=404, code=E404, error=NOT_FOUND, メッセージ本文を検証
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.findStudentById(studentId)} が {@link ResourceNotFoundException} を送出する
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 404 が返る
+   *   <li>{@code status}=404, {@code code}={@code "E404"}, {@code error}={@code "NOT_FOUND"} がレスポンスに含まれる
+   *   <li>{@code message} に {@code "見つかりません"} を含むことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void partialUpdateStudent_該当する受講生情報が存在しない場合_404を返すこと()
@@ -284,7 +290,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     request.setCourses(List.of(courseDto));
     request.setAppendCourses(false);
 
-    when(converter.decodeBase64(base64Id)).thenReturn(studentId);
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     when(service.findStudentById(studentId))
         .thenThrow(new ResourceNotFoundException("該当する受講生が見つかりません"));
 
@@ -304,19 +310,32 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   /**
    * （置換モード）部分更新の途中で想定外の例外が発生した場合に 500 を返すことを検証します。
    *
-   * <p>Endpoint: {@code PATCH /api/students/{studentId}} Status: {@code 500 Internal Server Error}
+   * <p>Endpoint: {@code PATCH /api/students/{studentId}} <br>
+   * Status: {@code 500 INTERNAL_SERVER_ERROR}
    *
-   * <p>Given: - student と courses を含む有効な JSON - 変換・マージは成功するが、置換処理中に例外が発生
+   * <p>Given:
+   * <ul>
+   *   <li>受講生IDのデコードおよび既存受講生の取得が成功する
+   *   <li>DTO → エンティティ変換とマージ処理は成功する
+   *   <li>{@code appendCourses} が未指定でデフォルト {@code false}（置換モード）となる
+   *   <li>{@code service.replaceCourses(studentId, ...)} が実行時例外を送出する
+   * </ul>
    *
-   * <p>Then: - {@code service.replaceCourses(...)} が呼ばれる - 想定外例外により 500 が返る - 以降の処理（{@code
-   * updateStudentInfoOnly} 等）は呼ばれない
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 500 が返る
+   *   <li>{@code service.replaceCourses(...)} が期待通りの引数で呼び出されることを検証する
+   *   <li>想定外例外発生のため {@code updateStudentInfoOnly(...)} や {@code searchCoursesByStudentId(...)} が呼び出されないことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void partialUpdateStudent_想定外の例外が発生した場合_500を返すこと() throws Exception {
 
     String body = json(Map.of("student", studentDto, "courses", List.of(courseDto)));
 
-    when(converter.decodeBase64(base64Id)).thenReturn(studentId);
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     Student existing = new Student();
     when(service.findStudentById(studentId)).thenReturn(existing);
 
@@ -362,23 +381,24 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * Status: {@code 404 NOT_FOUND}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code service.softDeleteStudent(studentId)} が {@code ResourceNotFoundException} を送出
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=404, code=E404, error=NOT_FOUND を検証
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.softDeleteStudent(studentId)} が {@link ResourceNotFoundException} を送出する
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 404 が返る
+   *   <li>レスポンスボディの {@code code} が {@code "E404"}、{@code error} が {@code "NOT_FOUND"} である
+   *   <li>{@code softDeleteStudent} 以外に余計なサービス呼び出しが行われないことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void deleteStudent_対象受講生が存在しない場合_404を返すこと() throws Exception {
 
-    when(converter.decodeBase64(base64Id)).thenReturn(studentId);
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     doThrow(new ResourceNotFoundException("IDが見つかりません"))
         .when(service)
         .softDeleteStudent(eq(studentId));
@@ -389,7 +409,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E404"))
         .andExpect(jsonPath("$.error").value("NOT_FOUND"));
 
-    verify(converter).decodeBase64(base64Id);
+    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
     verify(service).softDeleteStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
@@ -401,23 +421,24 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * Status: {@code 500 INTERNAL_SERVER_ERROR}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code service.softDeleteStudent(studentId)} が実行時例外を送出
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=500, code=E999, error=INTERNAL_SERVER_ERROR を検証
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.softDeleteStudent(studentId)} が実行時例外を送出する
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 500 が返る
+   *   <li>レスポンスボディの {@code code} が {@code "E999"}、{@code error} が {@code "INTERNAL_SERVER_ERROR"} である
+   *   <li>{@code softDeleteStudent} 以外に余計なサービス呼び出しが行われないことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void deleteStudent_想定外の例外が発生した場合_500を返すこと() throws Exception {
 
-    when(converter.decodeBase64(base64Id)).thenReturn(studentId);
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     doThrow(new RuntimeException("Unexpected failure"))
         .when(service)
         .softDeleteStudent(eq(studentId));
@@ -428,7 +449,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.error").value("INTERNAL_SERVER_ERROR"))
         .andExpect(jsonPath("$.code").value("E999"));
 
-    verify(converter).decodeBase64(base64Id);
+    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
     verify(service).softDeleteStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
@@ -440,24 +461,25 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * Status: {@code 404 NOT_FOUND}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code service.restoreStudent(studentId)} が {@code ResourceNotFoundException} を送出
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=404, code=E404, error=NOT_FOUND を検証
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.restoreStudent(studentId)} が {@link ResourceNotFoundException} を送出する
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 404 が返る
+   *   <li>レスポンスボディの {@code code} が {@code "E404"}、{@code error} が {@code "NOT_FOUND"} である
+   *   <li>{@code restoreStudent} 以外に余計なサービス呼び出しが行われないことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void restoreStudent_対象受講生が存在しないまたは未削除の場合_404を返すこと()
       throws Exception {
 
-    when(converter.decodeBase64(base64Id)).thenReturn(studentId);
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     doThrow(new ResourceNotFoundException("IDが見つかりません"))
         .when(service)
         .restoreStudent(eq(studentId));
@@ -468,7 +490,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E404"))
         .andExpect(jsonPath("$.error").value("NOT_FOUND"));
 
-    verify(converter).decodeBase64(base64Id);
+    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
     verify(service).restoreStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
@@ -480,23 +502,24 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * Status: {@code 500 INTERNAL_SERVER_ERROR}
    *
    * <p>Given:
-   *
    * <ul>
-   *   <li>{@code service.restoreStudent(studentId)} が実行時例外を送出
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>status=500, code=E999, error=INTERNAL_SERVER_ERROR を検証
+   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.restoreStudent(studentId)} が実行時例外を送出する
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 500 が返る
+   *   <li>レスポンスボディの {@code code} が {@code "E999"}、{@code error} が {@code "INTERNAL_SERVER_ERROR"} である
+   *   <li>{@code restoreStudent} 以外に余計なサービス呼び出しが行われないことを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void restoreStudent_想定外の例外が発生した場合_500を返すこと() throws Exception {
 
-    when(converter.decodeBase64(base64Id)).thenReturn(studentId);
+    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
     doThrow(new RuntimeException("Unexpected failure")).when(service).restoreStudent(eq(studentId));
 
     mockMvc
@@ -505,7 +528,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.error").value("INTERNAL_SERVER_ERROR"))
         .andExpect(jsonPath("$.code").value("E999"));
 
-    verify(converter).decodeBase64(base64Id);
+    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
     verify(service).restoreStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
@@ -515,23 +538,23 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   // ------------------------
 
   /**
-   * MissingServletRequestParameterException のテスト。 'keyword' パラメータなしで呼び出して 400 を期待。
-   * 必須パラメータ欠如時（MissingServletRequestParameterException）に 400/E003 が返ることを検証します。
+   * 必須リクエストパラメータ欠如時（MissingServletRequestParameterException）が 400/E003 としてハンドリングされることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students/test-missing-param} <br>
-   * Status: {@code 400 BAD_REQUEST} When:
+   * Status: {@code 400 BAD_REQUEST}
    *
+   * <p>When:
    * <ul>
-   *   <li>必須の {@code keyword} を付けずに呼び出す
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>code=E003 を検証
+   *   <li>必須のクエリパラメータ {@code keyword} を付与せずにエンドポイントを呼び出す
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 400 が返る
+   *   <li>レスポンスボディの {@code code} が {@code "E003"} であることを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void testMissingServletRequestParameterException() throws Exception {
@@ -542,23 +565,23 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   }
 
   /**
-   * MethodArgumentTypeMismatchException のテスト。 'id' に不正な型（例: abc）を指定して 400 を期待。
-   * 型不一致時（MethodArgumentTypeMismatchException）に 400/E004 が返ることを検証します。
+   * 型不一致時（MethodArgumentTypeMismatchException）が 400/E004 としてハンドリングされることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students/test-type} <br>
-   * Status: {@code 400 BAD_REQUEST} When:
+   * Status: {@code 400 BAD_REQUEST}
    *
+   * <p>When:
    * <ul>
-   *   <li>{@code id} に数値以外（例: {@code "abc"}}）を指定
-   * </ul>
-   * <p>
-   * Then:
-   *
-   * <ul>
-   *   <li>code=E004 を検証
+   *   <li>{@code int} 変換が必要な {@code id} パラメータに数値以外（例: {@code "abc"}}）を指定する
    * </ul>
    *
-   * @throws Exception 実行時例外
+   * <p>Then:
+   * <ul>
+   *   <li>HTTP ステータス 400 が返る
+   *   <li>レスポンスボディの {@code code} が {@code "E004"} であることを検証する
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
    */
   @Test
   public void testMethodArgumentTypeMismatchException() throws Exception {
