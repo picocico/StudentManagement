@@ -266,12 +266,24 @@ abstract class ControllerTestBase {
 
     // 2) ここで「共通の基本スタブ」を再設定（各テストで上書きしてOK）（UUID/IDを “VALID_UUID” に統一）
     // 例：成功系／500系で使う固定ID
+    // Base64 → UUID（必要なら）
+
+    // --- IDデコード系 ---
     when(idCodec.decodeUuidOrThrow(eq(base64Id))).thenReturn(UUID.fromString(VALID_UUID));
+    // Base64 → 16バイト
     when(idCodec.decodeUuidBytesOrThrow(eq(base64Id))).thenReturn(studentId); // ダミーのBINARY(16)
-    
-    // encodeBase64 の共通スタブが必要なら、VALID_UUID から作った bytes に合わせる
-    when(converter.encodeBase64(argThat(arr -> Arrays.equals(arr, studentId))))
+
+    // --- IDエンコード系 ---
+    // IdCodec.encodeId の共通スタブ：VALID_UUID の 16バイト studentId を
+    // Base64 文字列 base64Id にエンコードしたことにする
+    when(idCodec.encodeId(argThat(arr -> Arrays.equals(arr, studentId))))
         .thenReturn(base64Id);
+
+    // StudentController は converter.encodeBase64(...) を呼ぶので、
+    // テストでは encodeBase64 が IdCodec.encodeId(...) の結果を
+    // そのまま返すようにしておく
+    when(converter.encodeBase64(argThat(arr -> Arrays.equals(arr, studentId))))
+        .thenAnswer(inv -> idCodec.encodeId(inv.getArgument(0)));
 
     // 共通ハッピーパス・スタブ（必要なら各テストで上書きOK）
     stubConverterHappyPath();

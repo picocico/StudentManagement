@@ -20,6 +20,10 @@ import raisetech.student.management.util.IdCodec;
 /**
  * 受講生・コースのエンティティ、DTO、ドメインモデル間の相互変換を担うコンバータ。
  *
+ * <p>ID のエンコード／デコードは {@link IdCodec} に委譲し、
+ * 本クラスでは {@link raisetech.student.management.exception.InvalidIdFormatException}
+ * へのラップなどドメイン例外への変換のみを担当します。
+ *
  * <h3>ID表現の方針</h3>
  *
  * <ul>

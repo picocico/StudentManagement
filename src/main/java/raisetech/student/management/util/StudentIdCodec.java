@@ -6,10 +6,10 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /**
- * UUID/BINARY(16) と URL-safe Base64 の相互変換コンポーネント。
+ * UUID/BINARY(16) と URL-safe Base64 の相互変換コンポーネント。 デフォルトの {@link IdCodec} 実装。
  *
- * <p>{@code @Component("idCodec")} として Bean 名を固定しており、
- * 既存の {@code @Qualifier("idCodec")} や XML 設定との互換性を保つために名前を明示しています。
+ * <p>Bean 名を {@code "idCodec"} に固定することで、
+ * 既存コードの {@code @Qualifier("idCodec")} や XML 設定との互換性を維持します。
  */
 @Component("idCodec")
 public class StudentIdCodec implements IdCodec {

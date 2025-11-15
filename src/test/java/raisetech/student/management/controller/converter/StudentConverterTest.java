@@ -69,10 +69,10 @@ class StudentConverterTest {
   }
 
   /**
-   * テスト共通で利用する 16 バイト固定 ID（学生 A 用）。
+   * テスト共通で利用する 「UUID の生バイト表現」を示す16 バイト固定 ID（学生 A 用）。
    *
-   * <p>UUID の具体的な値そのものには依存せず、「常に 16 バイトである」ことのみを前提に
-   * コンバータの挙動を検証するための固定データです。
+   * <p>値そのもの（ビットパターン）はテストの関心外であり、
+   * 「常に16バイトの UUID/BINARY(16) である」ことだけを保証したいケースで利用します。
    */
   private final byte[] FIXED_UUID_BYTES = new byte[]{
       (byte) 0x12, (byte) 0x34, (byte) 0x56, (byte) 0x78,
@@ -87,7 +87,7 @@ class StudentConverterTest {
   private final String FIXED_BASE64_ID = b64(FIXED_UUID_BYTES);
 
   /**
-   * 新規採番を想定した 16 バイトの固定 ID。
+   * 新規採番を想定した 「UUID の生バイト表現」を示す16 バイトの固定 ID。
    *
    * <p>{@link IdCodec#generateNewIdBytes()} の戻り値として利用し、
    * 「ランダムだが 16 バイトである」という前提をテストに与えます。
@@ -100,7 +100,7 @@ class StudentConverterTest {
   };
 
   /**
-   * 学生 B 用の 16 バイト固定 ID。
+   * テスト内で使用する「UUID の生バイト表現」を示す学生 B 用の 16 バイト固定 ID。
    */
   private final byte[] FIXED_UUID_BYTES_B = new byte[]{
       (byte) 0xaa, (byte) 0xbb, (byte) 0xcc, (byte) 0xdd,

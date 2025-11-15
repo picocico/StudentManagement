@@ -34,6 +34,7 @@ import raisetech.student.management.dto.StudentCourseDto;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
+import raisetech.student.management.util.IdCodec;
 
 class StudentControllerSuccessTest extends ControllerTestBase {
 
@@ -457,7 +458,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *   <li>HTTP ステータス 200 が返る
    *   <li>レスポンスの {@code $.student.*} が期待どおりである
    *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} や各変換メソッドが期待どおり呼び出される
-   *   <li>{@code converter.encodeBase64(...)} および 3 引数版 {@code toDetailDto(...)} が呼び出されることを検証する
+   *   <li>IDエンコード（{@link IdCodec}）と 3 引数版 {@code toDetailDto(...)} を使って
+   *       レスポンス DTO が組み立てられることを検証する
    * </ul>
    *
    * @throws Exception MockMvc 実行時の例外

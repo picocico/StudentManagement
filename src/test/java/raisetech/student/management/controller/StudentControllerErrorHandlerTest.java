@@ -198,7 +198,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *   <li>HTTP ステータス 500 が返る
    *   <li>レスポンスボディの {@code status} が 500、{@code code} が {@code "E999"} である
    *   <li>{@code error} が {@code "INTERNAL_SERVER_ERROR"} である
-   *   <li>想定外例外発生のため、{@code converter.encodeBase64(...)} および 3 引数版 {@code toDetailDto(...)} は呼び出されないことを検証する
+   *   <li>想定外例外発生のため、{@code StudentConverter} を用いたレスポンス組み立て
+   *   IDエンコード／3引数版 {@code toDetailDto(...)} 等）が呼び出されないことを検証する
    * </ul>
    *
    * @throws Exception MockMvc 実行時の例外

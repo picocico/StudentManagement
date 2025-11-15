@@ -3,10 +3,31 @@ package raisetech.student.management.util;
 import java.util.UUID;
 
 /**
- * UUID/BINARY(16) ベースの ID を URL-safe Base64 文字列と相互変換するためのインターフェースです。
+ * UUID/BINARY(16) ベースのIDを Base64 文字列と相互変換するためのユーティリティ契約インターフェース。
  *
- * <p>実装クラス（例: {@code StudentIdCodec}）は、UUID 由来の 16 バイト配列と
- * {@code Base64.getUrlEncoder().withoutPadding()} による URL-safe Base64 文字列との変換を担当します。
+ * <p>契約:
+ * <ul>
+ *   <li>decodeUuidOrThrow / decodeUuidBytesOrThrow:
+ *       <ul>
+ *         <li>入力は URL-safe Base64 を前提とする</li>
+ *         <li>Base64 として不正、または 16 バイト UUID に復元できない場合は
+ *             {@link IllegalArgumentException} をスローする</li>
+ *       </ul>
+ *   </li>
+ *   <li>encodeId:
+ *       <ul>
+ *         <li>引数は UUID/BINARY(16) の 16 バイト配列を前提とする</li>
+ *         <li>16 バイト以外が渡された場合は {@link IllegalArgumentException} をスローする</li>
+ *       </ul>
+ *   </li>
+ *   <li>decode:
+ *       <ul>
+ *         <li>長さチェックは行わず、Base64 として不正な場合にのみ {@link IllegalArgumentException} をスローする</li>
+ *       </ul>
+ *   </li>
+ * </ul>
+ *
+ * <p>ドメイン層では、必要に応じてこれらの例外を {@code InvalidIdFormatException} などにラップして利用します。
  */
 public interface IdCodec {
 
