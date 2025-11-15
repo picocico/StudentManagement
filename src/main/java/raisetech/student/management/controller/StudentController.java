@@ -46,9 +46,11 @@ import raisetech.student.management.web.RawBodyCaptureFilter;
 import raisetech.student.management.web.RawBodyCaptureFilter.RawBodyState;
 
 /**
- * 受講生に関するREST APIを提供するコントローラークラス。
+ * 受講生に関する REST API を提供するコントローラークラス。
  *
- * <p>このクラスは、受講生の登録、取得、更新、削除、復元、およびふりがなによる検索などの 操作をエンドポイントとして提供します。
+ * <p>このクラスは、受講生の登録・取得・更新・論理削除・復元、および
+ * ふりがなによる検索などの操作をエンドポイントとして提供します。 受講生 ID は、UUID/BINARY(16) を URL-safe Base64 文字列にエンコードした形式で受け渡し、
+ * {@link IdCodec} を通じてデコード／エンコードします。
  */
 @Slf4j
 @RestController
@@ -149,7 +151,10 @@ public class StudentController {
           @ApiResponse(
               responseCode = "200",
               description = "一覧取得成功",
-              content = @Content(schema = @Schema(implementation = StudentDetailDto.class)))
+              content = @Content(
+                  array = @io.swagger.v3.oas.annotations.media.ArraySchema(
+                      schema = @Schema(implementation = StudentDetailDto.class)
+                  )))
       })
   @GetMapping
   public ResponseEntity<List<StudentDetailDto>> getStudentList(
@@ -192,7 +197,7 @@ public class StudentController {
   @GetMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> getStudentDetail(@PathVariable String studentId) {
     log.debug("GET - Fetching student detail: {}", studentId);
-    byte[] studentIdBytes = converter.decodeBase64(studentId);
+    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
 
     Student student = service.findStudentById(studentIdBytes);
     List<StudentCourse> courses = service.searchCoursesByStudentId(studentIdBytes);
@@ -202,14 +207,20 @@ public class StudentController {
   /**
    * 受講生情報を全体的に更新します。
    *
-   * @param studentIdBase64 受講生ID
-   * @param req             更新内容
+   * <p>Base64 形式の受講生 ID（UUID/BINARY(16) 由来）に対応するレコードを、
+   * リクエストボディの内容で全体更新します。
+   *
+   * @param studentIdBase64 URL-safe Base64 形式の受講生 ID（UUID/BINARY(16) 由来）
+   * @param req             更新内容（受講生情報＋コース情報）
    * @return 更新後の受講生詳細情報
    */
   @Operation(
       summary = "受講生情報更新（全体）",
       description = "受講生情報とコース情報を全て更新します。",
-      parameters = @Parameter(name = "studentId", description = "更新対象の受講生ID", required = true),
+      parameters = @Parameter(
+          name = "studentId",
+          description = "URL-safe Base64 形式の受講生ID（UUID/BINARY(16)由来）",
+          required = true),
       requestBody =
       @io.swagger.v3.oas.annotations.parameters.RequestBody(
           description = "更新内容（受講生情報＋コース）",
@@ -273,7 +284,7 @@ public class StudentController {
    * @throws ResourceNotFoundException 対象IDが存在しない場合（E404）
    */
   @Operation(
-      summary = "受講生情報新（部分）",
+      summary = "受講生情報更新（部分）",
       description = "指定項目のみ受講生情報を部分的に更新します。appendCourses=trueの場合はコース追加。",
       parameters = @Parameter(name = "studentId", description = "部分更新対象の受講生ID", required = true),
       requestBody =
@@ -285,6 +296,10 @@ public class StudentController {
               responseCode = "200",
               description = "部分更新成功",
               content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
+          @ApiResponse(
+              responseCode = "400",
+              description = "バリデーションエラー、リクエストボディ不足、空オブジェクト、ID形式不正など",
+              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
           @ApiResponse(
               responseCode = "404",
               description = "該当する受講生が存在しない",
@@ -306,7 +321,7 @@ public class StudentController {
 
     if (state != null) {
       switch (state) {
-        case NONE -> throw new MissingParameterException("リクエストボディは必須です。"); // E001
+        case NONE -> throw new MissingParameterException("リクエストボディは必須です。"); // E003
         case EMPTY_OBJECT ->
             throw new EmptyObjectException("更新対象のフィールドがありません"); // E003
         case NON_EMPTY -> {
@@ -397,8 +412,11 @@ public class StudentController {
   /**
    * 受講生情報を論理削除します。
    *
-   * @param studentId 削除対象の受講生ID
-   * @return 204 No Content
+   * <p>URL-safe Base64 形式の受講生 ID を {@link IdCodec} で UUID/BINARY(16) にデコードし、
+   * 対応するレコードの is_deleted フラグと deleted_at を更新します。
+   *
+   * @param studentId URL-safe Base64 形式の削除対象受講生 ID
+   * @return 削除成功時は本文無しの 204 No Content
    */
   @Operation(
       summary = "受講生論理削除",
@@ -414,7 +432,7 @@ public class StudentController {
   @DeleteMapping("/{studentId}")
   public ResponseEntity<Void> deleteStudent(@PathVariable String studentId) {
     log.debug("DELETE - Logically deleting student: {}", studentId);
-    byte[] studentIdBytes = converter.decodeBase64(studentId); // ← Base64からbyte[]へ変換
+    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId); // ← Base64からbyte[]へ変換
     service.softDeleteStudent(studentIdBytes);
     return ResponseEntity.noContent().build();
   }
@@ -439,7 +457,7 @@ public class StudentController {
   @PatchMapping("/{studentId}/restore")
   public ResponseEntity<Void> restoreStudent(@PathVariable String studentId) {
     log.debug("PATCH - Restoring student: {}", studentId);
-    byte[] studentIdBytes = converter.decodeBase64(studentId);
+    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
     service.restoreStudent(studentIdBytes);
     return ResponseEntity.noContent().build();
   }
@@ -455,7 +473,7 @@ public class StudentController {
   @Hidden
   @Operation(
       summary = "［テスト］パラメーター不足エラー",
-      description = "keywordパラメータが見しての場合、MissingServletRequestParameterException "
+      description = "keywordパラメータが未指定の場合、MissingServletRequestParameterException "
           + "を発生させます。",
       parameters = @Parameter(name = "keyword", description = "必須のキーワード", required = true),
       responses = {
