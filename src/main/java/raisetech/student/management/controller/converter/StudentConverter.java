@@ -1,10 +1,8 @@
 package raisetech.student.management.controller.converter;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -27,14 +25,16 @@ import raisetech.student.management.util.IdCodec;
  * <h3>ID表現の方針</h3>
  *
  * <ul>
- *   <li>DBの主キーは {@code byte[16]}（UUIDの生バイト）を前提とします。
- *   <li>APIの入出力は URL-safe Base64（paddingなし）文字列を基本とします。
+ *   <li>DBの主キーは {@code byte[16]}（UUIDの生バイト）を前提とします。</li>
+ *   <li>APIの入出力は、標準的な UUID 文字列表現
+ *       （例: {@code 123e4567-e89b-12d3-a456-426614174000}）を使用します。</li>
+ * </ul>
  *
- * <p>このクラスでは、文字列ID用のメソッド（{@link #decodeBase64ToBytes(String)} や
- * {@link #decodeIdOrThrow(String)}）では {@link InvalidIdFormatException} にラップして返し、
- * UUID/BINARY(16) 前提のメソッド（{@link #toEntity(StudentDto)} や
- * {@link #toEntityList(List, byte[])}）では {@link IdCodec} からの
- * {@link IllegalArgumentException} をそのまま伝播させます。
+ * <p>このクラスでは、UUID 文字列表現と内部の {@code byte[16]} の変換は
+ * {@link IdCodec} に委譲し、UUID 文字列として不正な入力に対しては
+ * {@link InvalidIdFormatException} へラップしてスローします。
+ * 例えば、{@link #decodeUuidToBytesOrThrow(String)} は不正な UUID 文字列を
+ * {@link InvalidIdFormatException} に変換します。
  */
 @Component
 @RequiredArgsConstructor
@@ -43,64 +43,45 @@ public class StudentConverter {
 
   private final IdCodec idCodec;
 
-  /**
-   * 文字列IDとして許容する文字（英数・ドット・アンダースコア・ハイフン）
-   */
-  private static final Pattern ID_TEXT_PATTERN = Pattern.compile("^[0-9A-Za-z._\\-]+$");
-
   // ------------------------------------------------------------
-  // Base64 エンコード／デコード（UUID 16バイトを前提に堅牢化）
+  // UUID 文字列表現 ⇔ UUID生バイト(16バイト) の変換ヘルパー
   // ------------------------------------------------------------
 
   /**
-   * URLセーフな Base64 文字列にエンコードします（paddingなし）。
+   * UUID の 16バイト配列を API 向けの UUID 文字列に変換します。
    *
-   * <p>長さチェック（16バイトかどうか）は {@link IdCodec#encodeId(byte[])} が責務を負います。
-   * このメソッドでは null をそのまま null として返すことに専念します。
+   * <p>長さチェック（16バイトかどうか）は {@link IdCodec#encodeId(byte[])} が行います。
+   * このメソッドでは null をそのまま null として返します。
    *
    * @param bytes エンコード対象のバイナリ（通常は UUID の生16バイト）
-   * @return URLセーフ Base64（paddingなし）の文字列。{@code bytes} が {@code null} の場合は {@code null}
-   * @throws IllegalArgumentException {@code bytes} が16バイト以外の場合（IdCodec側で判定）
+   * @return UUID 文字列表現。{@code bytes} が {@code null} の場合は {@code null}
+   * @throws IllegalArgumentException {@code bytes} が16バイト以外の場合（IdCodec 側で判定）
    */
-  public String encodeBase64(byte[] bytes) {
+  public String encodeUuidString(byte[] bytes) {
     if (bytes == null) {
       return null;
     }
     // 長さチェックは IdCodec#encodeId に委譲する
-    return idCodec.encodeId(bytes); // URL-safe & no padding 前提のユーティリティ
+    return idCodec.encodeId(bytes); // 標準的な UUID 文字列表現を返す
   }
 
   /**
-   * URL-safe Base64 文字列をデコードしてバイト配列に変換します。
+   * UUID 文字列表現をデコードして UUID 由来の16バイト配列に変換します。
    *
-   * <p>長さチェックは行いません（用途側で行います）。
-   *
-   * @param encoded URL-safe Base64（paddingなし）文字列
-   * @return 復号後のバイト配列
-   * @throws InvalidIdFormatException Base64 として不正な場合（「（Base64）」）
+   * @param uuidString UUID の文字列表現
+   * @return 復元された16バイト配列
+   * @throws InvalidIdFormatException UUID 文字列として不正な場合（「（UUID）」）
    */
-  public byte[] decodeBase64ToBytes(String encoded) {
+  public byte[] decodeUuidToBytesOrThrow(String uuidString) {
     try {
-      return idCodec.decode(encoded);
+      return idCodec.decodeUuidBytesOrThrow(uuidString);
     } catch (IllegalArgumentException e) {
       // IdCodec 側は IllegalArgumentException を投げる前提にしておいて、
       // ここで「ドメイン例外」にラップすることで、
       // 既存の InvalidIdFormatException を維持
       // Base64として不正 → （Base64）
-      throw new InvalidIdFormatException("IDの形式が不正です（Base64）", e);
+      throw new InvalidIdFormatException("IDの形式が不正です（UUID）", e);
     }
-  }
-
-  /**
-   * 互換ラッパー：既存コードが呼ぶ {@code decodeBase64(String)} を維持します。 実体は {@link #decodeBase64ToBytes(String)}
-   * です。
-   *
-   * @param encoded URL-safe Base64（paddingなし）文字列
-   * @return 復号したバイト配列（長さチェックはしません）
-   * @throws InvalidIdFormatException Base64として不正な場合（「（Base64）」）
-   */
-  public byte[] decodeBase64(String encoded) {
-    return decodeBase64ToBytes(encoded);
   }
 
   /**
@@ -112,27 +93,6 @@ public class StudentConverter {
     return idCodec.generateNewIdBytes();
   }
 
-  /**
-   * URL-safe Base64 文字列をデコードし、UTF-8 文字列として扱う ID を復元します。
-   *
-   * <p>復元された文字列は {@code [0-9A-Za-z._-]} のみを許容し、それ以外の文字を含む場合は
-   * {@link InvalidIdFormatException} をスローします。
-   *
-   * @param encoded URL-safe Base64 形式の文字列ID
-   * @return 復元されたテキスト ID
-   * @throws InvalidIdFormatException Base64 として不正、または許容されない文字を含む場合
-   */
-  public String decodeIdOrThrow(String encoded) {
-    final byte[] bytes = decodeBase64ToBytes(encoded); // ← ここが IdCodec 経由になる
-
-    final String id = new String(bytes, StandardCharsets.UTF_8);
-
-    if (!ID_TEXT_PATTERN.matcher(id).matches()) {
-      throw new InvalidIdFormatException("IDの形式が不正です（ID文字列）");
-    }
-    return id;
-  }
-
   // ------------------------------------------------------------
   // Student 変換
   // ------------------------------------------------------------
@@ -140,11 +100,12 @@ public class StudentConverter {
   /**
    * {@link StudentDto} から {@link Student} エンティティに変換します。
    *
-   * <p>{@code dto.studentId} が未指定（null または空文字）の場合は、新規にランダムUUIDを採番し、 その生16バイトをセットします。
+   * <p>{@code dto.studentId} が未指定（null または空文字）の場合は、新規にランダムUUIDを採番し、
+   * その生16バイトをセットします。
    *
    * @param dto 受講生DTO（IDは Base64 文字列）
    * @return 受講生エンティティ（IDは生16バイト）
-   * @throws InvalidIdFormatException Base64が不正な場合（「（Base64）」）
+   * @throws IllegalArgumentException UUID 文字列表現として不正な場合
    */
   public Student toEntity(StudentDto dto) {
     byte[] studentId =
@@ -172,12 +133,12 @@ public class StudentConverter {
    * {@link Student} エンティティから {@link StudentDto} に変換します。
    *
    * @param entity 受講生エンティティ
-   * @return 受講生DTO（IDは Base64 文字列）
+   * @return 受講生DTO（IDは UUID 文字列）
    * @throws IllegalArgumentException IDバイト長が16以外の場合
    */
   public StudentDto toDto(Student entity) {
     return new StudentDto(
-        encodeBase64(entity.getStudentId()),
+        encodeUuidString(entity.getStudentId()),
         entity.getFullName(),
         entity.getFurigana(),
         entity.getNickname(),
@@ -196,15 +157,15 @@ public class StudentConverter {
   /**
    * {@link StudentCourseDto} から {@link StudentCourse} エンティティに変換します。
    *
-   * <p>{@code dto.courseId} が未指定なら新規採番し、{@code studentIdBase64} は必ず Base64 復号して紐付けます。
+   * <p>{@code dto.courseId} が未指定なら新規採番し、{@code studentId} は UUID 文字列としてデコードし紐付けます。
    *
-   * @param dto             コースDTO（IDは Base64 文字列）
-   * @param studentIdBase64 受講生ID（Base64 文字列）
+   * @param dto       コースDTO（IDは UUID 文字列）
+   * @param studentId 受講生ID（UUID 文字列）
    * @return コースエンティティ（IDは生16バイト）
-   * @throws InvalidIdFormatException Base64が不正な場合（「（Base64）」）
+   * @throws IllegalArgumentException UUID 文字列として不正な場合
    */
   @SuppressWarnings("unused")
-  public StudentCourse toEntity(StudentCourseDto dto, String studentIdBase64) {
+  public StudentCourse toEntity(StudentCourseDto dto, String studentId) {
     byte[] courseId =
         Optional.ofNullable(dto.getCourseId())
             .filter(id -> !id.isBlank())
@@ -212,11 +173,11 @@ public class StudentConverter {
             .orElseGet(idCodec::generateNewIdBytes);
 
     // studentId: パスから渡されるIDなので、必ず UUID 16バイトであることを保証する
-    byte[] studentId = idCodec.decodeUuidBytesOrThrow(studentIdBase64);
+    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
 
     return new StudentCourse(
         courseId,
-        studentId,
+        studentIdBytes,
         dto.getCourseName(),
         dto.getStartDate(),
         dto.getEndDate(),
@@ -263,7 +224,7 @@ public class StudentConverter {
    */
   public StudentCourseDto toDto(StudentCourse entity) {
     return new StudentCourseDto(
-        encodeBase64(entity.getCourseId()),
+        encodeUuidString(entity.getCourseId()),
         entity.getCourseName(),
         entity.getStartDate(),
         entity.getEndDate());
@@ -287,7 +248,7 @@ public class StudentConverter {
   /**
    * 受講生とコースから詳細DTOを作成します。
    *
-   * <p>受講生ID・コースIDは Base64 文字列として詰められます。
+   * <p>受講生ID・コースIDは UUID 文字列として詰められます。
    *
    * @param student 受講生エンティティ
    * @param courses コースエンティティ一覧
@@ -303,19 +264,19 @@ public class StudentConverter {
   /**
    * {@link #toDetailDto(Student, List)} の拡張版。
    *
-   * <p>パスで受け取った Base64 ID（理論上DB返却と同一）を最終的に反映したい場合に使用します。
+   * <p>パスで受け取った UUID 文字列（理論上DB返却と同一）を最終的に反映したい場合に使用します。
    *
-   * @param student          受講生エンティティ
-   * @param courses          コースエンティティ一覧
-   * @param base64IdOverride 上書きしたい Base64 学生ID
-   * @return 詳細DTO（{@code base64IdOverride} が非nullなら学生IDを上書き）
+   * @param student           受講生エンティティ
+   * @param courses           コースエンティティ一覧
+   * @param studentIdOverride 上書きしたい学生ID（UUID文字列）
+   * @return 詳細DTO（{@code studentIdOverride} が非nullなら学生IDを上書き）
    */
   @SuppressWarnings("unused")
   public StudentDetailDto toDetailDto(
-      Student student, List<StudentCourse> courses, String base64IdOverride) {
+      Student student, List<StudentCourse> courses, String studentIdOverride) {
     StudentDetailDto dto = toDetailDto(student, courses);
-    if (dto != null && dto.getStudent() != null && base64IdOverride != null) {
-      dto.getStudent().setStudentId(base64IdOverride);
+    if (dto != null && dto.getStudent() != null && studentIdOverride != null) {
+      dto.getStudent().setStudentId(studentIdOverride);
     }
     return dto;
   }
@@ -339,7 +300,7 @@ public class StudentConverter {
   /**
    * 受講生／コースの一覧から詳細DTO一覧に変換します。
    *
-   * <p>コースは受講生ID（Base64）でグルーピングします。
+   * <p>コースは受講生ID（UUID）でグルーピングします。
    *
    * @param students 受講生エンティティ一覧
    * @param courses  全コースエンティティ一覧
@@ -350,14 +311,14 @@ public class StudentConverter {
       List<Student> students, List<StudentCourse> courses) {
     Map<String, List<StudentCourse>> courseMap =
         courses.stream()
-            .collect(Collectors.groupingBy(course -> encodeBase64(course.getStudentId())));
+            .collect(Collectors.groupingBy(course -> encodeUuidString(course.getStudentId())));
 
     return students.stream()
         .map(
             student ->
                 toDetailDto(
                     student,
-                    courseMap.getOrDefault(encodeBase64(student.getStudentId()), List.of())))
+                    courseMap.getOrDefault(encodeUuidString(student.getStudentId()), List.of())))
         .collect(Collectors.toList());
   }
 
