@@ -49,8 +49,11 @@ import raisetech.student.management.web.RawBodyCaptureFilter.RawBodyState;
  * 受講生に関する REST API を提供するコントローラークラス。
  *
  * <p>このクラスは、受講生の登録・取得・更新・論理削除・復元、および
- * ふりがなによる検索などの操作をエンドポイントとして提供します。 受講生 ID は、UUID/BINARY(16) を URL-safe Base64 文字列にエンコードした形式で受け渡し、
- * {@link IdCodec} を通じてデコード／エンコードします。
+ * ふりがなによる検索などの操作をエンドポイントとして提供します。
+ *
+ * <p>受講生 ID は、DB では UUID/BINARY(16)（{@code byte[16]}）として保持し、
+ * API では標準的な UUID 文字列表現 （例: {@code 123e4567-e89b-12d3-a456-426614174000}）で受け渡します。
+ * 文字列表現とバイト配列の相互変換は{@link IdCodec} に委譲します。
  */
 @Slf4j
 @RestController
@@ -77,10 +80,6 @@ public class StudentController {
   // Controller の private メソッドとして追加
   private boolean isEmptyUpdate(StudentRegistrationRequest req) {
     return req == null || req.isPatchEmpty();
-  }
-
-  private static boolean isBlank(String s) {
-    return s == null || s.isBlank();
   }
 
   /**
@@ -121,9 +120,9 @@ public class StudentController {
     List<StudentCourse> courses = converter.toEntityList(request.getCourses(), studentIdBytes);
 
     log.debug(
-        "POST - Registering new student: {}, ID(Base64): {}",
+        "POST - Registering new student: {}, ID(UUID): {}",
         student.getFullName(),
-        converter.encodeBase64(studentIdBytes));
+        converter.encodeUuidString(studentIdBytes));
     service.registerStudent(student, courses);
 
     StudentDetailDto responseDto = converter.toDetailDto(student, courses);
@@ -183,7 +182,11 @@ public class StudentController {
       summary = "受講生詳細取得",
       description = "指定された受講生IDに対応する詳細情報（基本＋コース）を取得します。",
       parameters =
-      @Parameter(name = "studentId", description = "Base64エンコードされた受講生ID", required = true),
+      @Parameter(
+          name = "studentId",
+          description = "UUID文字列表現の受講生ID（例: 123e4567-e89b-12d3-a456-426614174000）",
+          required = true
+      ),
       responses = {
           @ApiResponse(
               responseCode = "200",
@@ -207,20 +210,19 @@ public class StudentController {
   /**
    * 受講生情報を全体的に更新します。
    *
-   * <p>Base64 形式の受講生 ID（UUID/BINARY(16) 由来）に対応するレコードを、
+   * <p>UUID 文字列表現の受講生 ID（UUID/BINARY(16) 由来）に対応するレコードを、
    * リクエストボディの内容で全体更新します。
    *
-   * @param studentIdBase64 URL-safe Base64 形式の受講生 ID（UUID/BINARY(16) 由来）
-   * @param req             更新内容（受講生情報＋コース情報）
-   * @return 更新後の受講生詳細情報
+   * @param studentId UUID文字列表現の受講生 ID（例: {@code 123e4567-e89b-12d3-a456-426614174000}）
    */
   @Operation(
       summary = "受講生情報更新（全体）",
       description = "受講生情報とコース情報を全て更新します。",
       parameters = @Parameter(
           name = "studentId",
-          description = "URL-safe Base64 形式の受講生ID（UUID/BINARY(16)由来）",
-          required = true),
+          description = "UUID文字列表現の受講生ID（例: 123e4567-e89b-12d3-a456-426614174000）",
+          required = true
+      ),
       requestBody =
       @io.swagger.v3.oas.annotations.parameters.RequestBody(
           description = "更新内容（受講生情報＋コース）",
@@ -241,7 +243,7 @@ public class StudentController {
       })
   @PutMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> updateStudent(
-      @PathVariable("studentId") String studentIdBase64,
+      @PathVariable("studentId") String studentId,
       @Valid @RequestBody(required = false) StudentRegistrationRequest req // ← required=false
   ) {
     // ★ ここでまず「実質空更新」チェック（nullではないが全フィールド空）
@@ -252,22 +254,22 @@ public class StudentController {
       throw new EmptyObjectException("更新対象のフィールドがありません"); // → E003
     }
 
-    // 1) IDデコード（Base64不正/UUID不正は InvalidIdFormatException → E006）
-    final byte[] studentId = idCodec.decodeUuidBytesOrThrow(studentIdBase64);
+    // 1) IDデコード（UUID文字列として不正な場合は InvalidIdFormatException → E006）
+    final byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
 
     // 2) 変換（@Valid 済みなのでここに到達している）
     final Student toUpdate = converter.toEntity(req.getStudent());
     // パスのIDを最優先に統一（ボディのIDが入っていても上書き）
-    toUpdate.setStudentId(studentId);
+    toUpdate.setStudentId(studentIdBytes);
 
-    final List<StudentCourse> courses = converter.toEntityList(req.getCourses(), studentId);
+    final List<StudentCourse> courses = converter.toEntityList(req.getCourses(), studentIdBytes);
 
-    // 3) 再取得→DTO化（レスポンスの studentId はパスのBase64で上書き）
+    // 3) 再取得→DTO化（レスポンスの studentId はパスの UUID 文字列で上書き）
     final Student updated = service.updateStudentWithCourses(toUpdate, courses);
 
-    // 表示用ID文字列（必要なら事前生成して渡す。内部で再デコードさせない）
-    final String idBase64 = converter.encodeBase64(studentId);
-    final StudentDetailDto dto = converter.toDetailDto(updated, courses, idBase64);
+    // 表示用の UUID 文字列（必要なら事前生成して渡す。内部で再デコードさせない）
+    final String studentIdString = converter.encodeUuidString(studentIdBytes);
+    final StudentDetailDto dto = converter.toDetailDto(updated, courses, studentIdString);
 
     return ResponseEntity.ok(dto);
   }
@@ -275,10 +277,12 @@ public class StudentController {
   /**
    * 受講生情報を部分的に更新します。
    *
-   * <p>Base64形式の受講生IDに紐づくレコードへ、指定されたフィールドのみ反映します。 コース更新は append/replace
-   * を内容に応じて振り分け、最終状態を再取得して返します。
+   * <p>UUID 文字列表現の受講生IDに紐づくレコードへ、指定されたフィールドのみ反映します。
+   * コース更新は append/replace を内容に応じて振り分け、最終状態を再取得して返します。
    *
-   * @param body 更新対象のフィールド（null/実質空はE003）
+   * @param studentId      部分更新対象の受講生ID（UUID文字列表現）
+   * @param body           更新対象のフィールド（null/実質空はE003）
+   * @param servletRequest 生リクエストボディの状態確認に利用するHTTPリクエスト
    * @return 更新後の受講生詳細情報
    * @throws EmptyObjectException      更新対象が実質空の場合（E003）
    * @throws ResourceNotFoundException 対象IDが存在しない場合（E404）
@@ -310,7 +314,7 @@ public class StudentController {
       consumes = MediaType.APPLICATION_JSON_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<StudentDetailDto> partialUpdateStudent(
-      @PathVariable("studentId") String studentIdBase64,
+      @PathVariable("studentId") String studentId,
       @RequestBody(required = false) Map<String, Object> body,
       HttpServletRequest servletRequest)
       throws BindException {
@@ -362,61 +366,52 @@ public class StudentController {
       throw new BindException(br); // → 400 E001
     }
 
-    // 2) Base64 → BINARY(16)
-    final byte[] studentId = idCodec.decodeUuidBytesOrThrow(studentIdBase64);
+    // 2) UUID文字列 → BINARY(16)
+    final byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
 
-    try {
-      // 3) Map → DTO
-      final StudentRegistrationRequest req =
-          objectMapper.convertValue(body, StudentRegistrationRequest.class);
+    // 3) Map → DTO
+    final StudentRegistrationRequest req =
+        objectMapper.convertValue(body, StudentRegistrationRequest.class);
 
-      // 4) 実質空更新（すべて空/未指定）→ E003
-      if (req == null || req.isPatchEmpty()) {
-        throw new EmptyObjectException("更新対象のフィールドがありません");
-      }
-
-      // 5) 既存取得＆マージ（基本情報のみのときはここで更新）
-      final Student existing = service.findStudentById(studentId);
-      final Student update = converter.toEntity(req.getStudent());
-      converter.mergeStudent(existing, update);
-
-      // 6) コース情報の処理
-      final boolean hasCourses = (req.getCourses() != null && !req.getCourses().isEmpty());
-      if (hasCourses) {
-        final boolean append = Boolean.TRUE.equals(req.getAppendCourses());
-        final List<StudentCourse> newCourses = converter.toEntityList(req.getCourses(), studentId);
-        if (append) {
-          service.appendCourses(studentId, newCourses);
-        } else {
-          service.replaceCourses(studentId, newCourses);
-        }
-      }
-      // 7) 基本情報の更新は1回だけ（重複呼出しを避ける）
-      service.updateStudentInfoOnly(existing);
-
-      // 8) 常に最新をDBから取り直してDTO化（空レス回避）
-      final Student latest = service.findStudentById(studentId);
-      final List<StudentCourse> latestCourses = service.searchCoursesByStudentId(studentId);
-      final StudentDetailDto dto = converter.toDetailDto(latest, latestCourses, studentIdBase64);
-      return ResponseEntity.ok(dto);
-
-    } catch (IllegalArgumentException e) {
-      // Base64不正 / 変換失敗など → GlobalExceptionHandlerで400系にマップさせる
-      throw e;
-    } catch (RuntimeException e) {
-      // 予期せぬ例外はそのまま投げて GlobalExceptionHandler(500/E999) へ
-      throw e;
+    // 4) 実質空更新（すべて空/未指定）→ E003
+    if (req == null || req.isPatchEmpty()) {
+      throw new EmptyObjectException("更新対象のフィールドがありません");
     }
+
+    // 5) 既存取得＆マージ（基本情報のみのときはここで更新）
+    final Student existing = service.findStudentById(studentIdBytes);
+    final Student update = converter.toEntity(req.getStudent());
+    converter.mergeStudent(existing, update);
+
+    // 6) コース情報の処理
+    final boolean hasCourses = (req.getCourses() != null && !req.getCourses().isEmpty());
+    if (hasCourses) {
+      final boolean append = Boolean.TRUE.equals(req.getAppendCourses());
+      final List<StudentCourse> newCourses = converter.toEntityList(req.getCourses(),
+          studentIdBytes);
+      if (append) {
+        service.appendCourses(studentIdBytes, newCourses);
+      } else {
+        service.replaceCourses(studentIdBytes, newCourses);
+      }
+    }
+    // 7) 基本情報の更新は1回だけ（重複呼出しを避ける）
+    service.updateStudentInfoOnly(existing);
+
+    // 8) 常に最新をDBから取り直してDTO化（空レス回避）
+    final Student latest = service.findStudentById(studentIdBytes);
+    final List<StudentCourse> latestCourses = service.searchCoursesByStudentId(studentIdBytes);
+    final StudentDetailDto dto = converter.toDetailDto(latest, latestCourses, studentId);
+    return ResponseEntity.ok(dto);
   }
 
   /**
    * 受講生情報を論理削除します。
    *
-   * <p>URL-safe Base64 形式の受講生 ID を {@link IdCodec} で UUID/BINARY(16) にデコードし、
+   * <p>UUID文字列表現の受講生 ID を {@link IdCodec} で UUID/BINARY(16) にデコードし、
    * 対応するレコードの is_deleted フラグと deleted_at を更新します。
    *
-   * @param studentId URL-safe Base64 形式の削除対象受講生 ID
-   * @return 削除成功時は本文無しの 204 No Content
+   * @param studentId 論理削除対象の受講生ID（UUID文字列表現）
    */
   @Operation(
       summary = "受講生論理削除",
@@ -432,7 +427,7 @@ public class StudentController {
   @DeleteMapping("/{studentId}")
   public ResponseEntity<Void> deleteStudent(@PathVariable String studentId) {
     log.debug("DELETE - Logically deleting student: {}", studentId);
-    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId); // ← Base64からbyte[]へ変換
+    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId); // ← UUID文字列から byte[16] へ変換
     service.softDeleteStudent(studentIdBytes);
     return ResponseEntity.noContent().build();
   }
@@ -440,7 +435,7 @@ public class StudentController {
   /**
    * 論理削除された受講生情報を復元します。
    *
-   * @param studentId 復元対象の受講生ID
+   * @param studentId 復元対象の受講生ID（UUID文字列表現）
    * @return 204 No Content
    */
   @Operation(

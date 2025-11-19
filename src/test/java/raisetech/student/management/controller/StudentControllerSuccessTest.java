@@ -509,7 +509,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     verify(converter).toEntity(studentDto);
     verify(converter).toEntityList(anyList(), argThat(arr -> Arrays.equals(arr, studentId)));
     // verify も3引数に
-    verify(converter).encodeBase64(argThat(arr -> Arrays.equals(arr, studentId))); // 追加
+    verify(converter).encodeUuidString(argThat(arr -> Arrays.equals(arr, studentId))); // 追加
     verify(converter).toDetailDto(any(Student.class), same(courses), eq(base64Id));
     verifyNoMoreInteractions(converter);
   }

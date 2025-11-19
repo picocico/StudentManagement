@@ -158,7 +158,7 @@ abstract class ControllerTestBase {
    *     <ul>
    *       <li>{@link IdCodec#decodeUuidBytesOrThrow(String)} による 16 バイト ID デコード</li>   // ←★ココを変更: decodeUuidBytesOrThrow を明示
    *       <li>{@link IdCodec#decodeUuidOrThrow(String)} による {@link java.util.UUID} へのデコード</li> // ←★追加
-   *       <li>{@link StudentConverter#encodeBase64(byte[])} による 16 バイト ID → Base64 のエンコード</li> // ←★追加
+   *       <li>{@link StudentConverter#encodeUuidString(byte[])} による 16 バイト ID → Base64 のエンコード</li> // ←★追加
    *       <li>{@link #stubConverterHappyPath()} および {@link #stubServiceHappyPath()} による「ハッピーパス」スタブ</li> // ←★ココを変更: 共通スタブの実体を列挙
    *     </ul>
    *   </li>
@@ -279,10 +279,10 @@ abstract class ControllerTestBase {
     when(idCodec.encodeId(argThat(arr -> Arrays.equals(arr, studentId))))
         .thenReturn(base64Id);
 
-    // StudentController は converter.encodeBase64(...) を呼ぶので、
-    // テストでは encodeBase64 が IdCodec.encodeId(...) の結果を
+    // StudentController は converter.encodeUuidString(...) を呼ぶので、
+    // テストでは encodeUuidString が IdCodec.encodeId(...) の結果を
     // そのまま返すようにしておく
-    when(converter.encodeBase64(argThat(arr -> Arrays.equals(arr, studentId))))
+    when(converter.encodeUuidString(argThat(arr -> Arrays.equals(arr, studentId))))
         .thenAnswer(inv -> idCodec.encodeId(inv.getArgument(0)));
 
     // 共通ハッピーパス・スタブ（必要なら各テストで上書きOK）

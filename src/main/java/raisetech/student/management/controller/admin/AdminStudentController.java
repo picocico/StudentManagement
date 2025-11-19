@@ -21,8 +21,8 @@ import raisetech.student.management.util.IdCodec;
 /**
  * 管理者用の受講生物理削除 API コントローラー。
  *
- * <p>管理者権限を持つユーザーのみがアクセスでき、URL-safe Base64 形式で指定された
- * 受講生 ID（UUID/BINARY(16)）に対応するレコードをデータベースから完全に削除します。
+ * <p>管理者権限を持つユーザーのみがアクセスでき、パスで指定された
+ * 受講生 ID（UUID 文字列表現 → 内部的には BINARY(16)）に対応するレコードを データベースから完全に削除します。
  */
 @Tag(name = "管理者用API", description = "管理者のみがアクセス可能な受講生操作API")
 @SecurityRequirement(name = "basicAuth")
@@ -39,23 +39,28 @@ public class AdminStudentController {
    *
    * <p>処理の流れ:
    * <ul>
-   *   <li>パス変数 {@code studentId}（URL-safe Base64 形式）を {@link IdCodec} で 16 バイト配列にデコードする</li>
-   *   <li>デコードした ID を用いて {@link StudentService#forceDeleteStudent(byte[])} を呼び出し、該当レコードを物理削除する</li>
+   *   <li>パス変数 {@code studentId}（UUID 文字列表現）を {@link IdCodec} で
+   *   UUID 由来の 16 バイト配列にデコードする</li>
+   *   <li>デコードした ID を用いて {@link StudentService#forceDeleteStudent(byte[])} を呼び出し、
+   *   該当レコードを物理削除する</li>
    * </ul>
    *
    * <p>正常終了時は HTTP 204 No Content を返します。
-   * Base64 文字列が不正、または該当する受講生が存在しない場合は
+   * UUID 文字列が不正、または該当する受講生が存在しない場合は
    * {@link raisetech.student.management.exception.GlobalExceptionHandler} により
    * 400 / 404 のエラーレスポンスに変換されます。
    *
-   * @param studentId URL-safe Base64 形式の受講生 ID （UUID/BINARY(16) を
-   *                  {@code Base64.getUrlEncoder().withoutPadding()} でエンコードした文字列）
+   * @param studentId 受講生 ID（標準的な UUID 文字列表現。 例: {@code 123e4567-e89b-12d3-a456-426614174000}）
    * @return 削除成功時は本文なしの 204 No Content を返却します
    */
   @Operation(
       summary = "受講生の物理削除（管理者専用）",
-      description = "Base64形式のUUIDで指定された受講生をデータベースから完全に削除します。",
-      parameters = @Parameter(name = "studentId", description = "Base64形式の受講生ID", required = true),
+      description = "UUID形式の受講生IDで指定された受講生をデータベースから完全に削除します。",
+      parameters = @Parameter(
+          name = "studentId",
+          description = "UUID形式の受講生ID（例: 123e4567-e89b-12d3-a456-426614174000）",
+          required = true
+      ),
       responses = {
           @ApiResponse(responseCode = "204", description = "削除成功"),
           @ApiResponse(

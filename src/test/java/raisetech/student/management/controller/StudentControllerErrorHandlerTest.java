@@ -254,7 +254,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     verify(service).updateStudentWithCourses(any(Student.class), anyList());
 
     // ★到達しないことを明示
-    verify(converter, never()).encodeBase64(any(byte[].class));
+    verify(converter, never()).encodeUuidString(any(byte[].class));
     verify(converter, never()).toDetailDto(any(), anyList(), anyString());
 
     // 余計な呼び出しが無いこと

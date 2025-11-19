@@ -2,12 +2,10 @@ package raisetech.student.management.service;
 
 import java.util.List;
 import java.util.Objects;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -80,7 +78,7 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 既存の受講生に新しいコースのみを追加します（既存のコースは保持）。
    *
-   * @param studentId 受講生ID
+   * @param studentId  受講生ID
    * @param newCourses 追加するコースリスト
    */
   public void appendCourses(byte[] studentId, List<StudentCourse> newCourses) {
@@ -107,9 +105,9 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 検索条件に基づいて受講生詳細情報リストを取得します。
    *
-   * @param furigana ふりがな検索（省略可能）
+   * @param furigana       ふりがな検索（省略可能）
    * @param includeDeleted 論理削除済みも含めるか
-   * @param deletedOnly 論理削除済みのみ取得するか
+   * @param deletedOnly    論理削除済みのみ取得するか
    * @return 受講生詳細DTOリスト
    */
   @Override
@@ -121,7 +119,8 @@ public class StudentServiceImpl implements StudentService {
         includeDeleted,
         deletedOnly);
     if (includeDeleted && deletedOnly) {
-      throw new IllegalArgumentException("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
+      throw new IllegalArgumentException(
+          "includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
     }
     // 動的SQLにより1本化されたリポジトリメソッドを呼び出し
     List<Student> students =
@@ -133,7 +132,7 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 受講生IDで受講生情報を取得します。
    *
-   * @param studentId 受講生ID（BINARY型、Base64エンコード前の16バイト配列）
+   * @param studentId 受講生ID（UUID を BINARY(16) で保持した 16バイト配列）
    * @return 該当する受講生
    * @throws ResourceNotFoundException 該当する受講生が存在しない場合
    */
@@ -145,7 +144,8 @@ public class StudentServiceImpl implements StudentService {
 
     Student student = studentRepository.findById(studentId);
     if (student == null) {
-      String idForLog = converter.encodeBase64(studentId);
+      // ログ用に UUID 文字列を生成
+      String idForLog = converter.encodeUuidString(studentId);
       throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
     }
     return student;
@@ -154,7 +154,7 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 受講生IDに紐づくコース情報を取得します。
    *
-   * @param studentId 受講生ID（BINARY型、Base64エンコード前の16バイト配列）
+   * @param studentId 受講生ID（UUID を BINARY(16) で保持した 16バイト配列）
    * @return コースリスト
    */
   @Override
@@ -175,7 +175,7 @@ public class StudentServiceImpl implements StudentService {
   /**
    * 受講生を論理削除します。
    *
-   * @param studentId 受講生ID（BINARY型、Base64エンコード前の16バイト配列）
+   * @param studentId 受講生ID（UUID を BINARY(16) で保持した 16バイト配列）
    */
   @Override
   @Transactional
@@ -185,28 +185,28 @@ public class StudentServiceImpl implements StudentService {
     // 対象の受講生が存在しない場合は例外をスロー
     if (student == null) {
       throw new ResourceNotFoundException(
-          "Student not found for ID: " + converter.encodeBase64(studentId));
+          "Student not found for ID: " + converter.encodeUuidString(studentId));
     }
 
     // すでに論理削除済みでなければ、削除処理を行う
     if (!Boolean.TRUE.equals(student.getDeleted())) {
       student.softDelete();
       studentRepository.updateStudent(student);
-      log.info("論理削除完了 - studentId: {}", converter.encodeBase64(studentId));
+      log.info("論理削除完了 - studentId: {}", converter.encodeUuidString(studentId));
     }
   }
 
   /**
    * 論理削除された受講生を復元します。
    *
-   * @param studentId 受講生ID（BINARY型、Base64エンコード前の16バイト配列）
+   * @param studentId 受講生ID（UUID を BINARY(16) で保持した 16バイト配列）
    * @throws ResourceNotFoundException 受講生が存在しない場合
    */
   @Override
   @Transactional
   public void restoreStudent(byte[] studentId) {
     Student student = studentRepository.findById(studentId);
-    String idForLog = converter.encodeBase64(studentId);
+    String idForLog = converter.encodeUuidString(studentId);
 
     if (student == null) {
       throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
@@ -240,7 +240,7 @@ public class StudentServiceImpl implements StudentService {
   @Override
   @Transactional
   public void forceDeleteStudent(byte[] studentId) {
-    String idForLog = converter.encodeBase64(studentId);
+    String idForLog = converter.encodeUuidString(studentId);
     // 存在確認
     if (studentRepository.findById(studentId) == null) {
       throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
@@ -252,7 +252,9 @@ public class StudentServiceImpl implements StudentService {
     log.info("物理削除完了 - studentId: {}", idForLog);
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   @Transactional
   public Student updateStudentWithCourses(Student student, List<StudentCourse> courses) {
@@ -289,7 +291,9 @@ public class StudentServiceImpl implements StudentService {
     return updated;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public List<StudentCourse> getCoursesByStudentId(byte[] studentId) {
     if (studentId == null) {
