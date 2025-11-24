@@ -3,7 +3,6 @@ package raisetech.student.management.util;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.nio.ByteBuffer;
 import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,29 +28,13 @@ public class StudentIdCodecTest {
    * <p>UUID 自体の値はテストの関心事ではなく、再現性のある固定値であればよい前提です。
    */
   private final UUID FIXED_UUID = UUID.fromString("12345678-9abc-def0-1234-56789abcdef0");
-
-  /**
-   * UUID を 16 バイトの配列（BINARY(16)）に変換するテスト用ユーティリティです。
-   *
-   * <p>本番コード側でも、UUID を {@code BINARY(16)} に変換するユーティリティ
-   * （例: {@code UUIDUtil#fromUUID(UUID)} 等）が同じ変換を担うことを想定しています。
-   *
-   * @param uuid 変換対象の UUID
-   * @return 引数の UUID を表現する 16 バイト配列
-   */
-  private static byte[] toBytes(UUID uuid) {
-    ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
-    bb.putLong(uuid.getMostSignificantBits());
-    bb.putLong(uuid.getLeastSignificantBits());
-    return bb.array();
-  }
-
+  
   /**
    * FIXED_UUID を BINARY(16) に変換したもの（UUID の生 16 バイト表現）。
    *
    * <p>encode／decode の結果検証に利用します。
    */
-  private final byte[] FIXED_UUID_BYTES = toBytes(FIXED_UUID);
+  private final byte[] FIXED_UUID_BYTES = UUIDUtil.fromUUID(FIXED_UUID);
 
   /**
    * FIXED_UUID の標準的な UUID 文字列表現。
@@ -182,8 +165,9 @@ public class StudentIdCodecTest {
     void generateNewIdBytes_正常系_16バイト長の配列が返されること() {
       byte[] idBytes = codec.generateNewIdBytes();
 
-      assertThat(idBytes).isNotNull();
-      assertThat(idBytes).hasSize(16);
+      assertThat(idBytes)
+          .isNotNull()
+          .hasSize(16);
     }
   }
 

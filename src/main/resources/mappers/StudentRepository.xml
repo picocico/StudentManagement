@@ -7,7 +7,8 @@
 
   <!-- 共通のマッピング -->
   <resultMap id="StudentResultMap" type="raisetech.student.management.data.Student">
-    <result property="studentId" column="student_id"/>
+    <result property="studentId" column="student_id" jdbcType="BINARY"
+      typeHandler="raisetech.student.management.config.typehandler.ByteArrayTypeHandler"/>
     <result property="fullName" column="full_name"/>
     <result property="furigana" column="furigana"/>
     <result property="nickname" column="nickname"/>

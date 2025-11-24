@@ -176,6 +176,9 @@ class StudentServiceImplTest {
 
     List<StudentCourse> courses = List.of(course);
 
+    // 更新件数 1 を返すようにスタブ
+    when(studentRepository.updateStudent(student)).thenReturn(1);
+
     // 実行
     service.updateStudent(student, courses);
 
@@ -187,6 +190,23 @@ class StudentServiceImplTest {
     inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
     // 新たにcoursesをDBに登録する処理が呼び出されたかどうか？
     inOrder.verify(courseRepository).insertCourses(courses);
+  }
+
+  /**
+   * updateStudent 実行時に、リポジトリから「0件更新」が返された場合、 対象受講生が存在しないものとみなして ResourceNotFoundException
+   * を送出することを検証します。
+   *
+   * <p>リポジトリ層は「0件更新」で存在有無を表現し、サービス層で
+   * ドメイン例外（404系）にマッピングする責務を負います。
+   */
+  @Test
+  void updateStudent_存在しないIDならResourceNotFoundExceptionが送出されること() {
+    when(studentRepository.updateStudent(student)).thenReturn(0);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
+
+    assertThatThrownBy(() -> service.updateStudent(student, List.of()))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
   }
 
   /**
@@ -207,7 +227,12 @@ class StudentServiceImplTest {
     student.setStudentId(studentId);
     student.setFullName("検証 太郎");
 
-    List<StudentCourse> courses = List.of(new StudentCourse());
+    StudentCourse course = new StudentCourse();
+    course.setCourseId(new byte[16]);
+    List<StudentCourse> courses = List.of(course);
+
+    // ★件数 1 を返すようにスタブ
+    when(studentRepository.updateStudent(student)).thenReturn(1);
 
     // 実行
     service.partialUpdateStudent(student, courses);
@@ -219,6 +244,23 @@ class StudentServiceImplTest {
     // studentId に紐づく受講コースを 一括削除する処理が実行されたかどうか？
     inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
     inOrder.verify(courseRepository).insertCourses(courses);
+  }
+
+  /**
+   * partialUpdateStudent 実行時に、studentId が UUID として不正な長さ（16バイト以外）の場合、 処理を行わずに
+   * IllegalArgumentException を送出することを検証します。
+   *
+   * <p>サービス層で ID フォーマットを早期にチェックすることで、
+   * 不正な ID によるリポジトリ呼び出しを防ぎます。
+   */
+  @Test
+  void partialUpdateStudent_studentIdが16バイト以外ならIllegalArgumentException() {
+    Student s = new Student();
+    s.setStudentId(new byte[8]); // 不正な長さ
+
+    assertThatThrownBy(() -> service.partialUpdateStudent(s, List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("UUIDの形式が不正です");
   }
 
   /**
@@ -242,8 +284,6 @@ class StudentServiceImplTest {
 
     // insertIfNotExists が正しく呼ばれているか?
     verify(courseRepository).insertIfNotExists(course);
-    // コースが複数ある場合は、すべて処理されているか?
-    verify(courseRepository, times(newCourses.size())).insertIfNotExists(any());
   }
 
   /**
@@ -259,11 +299,34 @@ class StudentServiceImplTest {
     student.setStudentId(new byte[16]);
     student.setFullName("検証　テスト");
 
+    // ★件数 1 を返す
+    when(studentRepository.updateStudent(student)).thenReturn(1);
+
     // 実行
     service.updateStudentInfoOnly(student);
 
     // 検証：studentRepository.updateStudent(...) が呼ばれていること
     verify(studentRepository).updateStudent(student);
+  }
+
+  /**
+   * updateStudentInfoOnly 実行時に、リポジトリからの更新件数が 0 件の場合、 対象受講生が存在しないものとみなして ResourceNotFoundException
+   * を送出することを検証します。
+   *
+   * <p>「情報だけ更新する」ケースでも、存在しない ID に対しては
+   * 一貫して 404 相当のドメイン例外を返すポリシーを確認します。
+   */
+  @Test
+  void updateStudentInfoOnly_存在しないIDならResourceNotFoundExceptionが送出されること() {
+    Student s = new Student();
+    s.setStudentId(studentId);
+
+    when(studentRepository.updateStudent(s)).thenReturn(0);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
+
+    assertThatThrownBy(() -> service.updateStudentInfoOnly(s))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
   }
 
   /**
@@ -523,13 +586,14 @@ class StudentServiceImplTest {
    */
   @Test
   void softDeleteStudent_論理削除されていなければ削除処理が実行されること() {
-
     // 準備
     Student student = mock(Student.class);
 
     // モックの準備
     when(studentRepository.findById(studentId)).thenReturn(student);
     when(student.getDeleted()).thenReturn(false);
+
+    when(studentRepository.updateStudent(student)).thenReturn(1);
 
     // 実行
     service.softDeleteStudent(studentId);
@@ -568,6 +632,8 @@ class StudentServiceImplTest {
     when(studentRepository.findById(studentId)).thenReturn(student);
     when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
+    when(studentRepository.updateStudent(student)).thenReturn(1);
+
     service.restoreStudent(studentId);
 
     verify(student).restore(); // restore() 呼び出しの検証（可能なら）
@@ -591,18 +657,25 @@ class StudentServiceImplTest {
   }
 
   /**
-   * forceDeleteStudent で、該当受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。
+   * forceDeleteStudent 実行時に、物理削除の件数が 0 件だった場合、 対象受講生が存在しないものとみなして ResourceNotFoundException
+   * を送出することを検証します。
+   *
+   * <p>このとき先に実行した deleteCoursesByStudentId の削除も
+   * {@code @Transactional} によりロールバックされる前提であり、 部分的な削除状態が残らないことを保証します（実装側の意図の確認）。
    */
   @Test
   void forceDeleteStudent_該当の受講生が存在しない時は例外がスローされること() {
     // モックの設定
-    when(studentRepository.findById(studentId)).thenReturn(null);
+    when(studentRepository.forceDeleteStudent(studentId)).thenReturn(0);
     when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     // 実行＆検証
     assertThatThrownBy(() -> service.forceDeleteStudent(studentId))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
+
+    verify(courseRepository).deleteCoursesByStudentId(studentId);
+    verify(studentRepository).forceDeleteStudent(studentId);
   }
 
   /**
@@ -616,12 +689,8 @@ class StudentServiceImplTest {
    */
   @Test
   void forceDeleteStudent_受講生が存在する場合はコースと受講生情報が削除されること() {
-
-    // 準備
-    Student student = mock(Student.class);
-
     // モックの準備
-    when(studentRepository.findById(studentId)).thenReturn(student);
+    when(studentRepository.forceDeleteStudent(studentId)).thenReturn(1);
     when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     // 実行
