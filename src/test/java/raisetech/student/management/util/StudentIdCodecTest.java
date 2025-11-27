@@ -34,7 +34,7 @@ public class StudentIdCodecTest {
    * UUID を 16 バイトの配列（BINARY(16)）に変換するテスト用ユーティリティです。
    *
    * <p>本番コード側でも、UUID を {@code BINARY(16)} に変換するユーティリティ
-   * （例: {@code UUIDUtil#fromUUID(UUID)} 等）が同じ変換を担うことを想定しています。
+   * （例: {@code UUIDUtil#toBytes(UUID)} 等）が同じ変換を担うことを想定しています。
    *
    * @param uuid 変換対象の UUID
    * @return 引数の UUID を表現する 16 バイト配列
@@ -131,7 +131,7 @@ public class StudentIdCodecTest {
       assertThat(result).hasSize(16);
 
       // 往復させて検証
-      UUID actual = UUIDUtil.toUUID(result);
+      UUID actual = UUIDUtil.fromBytes(result);
       assertThat(actual.toString()).isEqualTo(uuidString);
     }
 

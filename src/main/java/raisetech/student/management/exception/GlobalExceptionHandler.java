@@ -1,7 +1,8 @@
 package raisetech.student.management.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import java.util.List;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -17,9 +18,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
-
-import jakarta.validation.ConstraintViolationException;
-import lombok.extern.slf4j.Slf4j;
 import raisetech.student.management.exception.dto.ErrorResponse;
 import raisetech.student.management.exception.dto.FieldErrorDetail;
 
@@ -64,7 +62,8 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(
       MethodArgumentNotValidException ex) {
     var errors = toFieldErrors(ex.getBindingResult());
-    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001", "入力値に不備があります", errors);
+    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001", "入力値に不備があります",
+        errors);
   }
 
   /// ========= 400: バリデーション失敗 (ConstraintViolation) =========
@@ -74,14 +73,16 @@ public class GlobalExceptionHandler {
         ex.getConstraintViolations().stream()
             .map(v -> new FieldErrorDetail(v.getPropertyPath().toString(), v.getMessage()))
             .toList();
-    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001", "入力値に不備があります", details);
+    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001", "入力値に不備があります",
+        details);
   }
 
   /// ========= 400: バリデーション失敗 (BindException) =========
   @ExceptionHandler(BindException.class)
   public ResponseEntity<ErrorResponse> handleBind(BindException ex) {
     var errors = toFieldErrors(ex.getBindingResult());
-    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001", "入力値に不備があります", errors);
+    return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "E001", "入力値に不備があります",
+        errors);
   }
 
   /// ========= 400: JSON不正 / ボディ欠如 =========
@@ -93,39 +94,16 @@ public class GlobalExceptionHandler {
         || root instanceof com.fasterxml.jackson.databind.JsonMappingException) {
       return build(HttpStatus.BAD_REQUEST, "INVALID_JSON", "E002", "JSONの構文が不正です。", null);
     }
-    // 2) 空ボディや EOF っぽいケース → MISSING_PARAMETER / E001
+    // 2) 空ボディや EOF っぽいケース → MISSING_PARAMETER / E003
     String msg = String.valueOf(ex.getMessage()).toLowerCase();
     if (msg.contains("no content")
         || msg.contains("required request body is missing")
         || root == null) {
-      return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E001", "リクエストボディが必要です。", null);
+      return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003",
+          "リクエストボディが必要です。", null);
     }
     // 3) それ以外はINVALID_REQUESTで吸収
     return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006", "不正なリクエストです。", null);
-  }
-
-  /// ========= 400: ID形式不正（Base64/UUID長） =========
-  @ExceptionHandler(InvalidIdFormatException.class)
-  public ResponseEntity<ErrorResponse> handleInvalidId(InvalidIdFormatException ex) {
-    String msg =
-        (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "IDの形式が不正です";
-    var details = List.of(new FieldErrorDetail("studentId", msg));
-    return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006", msg, details);
-  }
-
-  /// ========= 400: 型不一致（クエリ/パスパラメータ変換） =========
-  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-  public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-    String field = ex.getName();
-    String rejected = String.valueOf(ex.getValue());
-    String expected =
-        ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
-
-    var detail =
-        new FieldErrorDetail(field, String.format("型不一致（値='%s', 期待型=%s）", rejected, expected));
-    String msg = String.format("リクエストパラメータ '%s' の型が不正です", field);
-
-    return build(HttpStatus.BAD_REQUEST, "TYPE_MISMATCH", "E004", msg, List.of(detail));
   }
 
   /// ========= 400: 必須クエリ欠如 =========
@@ -148,7 +126,8 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MissingParameterException.class)
   public ResponseEntity<ErrorResponse> handleMissingParameter(MissingParameterException ex) {
     String msg =
-        (ex.getMessage() == null || ex.getMessage().isBlank()) ? "リクエストボディは必須です。" : ex.getMessage();
+        (ex.getMessage() == null || ex.getMessage().isBlank()) ? "リクエストボディは必須です。"
+            : ex.getMessage();
     return build(HttpStatus.BAD_REQUEST, "MISSING_PARAMETER", "E003", msg, null);
   }
 
@@ -165,18 +144,46 @@ public class GlobalExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "EMPTY_OBJECT", "E003", msg, null);
   }
 
+  /// ========= 400: 型不一致（クエリ/パスパラメータ変換） =========
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+    String field = ex.getName();
+    String rejected = String.valueOf(ex.getValue());
+    String expected =
+        ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+
+    var detail =
+        new FieldErrorDetail(field,
+            String.format("型不一致（値='%s', 期待型=%s）", rejected, expected));
+    String msg = String.format("リクエストパラメータ '%s' の型が不正です", field);
+
+    return build(HttpStatus.BAD_REQUEST, "TYPE_MISMATCH", "E004", msg, List.of(detail));
+  }
+
+  /// ========= 400: ID形式不正（UUID形式） =========
+  @ExceptionHandler(InvalidIdFormatException.class)
+  public ResponseEntity<ErrorResponse> handleInvalidId(InvalidIdFormatException ex) {
+    String msg =
+        (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage()
+            : "IDの形式が不正です";
+    var details = List.of(new FieldErrorDetail("studentId", msg));
+    return build(HttpStatus.BAD_REQUEST, "INVALID_ID_FORMAT", "E006", msg, details);
+  }
+
   /// ========= 400: その他 IllegalArgumentException は E006 に寄せる =========
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ErrorResponse> handleBadInput(IllegalArgumentException ex) {
     String message =
-        (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "リクエスト形式が不正です";
+        (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage()
+            : "リクエスト形式が不正です";
     return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006", message, null);
   }
 
   /// ========= 403: 権限不足 =========
   @ExceptionHandler(AccessDeniedException.class)
   public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
-    return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "E403", "アクセスが拒否されました。管理者権限が必要です。", null);
+    return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "E403",
+        "アクセスが拒否されました。管理者権限が必要です。", null);
   }
 
   /// ========= 404: 存在しないURL (NoHandlerFound) =========
@@ -199,7 +206,8 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
     return build(
-        HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "E999", "予期しないエラーが発生しました", null);
+        HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "E999",
+        "予期しないエラーが発生しました", null);
   }
 
   // ===== 共通ビルダ =====
@@ -253,7 +261,7 @@ public class GlobalExceptionHandler {
       String message, // 人間可読
       List<FieldErrorDetail> errors, // optional
       List<FieldErrorDetail> details // optional（非推奨エイリアス）
-      ) {
+  ) {
     try {
       String e = trim(error);
       String c = trim(code);
@@ -307,7 +315,7 @@ public class GlobalExceptionHandler {
                   nonBlankOrDefault(m, ""), // message
                   outErrors,
                   null // details は最終仕様で常に非出力
-                  ));
+              ));
 
     } catch (Exception ex) {
       // ★ 例外ハンドラ内では“絶対に投げない”。ログだけ出してフォールバックを返す

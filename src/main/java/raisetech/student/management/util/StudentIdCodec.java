@@ -21,7 +21,7 @@ public class StudentIdCodec implements IdCodec {
     if (id.length != 16) {
       throw new IllegalArgumentException("UUIDの形式が不正です");
     }
-    UUID uuid = UUIDUtil.toUUID(id);
+    UUID uuid = UUIDUtil.fromBytes(id);
     return uuid.toString(); // 標準的な UUID 文字列表現
   }
 
@@ -41,12 +41,12 @@ public class StudentIdCodec implements IdCodec {
   @Override
   public byte[] decodeUuidBytesOrThrow(String uuidString) {
     UUID uuid = decodeUuidOrThrow(uuidString);
-    return UUIDUtil.fromUUID(uuid);
+    return UUIDUtil.toBytes(uuid);
   }
 
   @Override
   public byte[] generateNewIdBytes() {
     UUID uuid = UUID.randomUUID();
-    return UUIDUtil.fromUUID(uuid);
+    return UUIDUtil.toBytes(uuid);
   }
 }

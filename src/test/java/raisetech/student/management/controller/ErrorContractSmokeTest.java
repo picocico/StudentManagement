@@ -62,7 +62,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    * @throws Exception MockMvc実行時例外
    */
   @Test
-  void errorSchema_isConsistent_forTypeMismatch() throws Exception {
+  void 型不一致時_エラーレスポンスのスキーマが安定していること() throws Exception {
     mockMvc
         .perform(get("/api/students").param("includeDeleted", "abc"))
         .andExpect(status().isBadRequest())
@@ -97,11 +97,11 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    * @throws Exception MockMvc実行時例外
    */
   @Test
-  void errorResponse_schema_is_stable_without_legacy_keys() throws Exception {
+  void エラーレスポンスにレガシーなキーが含まれないこと() throws Exception {
     // 適当なエラーを発生させる（例：型不一致）
     mockMvc
         .perform(
-            patch("/api/students/{id}", base64Id)
+            patch("/api/students/{id}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isBadRequest())
@@ -117,10 +117,10 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    * @throws Exception MockMvc実行時例外
    */
   @Test
-  void errorResponse_has_no_alias_fields_when_no_details() throws Exception {
+  void 詳細情報なしのエラーでエイリアスフィールドが出力されないこと() throws Exception {
     mockMvc
         .perform(
-            patch("/api/students/{id}", base64Id)
+            patch("/api/students/{id}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isBadRequest())
@@ -141,10 +141,10 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    * @throws Exception MockMvc実行時例外
    */
   @Test
-  void error_contract_has_only_final_keys_and_no_alias() throws Exception {
+  void エラー契約が最終キーのみを持ちエイリアスを含まないこと() throws Exception {
     mockMvc
         .perform(
-            patch("/api/students/{id}", base64Id)
+            patch("/api/students/{id}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isBadRequest())
@@ -170,9 +170,9 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    * @throws Exception MockMvc実行時例外
    */
   @Test
-  void patch_emptyBody_returns_400_missingParameter_schemaLocked() throws Exception {
+  void PATCHボディ無しで400_MISSING_PARAMETER_E003が返ること() throws Exception {
     mockMvc
-        .perform(patch("/api/students/{id}", base64Id).contentType(MediaType.APPLICATION_JSON))
+        .perform(patch("/api/students/{id}", studentById).contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("MISSING_PARAMETER"))
         .andExpect(jsonPath("$.code").value("E003"))
@@ -188,10 +188,11 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    *
    * @throws Exception MockMvc実行時例外
    */
+  @Test
   void patch_emptyJson_returns_400_emptyObject_schemaLocked() throws Exception {
     mockMvc
         .perform(
-            patch("/api/students/{id}", base64Id)
+            patch("/api/students/{id}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isBadRequest())
@@ -213,7 +214,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
   void patch_malformedJson_returns_400_invalidJson_schemaLocked() throws Exception {
     mockMvc
         .perform(
-            patch("/api/students/{id}", base64Id)
+            patch("/api/students/{id}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{"))
         .andExpect(status().isBadRequest())
@@ -263,7 +264,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
     // Act & Assert
     mockMvc
         .perform(
-            patch("/api/students/{id}", base64Id)
+            patch("/api/students/{id}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
         .andExpect(status().isInternalServerError())

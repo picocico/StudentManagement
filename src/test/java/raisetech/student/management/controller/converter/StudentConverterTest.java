@@ -147,7 +147,7 @@ class StudentConverterTest {
     }
 
     /**
-     * {@link StudentConverter#decodeUuidToBytesOrThrow(String)} が 正常な UUID 文字列を正しくバイト配列へ復元し、
+     * {@link StudentConverter#decodeUuidStringToBytesOrThrow(String)} が 正常な UUID 文字列を正しくバイト配列へ復元し、
      * {@link IdCodec#decodeUuidBytesOrThrow(String)} に委譲していることを検証します。
      */
     @Test
@@ -156,7 +156,7 @@ class StudentConverterTest {
       String uuidString = FIXED_UUID_STRING; // "123e4567-e89b-12d3-a456-426614174000" など
       when(idCodec.decodeUuidBytesOrThrow(uuidString)).thenReturn(FIXED_UUID_BYTES);
 
-      byte[] resultBytes = converter.decodeUuidToBytesOrThrow(uuidString);
+      byte[] resultBytes = converter.decodeUuidStringToBytesOrThrow(uuidString);
       // バイト配列の内容が一致することを確認
       assertThat(resultBytes).containsExactly(FIXED_UUID_BYTES);
     }
@@ -171,7 +171,7 @@ class StudentConverterTest {
       when(idCodec.decodeUuidBytesOrThrow(invalid))
           .thenThrow(new IllegalArgumentException("dummy"));
 
-      assertThatThrownBy(() -> converter.decodeUuidToBytesOrThrow(invalid))
+      assertThatThrownBy(() -> converter.decodeUuidStringToBytesOrThrow(invalid))
           .isInstanceOf(InvalidIdFormatException.class)
           .hasMessageContaining("（UUID）"); // メッセージは実装に合わせて
     }

@@ -83,7 +83,7 @@ class StudentServiceImplTest {
   /**
    * テストで利用する固定 UUID 文字列表現。
    *
-   * <p>この値を {@link UUIDUtil#fromUUID(UUID)} で byte[16] に変換して
+   * <p>この値を {@link UUIDUtil#toBytes(UUID)} で byte[16] に変換して
    * {@code studentId} として利用します。
    */
   private static final String UUID_STRING = "123e4567-e89b-12d3-a456-426614174000";
@@ -117,7 +117,7 @@ class StudentServiceImplTest {
   @BeforeEach
   void setUp() {
     // UUID文字列 → UUID → byte[16]
-    studentId = UUIDUtil.fromUUID(UUID.fromString(UUID_STRING));
+    studentId = UUIDUtil.toBytes(UUID.fromString(UUID_STRING));
 
     student = new Student();
     student.setStudentId(studentId);
@@ -444,12 +444,12 @@ class StudentServiceImplTest {
     // 準備
     StudentCourse course1 = new StudentCourse();
     course1.setStudentId(studentId);
-    course1.setCourseId(UUIDUtil.fromUUID(
+    course1.setCourseId(UUIDUtil.toBytes(
         UUID.fromString("123e4567-e89b-12d3-a456-426614174001"))); // 仮のCourse ID 1
 
     StudentCourse course2 = new StudentCourse();
     course2.setStudentId(studentId);
-    course2.setCourseId(UUIDUtil.fromUUID(
+    course2.setCourseId(UUIDUtil.toBytes(
         UUID.fromString("123e4567-e89b-12d3-a456-426614174001"))); // 仮のCourse ID 2
 
     List<StudentCourse> expectedCourses = List.of(course1, course2);
@@ -475,11 +475,11 @@ class StudentServiceImplTest {
 
     // 準備
     StudentCourse course1 = new StudentCourse();
-    course1.setCourseId(UUIDUtil.fromUUID(UUID.fromString("123e4567-e89b-12d3-a456-426614174003")));
+    course1.setCourseId(UUIDUtil.toBytes(UUID.fromString("123e4567-e89b-12d3-a456-426614174003")));
     course1.setCourseName("Javaコース");
 
     StudentCourse course2 = new StudentCourse();
-    course2.setCourseId(UUIDUtil.fromUUID(UUID.fromString("123e4567-e89b-12d3-a456-426614174003")));
+    course2.setCourseId(UUIDUtil.toBytes(UUID.fromString("123e4567-e89b-12d3-a456-426614174003")));
     course2.setCourseName("AWSコース");
 
     List<StudentCourse> mockCourses = List.of(course1, course2);
