@@ -170,7 +170,7 @@ public class GlobalExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "INVALID_ID_FORMAT", "E006", msg, details);
   }
 
-  /// ========= 400: その他 IllegalArgumentException は E006 に寄せる =========
+  /// ========= 400: その他の IllegalArgumentException を汎用的なリクエスト不正としてマッピング =========
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ErrorResponse> handleBadInput(IllegalArgumentException ex) {
     String message =

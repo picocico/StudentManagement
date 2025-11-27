@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import raisetech.student.management.exception.InvalidIdFormatException;
 
 /**
  * {@link StudentIdCodec} の単体テストクラス。
@@ -103,7 +104,7 @@ public class StudentIdCodecTest {
 
       assertThatThrownBy(() -> codec.encodeId(invalid))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("UUIDの形式");
+          .hasMessageContaining("IDの形式が不正です");
     }
   }
 
@@ -136,28 +137,28 @@ public class StudentIdCodecTest {
     }
 
     /**
-     * 異常系: UUID として不正な文字列を渡した場合に、 {@link IllegalArgumentException} がスローされることを検証します。
+     * 異常系: UUID として不正な文字列を渡した場合に、 {@link InvalidIdFormatException} がスローされることを検証します。
      *
      * <p>UUID 形式チェックに失敗したケースのハンドリング確認です。
      */
     @Test
-    void decodeUuidBytesOrThrow_異常系_UUIDとして不正な文字列の場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidBytesOrThrow_異常系_UUIDとして不正な文字列の場合はInvalidIdFormatExceptionがスローされること() {
       String invalid = "%%%invalid-uuid%%%";
 
       assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(invalid))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("(UUID)");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDの形式が不正です（UUID）");
     }
 
     /**
-     * 異常系: 引数が {@code null} の場合に {@link IllegalArgumentException} が スローされることを検証します。
+     * 異常系: 引数が {@code null} の場合に {@link InvalidIdFormatException} が スローされることを検証します。
      *
      * <p>{@code null} は許容されない前提であることをテストで明示します。
      */
     @Test
-    void decodeUuidBytesOrThrow_異常系_nullの場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidBytesOrThrow_異常系_nullの場合はInvalidIdFormatExceptionがスローされること() {
       assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(null))
-          .isInstanceOf(IllegalArgumentException.class);
+          .isInstanceOf(InvalidIdFormatException.class);
     }
   }
 
@@ -210,28 +211,28 @@ public class StudentIdCodecTest {
     }
 
     /**
-     * 異常系: UUID として不正な文字列を渡した場合に、 {@link IllegalArgumentException} がスローされることを検証します。
+     * 異常系: UUID として不正な文字列を渡した場合に、 {@link InvalidIdFormatException} がスローされることを検証します。
      *
      * <p>UUID 形式チェックに失敗した際のエラーハンドリング確認です。
      */
     @Test
-    void decodeUuidOrThrow_異常系_UUIDとして不正な場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidOrThrow_異常系_UUIDとして不正な場合はInvalidIdFormatExceptionがスローされること() {
       String invalid = "###invalid###";
 
       assertThatThrownBy(() -> codec.decodeUuidOrThrow(invalid))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("(UUID)");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDの形式が不正です（UUID）");
     }
 
     /**
-     * 異常系: 引数が {@code null} の場合に、 「null は許容されない」という前提で {@link IllegalArgumentException} が
+     * 異常系: 引数が {@code null} の場合に、 「null は許容されない」という前提で {@link InvalidIdFormatException} が
      * スローされることを検証します。
      */
     @Test
-    void decodeUuidOrThrow_異常系_nullの場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidOrThrow_異常系_nullの場合はInvalidIdFormatExceptionがスローされること() {
       assertThatThrownBy(() -> codec.decodeUuidOrThrow(null))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("studentId(UUID) は null にできません");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDはnullにできません（UUID）");
     }
   }
 
@@ -257,17 +258,17 @@ public class StudentIdCodecTest {
     }
 
     /**
-     * 異常系: UUID として不正な文字列を渡した場合に、 {@link IllegalArgumentException} がスローされることを検証します。
+     * 異常系: UUID として不正な文字列を渡した場合に、 {@link InvalidIdFormatException} がスローされることを検証します。
      *
      * <p>簡易な不正入力パターンに対する防御が機能していることを確認します。
      */
     @Test
-    void decodeUuidBytesOrThrow_異常系_UUIDとして不正な場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidBytesOrThrow_異常系_UUIDとして不正な場合はInvalidIdFormatExceptionがスローされること() {
       String invalid = "NG!!";
 
       assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(invalid))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("(UUID)");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDの形式が不正です（UUID）");
     }
   }
 }

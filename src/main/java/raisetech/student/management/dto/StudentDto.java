@@ -12,7 +12,8 @@ import lombok.NoArgsConstructor;
 /**
  * 受講生の基本情報を表すデータ転送オブジェクト（DTO）。
  *
- * <p>登録・更新・検索時のリクエストおよびレスポンスで使用されるクラスであり、 バリデーションアノテーションにより、リクエストデータの整合性を保証します。
+ * <p>登録・更新・検索時のリクエストおよびレスポンスで使用されるクラスであり、
+ * バリデーションアノテーションにより、リクエストデータの整合性を保証します。
  */
 @Schema(description = "受講生の基本情報 DTO")
 @Data
@@ -25,7 +26,10 @@ public class StudentDto {
    *
    * <p>新規登録時は省略可能で、取得・更新時に使用されます。
    */
-  @Schema(description = "受講生ID（UUID文字列表現、更新時などに使用）", example = "GdgYbbFeRU6A70yPTvUN2A==")
+  @Schema(
+      description = "受講生ID（UUID文字列表現、更新時などに使用）",
+      format = "uuid",
+      example = "123e4567-e89b-12d3-a456-426614174000")
   private String studentId;
 
   /**

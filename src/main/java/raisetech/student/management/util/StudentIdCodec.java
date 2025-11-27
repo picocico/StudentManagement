@@ -1,7 +1,9 @@
 package raisetech.student.management.util;
 
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
+import raisetech.student.management.exception.InvalidIdFormatException;
 
 /**
  * UUID/BINARY(16) と UUID 文字列表現の相互変換コンポーネント。 デフォルトの {@link IdCodec} 実装。
@@ -28,20 +30,30 @@ public class StudentIdCodec implements IdCodec {
   @Override
   public UUID decodeUuidOrThrow(String uuidString) {
     if (uuidString == null) {
-      throw new IllegalArgumentException("studentId(UUID) は null にできません");
+      throw new InvalidIdFormatException("IDはnullにできません（UUID）");
     }
     try {
       return UUID.fromString(uuidString);
     } catch (IllegalArgumentException e) {
       // ここでメッセージを UUID 用に変更
-      throw new IllegalArgumentException("studentId(UUID) の形式が不正です", e);
+      throw new InvalidIdFormatException("IDの形式が不正です（UUID）", e);
     }
   }
 
   @Override
   public byte[] decodeUuidBytesOrThrow(String uuidString) {
-    UUID uuid = decodeUuidOrThrow(uuidString);
-    return UUIDUtil.toBytes(uuid);
+    if (uuidString == null) {
+      throw new InvalidIdFormatException("IDはnullにできません（UUID）");
+    }
+    try {
+      UUID uuid = decodeUuidOrThrow(uuidString);
+      ByteBuffer bb = ByteBuffer.allocate(16);
+      bb.putLong(uuid.getMostSignificantBits());
+      bb.putLong(uuid.getLeastSignificantBits());
+      return bb.array();
+    } catch (IllegalArgumentException ex) {
+      throw new InvalidIdFormatException("IDの形式が不正です（UUID）", ex);
+    }
   }
 
   @Override

@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 /**
  * 受講生が登録しているコース情報を表すデータ転送オブジェクト（DTO）。
  *
- * <p>クライアントとのリクエストおよびレスポンス時に使用されるクラスで、 {@code StudentCourse} エンティティの必要な情報のみを提供します。
+ * <p>クライアントとのリクエストおよびレスポンス時に使用されるクラスで、
+ * {@code StudentCourse} エンティティの必要な情報のみを提供します。
  */
 @Schema(description = "受講生コース情報 DTO")
 @Data
@@ -25,6 +26,7 @@ public class StudentCourseDto {
    */
   @Schema(
       description = "コースID（UUID 文字列表現、更新や既存識別用）",
+      format = "uuid",
       example = "123e4567-e89b-12d3-a456-426614174000",
       requiredMode = Schema.RequiredMode.NOT_REQUIRED)
   private String courseId;
