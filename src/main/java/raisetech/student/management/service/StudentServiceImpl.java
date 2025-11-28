@@ -52,7 +52,14 @@ public class StudentServiceImpl implements StudentService {
   @Override
   @Transactional
   public void updateStudent(Student student, List<StudentCourse> courses) {
-    studentRepository.updateStudent(student);
+    // 1. まず学生情報を更新
+    int updated = studentRepository.updateStudent(student);
+    // 2. 1件も更新されなければ「存在しないID」とみなして404系例外を投げる
+    if (updated == 0) {
+      String idForLog = converter.encodeUuidString(student.getStudentId());
+      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
+    }
+    // 3. 学生の更新が成功した場合だけ、コース側を更新
     courseRepository.deleteCoursesByStudentId(student.getStudentId());
     if (courses != null && !courses.isEmpty()) {
       courseRepository.insertCourses(courses);
@@ -68,9 +75,25 @@ public class StudentServiceImpl implements StudentService {
   @Override
   @Transactional
   public void partialUpdateStudent(Student student, List<StudentCourse> courses) {
-    studentRepository.updateStudent(student);
+    Objects.requireNonNull(student, "student must not be null");
+
+    byte[] studentId = student.getStudentId();
+    if (studentId == null || studentId.length != 16) {
+      throw new IllegalArgumentException("UUIDの形式が不正です");
+    }
+
+    int updated = studentRepository.updateStudent(student);
+    if (updated == 0) {
+      String idForLog = converter.encodeUuidString(studentId);
+      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
+    }
+
     if (courses != null && !courses.isEmpty()) {
-      courseRepository.deleteCoursesByStudentId(student.getStudentId());
+      // 念のため studentId を統一
+      for (StudentCourse c : courses) {
+        c.setStudentId(studentId);
+      }
+      courseRepository.deleteCoursesByStudentId(studentId);
       courseRepository.insertCourses(courses);
     }
   }
@@ -99,7 +122,18 @@ public class StudentServiceImpl implements StudentService {
   @Override
   @Transactional
   public void updateStudentInfoOnly(Student student) {
-    studentRepository.updateStudent(student);
+    Objects.requireNonNull(student, "student must not be null");
+
+    byte[] studentId = student.getStudentId();
+    if (studentId == null || studentId.length != 16) {
+      throw new IllegalArgumentException("UUIDの形式が不正です");
+    }
+
+    int updated = studentRepository.updateStudent(student);
+    if (updated == 0) {
+      String idForLog = converter.encodeUuidString(studentId);
+      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
+    }
   }
 
   /**
@@ -191,7 +225,12 @@ public class StudentServiceImpl implements StudentService {
     // すでに論理削除済みでなければ、削除処理を行う
     if (!Boolean.TRUE.equals(student.getDeleted())) {
       student.softDelete();
-      studentRepository.updateStudent(student);
+      int updated = studentRepository.updateStudent(student);
+      if (updated == 0) {
+        // ここは通常起こりにくいが、整合性の保険として
+        throw new IllegalStateException("論理削除に失敗しました: " +
+            converter.encodeUuidString(studentId));
+      }
       log.info("論理削除完了 - studentId: {}", converter.encodeUuidString(studentId));
     }
   }
@@ -220,12 +259,15 @@ public class StudentServiceImpl implements StudentService {
 
     if (Boolean.TRUE.equals(student.getDeleted())) {
       student.restore();
-      studentRepository.updateStudent(student);
+      int updated = studentRepository.updateStudent(student);
       log.debug(
           "After restore: studentId = {}, deleted = {}, deletedAt = {}",
           idForLog,
           student.getDeleted(),
           student.getDeletedAt());
+      if (updated == 0) {
+        throw new IllegalStateException("復元に失敗しました: " + idForLog);
+      }
     }
   }
 
@@ -241,14 +283,19 @@ public class StudentServiceImpl implements StudentService {
   @Transactional
   public void forceDeleteStudent(byte[] studentId) {
     String idForLog = converter.encodeUuidString(studentId);
-    // 存在確認
-    if (studentRepository.findById(studentId) == null) {
+    // 1. 先にコースを削除（存在しないIDなら 0件削除で終わるだけ）
+    courseRepository.deleteCoursesByStudentId(studentId);
+
+    // 2. 物理削除して、削除件数を受け取る
+    int deleted = studentRepository.forceDeleteStudent(studentId);
+
+    // 3. 1件も削除されなければ「存在しないID」と判断
+    if (deleted == 0) {
+      // Transactional によりコース削除もロールバックされるので、副作用は残らない
       throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
     }
-    // 関連するコースも削除
-    courseRepository.deleteCoursesByStudentId(studentId);
-    // 学生レコードの物理削除
-    studentRepository.forceDeleteStudent(studentId);
+
+    // 4. 正常に1件削除された場合はログを出して終了
     log.info("物理削除完了 - studentId: {}", idForLog);
   }
 
@@ -264,16 +311,14 @@ public class StudentServiceImpl implements StudentService {
       throw new IllegalArgumentException("studentId must not be null");
     }
 
-    // 1) 存在確認（StudentRepository#findById は null返し仕様）
-    Student present = studentRepository.findById(studentId);
-    if (present == null) {
-      throw new ResourceNotFoundException("student", "studentId");
+    // 1) いきなり UPDATE して件数を見る
+    int updatedCount = studentRepository.updateStudent(student);
+    if (updatedCount == 0) {
+      String idForLog = converter.encodeUuidString(studentId);
+      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
     }
 
-    // 2) 学生本体の更新（メソッド名は updateStudent）
-    studentRepository.updateStudent(student);
-
-    // 3) コース全削除 → 一括Insert（メソッド名：deleteCoursesByStudentId / insertCourses）
+    // 2) コース全削除 → 一括Insert（メソッド名：deleteCoursesByStudentId / insertCourses）
     courseRepository.deleteCoursesByStudentId(studentId);
     if (courses != null && !courses.isEmpty()) {
       for (StudentCourse sc : courses) {
@@ -282,7 +327,7 @@ public class StudentServiceImpl implements StudentService {
       courseRepository.insertCourses(courses);
     }
 
-    // 4) 最新の学生を再取得（null返し仕様に合わせる）
+    // 3) 最新の学生を再取得（null返し仕様に合わせる）
     Student updated = studentRepository.findById(studentId);
     if (updated == null) {
       // 直前で更新しているので通常起きないが、整合性確保のため
