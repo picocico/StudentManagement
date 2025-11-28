@@ -139,15 +139,15 @@ class StudentConverterTest {
       when(idCodec.encodeId(invalidLengthBytes))
           .thenThrow(new IllegalArgumentException("UUIDの形式が不正です"));
 
-      // 特定の例外（IllegalArgumentException）がスローされることを確認
+      // 特定の例外（InvalidIdFormatException）がスローされることを確認
       // （このチェックは Converter 側で行っているので、IdCodec のモックは不要）
       assertThatThrownBy(() -> converter.encodeUuidString(invalidLengthBytes))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("UUIDの形式");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDの形式が不正です（UUIDバイト長が不正など）");
     }
 
     /**
-     * {@link StudentConverter#decodeUuidToBytesOrThrow(String)} が 正常な UUID 文字列を正しくバイト配列へ復元し、
+     * {@link StudentConverter#decodeUuidStringToBytesOrThrow(String)} が 正常な UUID 文字列を正しくバイト配列へ復元し、
      * {@link IdCodec#decodeUuidBytesOrThrow(String)} に委譲していることを検証します。
      */
     @Test
@@ -156,7 +156,7 @@ class StudentConverterTest {
       String uuidString = FIXED_UUID_STRING; // "123e4567-e89b-12d3-a456-426614174000" など
       when(idCodec.decodeUuidBytesOrThrow(uuidString)).thenReturn(FIXED_UUID_BYTES);
 
-      byte[] resultBytes = converter.decodeUuidToBytesOrThrow(uuidString);
+      byte[] resultBytes = converter.decodeUuidStringToBytesOrThrow(uuidString);
       // バイト配列の内容が一致することを確認
       assertThat(resultBytes).containsExactly(FIXED_UUID_BYTES);
     }
@@ -171,7 +171,7 @@ class StudentConverterTest {
       when(idCodec.decodeUuidBytesOrThrow(invalid))
           .thenThrow(new IllegalArgumentException("dummy"));
 
-      assertThatThrownBy(() -> converter.decodeUuidToBytesOrThrow(invalid))
+      assertThatThrownBy(() -> converter.decodeUuidStringToBytesOrThrow(invalid))
           .isInstanceOf(InvalidIdFormatException.class)
           .hasMessageContaining("（UUID）"); // メッセージは実装に合わせて
     }
@@ -293,11 +293,11 @@ class StudentConverterTest {
 
     /**
      * {@link StudentConverter#toDto(Student)} において、学生 ID が 16 バイト未満の場合、 内部で呼び出される
-     * {@link IdCodec#encodeId(byte[])} が {@link IllegalArgumentException} を投げ、
-     * その例外がコンバータからも伝播することを検証します。
+     * {@link IdCodec#encodeId(byte[])} が {@link IllegalArgumentException} を投げ、 それが
+     * {@link InvalidIdFormatException} にラップされてコンバータから伝播することを検証します。
      */
     @Test
-    void toDto_Student_異常系_ID長が16バイトでない場合にIllegalArgumentExceptionがスローされること() {
+    void toDto_Student_異常系_ID長が16バイトでない場合にInvalidIdFormatExceptionがスローされること() {
       // 💡 異常系データ: 15バイトのIDを持つバイト配列を作成
       byte[] invalid = new byte[]{
           0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
@@ -316,8 +316,8 @@ class StudentConverterTest {
 
       // toDtoメソッドは内部でencodeIdを呼び出し、ID長が16バイトでないため例外が発生する
       assertThatThrownBy(() -> converter.toDto(input))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("UUIDの形式");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDの形式が不正です");
 
       // ★ ちゃんと IdCodec が呼ばれていることも確認しておくと安心
       verify(idCodec).encodeId(invalid);

@@ -37,11 +37,11 @@ import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.exception.EmptyObjectException;
+import raisetech.student.management.exception.InvalidIdFormatException;
 import raisetech.student.management.exception.MissingParameterException;
 import raisetech.student.management.exception.ResourceNotFoundException;
 import raisetech.student.management.exception.dto.ErrorResponse;
 import raisetech.student.management.service.StudentService;
-import raisetech.student.management.util.IdCodec;
 import raisetech.student.management.web.RawBodyCaptureFilter;
 import raisetech.student.management.web.RawBodyCaptureFilter.RawBodyState;
 
@@ -53,7 +53,6 @@ import raisetech.student.management.web.RawBodyCaptureFilter.RawBodyState;
  *
  * <p>受講生 ID は、DB では UUID/BINARY(16)（{@code byte[16]}）として保持し、
  * API では標準的な UUID 文字列表現 （例: {@code 123e4567-e89b-12d3-a456-426614174000}）で受け渡します。
- * 文字列表現とバイト配列の相互変換は{@link IdCodec} に委譲します。
  */
 @Slf4j
 @RestController
@@ -62,8 +61,6 @@ import raisetech.student.management.web.RawBodyCaptureFilter.RawBodyState;
 @RequiredArgsConstructor
 @Tag(name = "受講生API", description = "受講生のCRUDおよび検索・復元操作")
 public class StudentController {
-
-  private final IdCodec idCodec;
 
   /**
    * 受講生サービス
@@ -140,7 +137,7 @@ public class StudentController {
    */
   @Operation(
       summary = "受講生一覧検索",
-      description = "受講生の一覧をふりがな検索・削除状態を条件に取得します。",
+      description = "受講生の一覧をふりがな検索・削除状態を条件に取得します。（該当者なしの場合は空配列を返します）",
       parameters = {
           @Parameter(name = "furigana", description = "ふりがなで部分一致検索（任意）"),
           @Parameter(name = "includeDeleted", description = "論理削除済みも含める（デフォルト: false)"),
@@ -153,7 +150,13 @@ public class StudentController {
               content = @Content(
                   array = @io.swagger.v3.oas.annotations.media.ArraySchema(
                       schema = @Schema(implementation = StudentDetailDto.class)
-                  )))
+
+                  ))),
+          @ApiResponse(
+              responseCode = "400",
+              description = "クエリパラメータ形式不正（boolean として解釈できない値、"
+                  + "または includeDeleted と deletedOnly の同時指定など）",
+              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @GetMapping
   public ResponseEntity<List<StudentDetailDto>> getStudentList(
@@ -184,7 +187,9 @@ public class StudentController {
       parameters =
       @Parameter(
           name = "studentId",
-          description = "UUID文字列表現の受講生ID（例: 123e4567-e89b-12d3-a456-426614174000）",
+          description = "受講生ID（UUID形式）",
+          example = "123e4567-e89b-12d3-a456-426614174000",
+          schema = @Schema(type = "string", format = "uuid"),
           required = true
       ),
       responses = {
@@ -193,6 +198,10 @@ public class StudentController {
               description = "詳細取得成功",
               content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
           @ApiResponse(
+              responseCode = "400",
+              description = "ID形式不正（UUIDとして不正など）",
+              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+          @ApiResponse(
               responseCode = "404",
               description = "該当する受講生が存在しない",
               content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
@@ -200,7 +209,7 @@ public class StudentController {
   @GetMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> getStudentDetail(@PathVariable String studentId) {
     log.debug("GET - Fetching student detail: {}", studentId);
-    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
+    byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
 
     Student student = service.findStudentById(studentIdBytes);
     List<StudentCourse> courses = service.searchCoursesByStudentId(studentIdBytes);
@@ -218,9 +227,12 @@ public class StudentController {
   @Operation(
       summary = "受講生情報更新（全体）",
       description = "受講生情報とコース情報を全て更新します。",
-      parameters = @Parameter(
+      parameters =
+      @Parameter(
           name = "studentId",
-          description = "UUID文字列表現の受講生ID（例: 123e4567-e89b-12d3-a456-426614174000）",
+          description = "受講生ID（UUID形式）",
+          example = "123e4567-e89b-12d3-a456-426614174000",
+          schema = @Schema(type = "string", format = "uuid"),
           required = true
       ),
       requestBody =
@@ -255,7 +267,7 @@ public class StudentController {
     }
 
     // 1) IDデコード（UUID文字列として不正な場合は InvalidIdFormatException → E006）
-    final byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
+    final byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
 
     // 2) 変換（@Valid 済みなのでここに到達している）
     final Student toUpdate = converter.toEntity(req.getStudent());
@@ -290,7 +302,14 @@ public class StudentController {
   @Operation(
       summary = "受講生情報更新（部分）",
       description = "指定項目のみ受講生情報を部分的に更新します。appendCourses=trueの場合はコース追加。",
-      parameters = @Parameter(name = "studentId", description = "部分更新対象の受講生ID", required = true),
+      parameters =
+      @Parameter(
+          name = "studentId",
+          description = "部分更新対象の受講生ID（UUID形式）",
+          example = "123e4567-e89b-12d3-a456-426614174000",
+          schema = @Schema(type = "string", format = "uuid"),
+          required = true
+      ),
       requestBody =
       @io.swagger.v3.oas.annotations.parameters.RequestBody(
           description = "部分更新する受講生情報＋（オプション）コース情報",
@@ -351,7 +370,7 @@ public class StudentController {
       final boolean noRawBody = (rawLen <= 0L);
 
       if (noRawBody && (body == null || body.isEmpty())) {
-        throw new MissingParameterException("リクエストボディは必須です。"); // E001
+        throw new MissingParameterException("リクエストボディは必須です。"); // E003
       }
       if (explicitEmptyObject || (body != null && body.isEmpty())) {
         throw new EmptyObjectException("更新対象のフィールドがありません"); // E003
@@ -367,7 +386,7 @@ public class StudentController {
     }
 
     // 2) UUID文字列 → BINARY(16)
-    final byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
+    final byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
 
     // 3) Map → DTO
     final StudentRegistrationRequest req =
@@ -408,7 +427,7 @@ public class StudentController {
   /**
    * 受講生情報を論理削除します。
    *
-   * <p>UUID文字列表現の受講生 ID を {@link IdCodec} で UUID/BINARY(16) にデコードし、
+   * <p>UUID文字列表現の受講生 ID を アプリ内部で扱う UUID/BINARY(16)（byte[16]）にデコードし、
    * 対応するレコードの is_deleted フラグと deleted_at を更新します。
    *
    * @param studentId 論理削除対象の受講生ID（UUID文字列表現）
@@ -416,9 +435,22 @@ public class StudentController {
   @Operation(
       summary = "受講生論理削除",
       description = "指定された受講生を論理削除(is_deleted=true,deleted_at更新)します。",
-      parameters = @Parameter(name = "studentId", description = "論理削除対象の受講生ID", required = true),
+      parameters =
+      @Parameter(
+          name = "studentId",
+          description = "論理削除対象の受講生ID（UUID形式）",
+          example = "123e4567-e89b-12d3-a456-426614174000",
+          schema = @Schema(type = "string", format = "uuid"),
+          required = true
+      ),
       responses = {
-          @ApiResponse(responseCode = "204", description = "削除成功"),
+          @ApiResponse(
+              responseCode = "204",
+              description = "削除成功"),
+          @ApiResponse(
+              responseCode = "400",
+              description = "ID形式不正（UUIDとして不正など）",
+              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
           @ApiResponse(
               responseCode = "404",
               description = "対象受講生が存在しない",
@@ -427,7 +459,8 @@ public class StudentController {
   @DeleteMapping("/{studentId}")
   public ResponseEntity<Void> deleteStudent(@PathVariable String studentId) {
     log.debug("DELETE - Logically deleting student: {}", studentId);
-    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId); // ← UUID文字列から byte[16] へ変換
+    byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(
+        studentId); // ← UUID文字列から byte[16] へ変換
     service.softDeleteStudent(studentIdBytes);
     return ResponseEntity.noContent().build();
   }
@@ -441,9 +474,22 @@ public class StudentController {
   @Operation(
       summary = "論理削除からの復元",
       description = "論理削除された受講生を復元します。",
-      parameters = @Parameter(name = "studentId", description = "復元対象の受講生ID", required = true),
+      parameters =
+      @Parameter(
+          name = "studentId",
+          description = "復元対象の受講生ID（UUID形式）",
+          example = "123e4567-e89b-12d3-a456-426614174000",
+          schema = @Schema(type = "string", format = "uuid"),
+          required = true
+      ),
       responses = {
-          @ApiResponse(responseCode = "204", description = "復元成功"),
+          @ApiResponse(
+              responseCode = "204",
+              description = "復元成功"),
+          @ApiResponse(
+              responseCode = "400",
+              description = "ID形式不正（UUIDとして不正など）",
+              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
           @ApiResponse(
               responseCode = "404",
               description = "対象受講生が存在しない、または未削除",
@@ -452,7 +498,7 @@ public class StudentController {
   @PatchMapping("/{studentId}/restore")
   public ResponseEntity<Void> restoreStudent(@PathVariable String studentId) {
     log.debug("PATCH - Restoring student: {}", studentId);
-    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
+    byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
     service.restoreStudent(studentIdBytes);
     return ResponseEntity.noContent().build();
   }
@@ -503,7 +549,7 @@ public class StudentController {
   @GetMapping("/test-type")
   public ResponseEntity<String> testTypeMismatch(@RequestParam Integer id) {
     if (id == null) {
-      throw new IllegalArgumentException("IDは整数で指定してください");
+      throw new InvalidIdFormatException("IDは整数で指定してください");
     }
     System.out.println("★★ Controller reached with id: " + id);
     return ResponseEntity.ok("受け取った ID: " + id);

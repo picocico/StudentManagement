@@ -1,18 +1,11 @@
 package raisetech.student.management.config;
 
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
-
-import java.util.UUID;
-
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.service.StudentService;
-import raisetech.student.management.util.IdCodec;
 
 /**
  * {@code @TestConfiguration} for {@code @WebMvcTest} - Controller単体の HTTP
@@ -36,12 +29,4 @@ public class TestMockConfig {
     return Mockito.mock(StudentConverter.class);
   }
 
-  @Bean
-  @Primary
-  IdCodec idCodec() {
-    var m = Mockito.mock(IdCodec.class);
-    when(m.decodeUuidBytesOrThrow(anyString())).thenReturn(new byte[16]);
-    when(m.decodeUuidOrThrow(anyString())).thenReturn(new UUID(0, 1));
-    return m;
-  }
 }

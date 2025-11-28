@@ -59,9 +59,9 @@ public interface IdCodec {
    * <p>引数が {@code null} の場合は {@code null} を返します。
    * それ以外で 16 バイト以外の長さの配列が渡された場合は {@link IllegalArgumentException} をスローします。
    *
-   * @param id UUID を表す 16 バイト配列（または {@code null}）
-   * @return UUID 文字列表現、または入力が {@code null} の場合は {@code null}
-   * @throws IllegalArgumentException 引数が 16 バイト以外の長さの配列である場合
+   * @param id UUID を表す 16 バイト配列、null や 16 バイト以外は許可しない。
+   * @return UUID 文字列表現
+   * @throws IllegalArgumentException 引数が null または 16 バイト以外の場合
    */
   String encodeId(byte[] id);
 

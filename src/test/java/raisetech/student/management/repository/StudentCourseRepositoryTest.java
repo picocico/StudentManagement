@@ -27,7 +27,7 @@ public class StudentCourseRepositoryTest {
    * テスト用の受講生を1件INSERTし、そのstudent_id(byte[16])を返すヘルパー。
    */
   private byte[] insertTestStudentAndReturnId() {
-    byte[] id = UUIDUtil.fromUUID(UUID.randomUUID());
+    byte[] id = UUIDUtil.toBytes(UUID.randomUUID());
 
     Student s = new Student();
     s.setStudentId(id);
@@ -51,7 +51,7 @@ public class StudentCourseRepositoryTest {
   private StudentCourse newCourse(byte[] studentId, String courseName,
       LocalDate start, LocalDate end) {
     StudentCourse c = new StudentCourse();
-    c.setCourseId(UUIDUtil.fromUUID(UUID.randomUUID()));
+    c.setCourseId(UUIDUtil.toBytes(UUID.randomUUID()));
     c.setStudentId(studentId);
     c.setCourseName(courseName);
     c.setStartDate(start);   // ★ここが今回のポイント
@@ -127,7 +127,7 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void insertCourses_存在しない受講生IDを指定した場合はDataIntegrityViolationException() {
-    byte[] nonExistingStudentId = UUIDUtil.fromUUID(UUID.randomUUID());
+    byte[] nonExistingStudentId = UUIDUtil.toBytes(UUID.randomUUID());
 
     // NOT NULL をすべて満たした上で FK だけ不正にする
     StudentCourse c = newCourse(
@@ -207,7 +207,7 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void deleteCoursesByStudentId_該当コースが無いIDでも例外にならないこと() {
-    byte[] nonExistingStudentId = UUIDUtil.fromUUID(UUID.randomUUID());
+    byte[] nonExistingStudentId = UUIDUtil.toBytes(UUID.randomUUID());
 
     int beforeSize = sut.findAllCourses().size();
 

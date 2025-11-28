@@ -32,8 +32,8 @@ import raisetech.student.management.util.IdCodec;
  *
  * <p>このクラスでは、UUID 文字列表現と内部の {@code byte[16]} の変換は
  * {@link IdCodec} に委譲し、UUID 文字列として不正な入力に対しては
- * {@link InvalidIdFormatException} へラップしてスローします。
- * 例えば、{@link #decodeUuidToBytesOrThrow(String)} は不正な UUID 文字列を
+ * {@link InvalidIdFormatException} にラップしてスローします。
+ * 例えば、{@link #decodeUuidStringToBytesOrThrow(String)} は不正な UUID 文字列を
  * {@link InvalidIdFormatException} に変換します。
  */
 @Component
@@ -48,38 +48,42 @@ public class StudentConverter {
   // ------------------------------------------------------------
 
   /**
-   * UUID の 16バイト配列を API 向けの UUID 文字列に変換します。
+   * UUID の 16 バイト配列を標準的な UUID 文字列表現に変換します。
    *
-   * <p>長さチェック（16バイトかどうか）は {@link IdCodec#encodeId(byte[])} が行います。
-   * このメソッドでは null をそのまま null として返します。
+   * <p>内部では {@link IdCodec#encodeId(byte[])} を呼び出し、
+   * ここで発生した {@link IllegalArgumentException} は {@link InvalidIdFormatException} にラップしてスローします。
    *
-   * @param bytes エンコード対象のバイナリ（通常は UUID の生16バイト）
+   * @param bytes エンコード対象のバイト列（通常は UUID の生 16 バイト）。 {@code null} の場合は変換を行わず {@code null} を返します。
    * @return UUID 文字列表現。{@code bytes} が {@code null} の場合は {@code null}
-   * @throws IllegalArgumentException {@code bytes} が16バイト以外の場合（IdCodec 側で判定）
+   * @throws InvalidIdFormatException {@code bytes} の長さが 16 バイト以外など、 ID の形式が不正な場合
    */
   public String encodeUuidString(byte[] bytes) {
     if (bytes == null) {
-      return null;
+      throw new InvalidIdFormatException("IDはnullにできません（UUIDバイト配列）");
     }
-    // 長さチェックは IdCodec#encodeId に委譲する
-    return idCodec.encodeId(bytes); // 標準的な UUID 文字列表現を返す
+    try {
+      // 長さチェックは IdCodec#encodeId に委譲する
+      return idCodec.encodeId(bytes); // 標準的な UUID 文字列表現を返す
+    } catch (IllegalArgumentException e) {
+      // バイト長が16ではないなどのケースをラップして、Controller側には InvalidIdFormatException だけ見せる
+      throw new InvalidIdFormatException("IDの形式が不正です（UUIDバイト長が不正など）", e);
+    }
   }
 
   /**
-   * UUID 文字列表現をデコードして UUID 由来の16バイト配列に変換します。
+   * UUID 文字列表現をデコードして UUID 由来の 16 バイト配列に変換します。
    *
    * @param uuidString UUID の文字列表現
-   * @return 復元された16バイト配列
-   * @throws InvalidIdFormatException UUID 文字列として不正な場合（「（UUID）」）
+   * @return 復元された 16 バイト配列
+   * @throws InvalidIdFormatException UUID 文字列表現が {@code null} または形式不正な場合
    */
-  public byte[] decodeUuidToBytesOrThrow(String uuidString) {
+  public byte[] decodeUuidStringToBytesOrThrow(String uuidString) {
     try {
       return idCodec.decodeUuidBytesOrThrow(uuidString);
     } catch (IllegalArgumentException e) {
       // IdCodec 側は IllegalArgumentException を投げる前提にしておいて、
       // ここで「ドメイン例外」にラップすることで、
       // 既存の InvalidIdFormatException を維持
-      // Base64として不正 → （Base64）
       throw new InvalidIdFormatException("IDの形式が不正です（UUID）", e);
     }
   }
@@ -103,9 +107,9 @@ public class StudentConverter {
    * <p>{@code dto.studentId} が未指定（null または空文字）の場合は、新規にランダムUUIDを採番し、
    * その生16バイトをセットします。
    *
-   * @param dto 受講生DTO（IDは Base64 文字列）
+   * @param dto 受講生DTO
    * @return 受講生エンティティ（IDは生16バイト）
-   * @throws IllegalArgumentException UUID 文字列表現として不正な場合
+   * @throws InvalidIdFormatException UUID 文字列表現として不正な場合
    */
   public Student toEntity(StudentDto dto) {
     byte[] studentId =
@@ -132,9 +136,12 @@ public class StudentConverter {
   /**
    * {@link Student} エンティティから {@link StudentDto} に変換します。
    *
+   * <p>エンティティが保持する受講生ID（16バイトの UUID/BINARY(16)）を
+   * {@link IdCodec} を通じて UUID 文字列表現へ変換し、DTO にマッピングします。
+   *
    * @param entity 受講生エンティティ
-   * @return 受講生DTO（IDは UUID 文字列）
-   * @throws IllegalArgumentException IDバイト長が16以外の場合
+   * @return 受講生DTO（IDは UUID 文字列表現）
+   * @throws InvalidIdFormatException エンティティに保持されている ID のバイト長が 16 バイト以外など、ID の形式が不正な場合
    */
   public StudentDto toDto(Student entity) {
     return new StudentDto(
@@ -157,23 +164,24 @@ public class StudentConverter {
   /**
    * {@link StudentCourseDto} から {@link StudentCourse} エンティティに変換します。
    *
-   * <p>{@code dto.courseId} が未指定なら新規採番し、{@code studentId} は UUID 文字列としてデコードし紐付けます。
+   * <p>{@code dto.courseId} が未指定なら新規採番し、
+   * {@code studentId} は UUID 文字列としてデコードして紐付けます。
    *
-   * @param dto       コースDTO（IDは UUID 文字列）
-   * @param studentId 受講生ID（UUID 文字列）
+   * @param dto       コースDTO（IDは UUID 文字列表現）
+   * @param studentId 受講生ID（UUID 文字列表現）
    * @return コースエンティティ（IDは生16バイト）
-   * @throws IllegalArgumentException UUID 文字列として不正な場合
+   * @throws InvalidIdFormatException UUID 文字列として不正な場合
    */
   @SuppressWarnings("unused")
   public StudentCourse toEntity(StudentCourseDto dto, String studentId) {
     byte[] courseId =
         Optional.ofNullable(dto.getCourseId())
             .filter(id -> !id.isBlank())
-            .map(idCodec::decodeUuidBytesOrThrow)// ★ 16バイトチェック付き
+            .map(this::decodeUuidStringToBytesOrThrow) //ラッパー経由で必ずInvalidIdFormatExceptionが飛ぶ
             .orElseGet(idCodec::generateNewIdBytes);
 
     // studentId: パスから渡されるIDなので、必ず UUID 16バイトであることを保証する
-    byte[] studentIdBytes = idCodec.decodeUuidBytesOrThrow(studentId);
+    byte[] studentIdBytes = decodeUuidStringToBytesOrThrow(studentId); // ★ ここもラッパー経由
 
     return new StudentCourse(
         courseId,
@@ -188,12 +196,10 @@ public class StudentConverter {
   /**
    * コースDTOのリストをエンティティリストに変換します。
    *
-   * <p>各 {@code dto.courseId} が未指定なら新規採番し、{@code studentId} を紐付けます。
-   *
    * @param dtoList   コースDTO一覧
    * @param studentId 紐付け先の受講生ID（生16バイト）
    * @return コースエンティティ一覧
-   * @throws InvalidIdFormatException Base64不正なIDが含まれる場合（「（Base64）」）
+   * @throws InvalidIdFormatException いずれかの ID の形式が不正な場合
    */
   public List<StudentCourse> toEntityList(List<StudentCourseDto> dtoList, byte[] studentId) {
     return dtoList.stream()
@@ -219,8 +225,8 @@ public class StudentConverter {
    * {@link StudentCourse} エンティティから {@link StudentCourseDto} に変換します。
    *
    * @param entity コースエンティティ
-   * @return コースDTO（IDは Base64 文字列）
-   * @throws IllegalArgumentException IDバイト長が16以外の場合
+   * @return コースDTO（IDは UUID 文字列表現）
+   * @throws InvalidIdFormatException エンティティに保持されている ID のバイト長が 16 バイト以外など、 ID の形式が不正な場合
    */
   public StudentCourseDto toDto(StudentCourse entity) {
     return new StudentCourseDto(
@@ -235,7 +241,7 @@ public class StudentConverter {
    *
    * @param entities コースエンティティ一覧
    * @return コースDTO一覧
-   * @throws IllegalArgumentException いずれかのIDが16バイト以外の場合
+   * @throws InvalidIdFormatException いずれかの ID の形式が不正な場合
    */
   public List<StudentCourseDto> toDtoList(List<StudentCourse> entities) {
     return entities.stream().map(this::toDto).collect(Collectors.toList());
@@ -248,12 +254,12 @@ public class StudentConverter {
   /**
    * 受講生とコースから詳細DTOを作成します。
    *
-   * <p>受講生ID・コースIDは UUID 文字列として詰められます。
+   * <p>受講生ID・コースIDは UUID 文字列表現として詰められます。
    *
    * @param student 受講生エンティティ
    * @param courses コースエンティティ一覧
    * @return 詳細DTO
-   * @throws IllegalArgumentException IDが16バイト以外の場合
+   * @throws InvalidIdFormatException ID の形式が不正な場合
    */
   public StudentDetailDto toDetailDto(Student student, List<StudentCourse> courses) {
     StudentDto studentDto = toDto(student);
@@ -305,7 +311,7 @@ public class StudentConverter {
    * @param students 受講生エンティティ一覧
    * @param courses  全コースエンティティ一覧
    * @return 詳細DTO一覧
-   * @throws IllegalArgumentException いずれかのIDが16バイト以外の場合
+   * @throws InvalidIdFormatException ID の形式が不正な場合
    */
   public List<StudentDetailDto> toDetailDtoList(
       List<Student> students, List<StudentCourse> courses) {

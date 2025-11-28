@@ -1,5 +1,6 @@
 package raisetech.student.management.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
@@ -13,6 +14,7 @@ import raisetech.student.management.dto.StudentRegistrationRequest;
 // Note: このエンドポイントは @Profile("test") のみで有効。
 // 本番プロファイルではコンテナに登録されない（副作用防止）。
 @Profile("test") // ← test プロファイルでのみ有効
+@Tag(name = "デバッグ用API")
 @RestController
 @RequestMapping("/api/students")
 public class DebugStudentController {

@@ -20,11 +20,11 @@ public class UUIDUtilTest {
       java.util.UUID.fromString("12345678-9abc-def0-1234-56789abcdef0");
 
   @Nested
-  class FromUUIDTest {
+  class toBytesTest {
 
     @Test
-    void fromUUID_正常系_16バイト配列に変換できること() {
-      byte[] bytes = UUIDUtil.fromUUID(FIXED_UUID);
+    void toBytes_正常系_16バイト配列に変換できること() {
+      byte[] bytes = UUIDUtil.toBytes(FIXED_UUID);
 
       // 16バイトであること
       assertThat(bytes)
@@ -32,43 +32,43 @@ public class UUIDUtilTest {
           .hasSize(16);
 
       // 往復させると同じ UUID に戻ること
-      UUID restored = UUIDUtil.toUUID(bytes);
+      UUID restored = UUIDUtil.fromBytes(bytes);
       assertThat(restored).isEqualTo(FIXED_UUID);
     }
   }
 
   @Test
-  void fromUUID_異常系_nullを渡すとIllegalArgumentExceptionがスローされること() {
-    assertThatThrownBy(() -> UUIDUtil.fromUUID(null))
+  void toBytes_異常系_nullを渡すとIllegalArgumentExceptionがスローされること() {
+    assertThatThrownBy(() -> UUIDUtil.toBytes(null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("UUIDはnullにできません");
   }
 
   @Nested
-  class ToUUIDTest {
+  class fromBytesTest {
 
     @Test
-    void toUUID_正常系_16バイト配列からUUIDに復元できること() {
+    void fromBytes_正常系_16バイト配列からUUIDに復元できること() {
       // まず fromUUID で 16バイト配列を作る
-      byte[] bytes = UUIDUtil.fromUUID(FIXED_UUID);
+      byte[] bytes = UUIDUtil.toBytes(FIXED_UUID);
 
-      UUID result = UUIDUtil.toUUID(bytes);
+      UUID result = UUIDUtil.fromBytes(bytes);
 
       assertThat(result).isEqualTo(FIXED_UUID);
     }
 
     @Test
-    void toUUID_異常系_nullを渡すとIllegalArgumentExceptionがスローされること() {
-      assertThatThrownBy(() -> UUIDUtil.toUUID(null))
+    void fromBytes_異常系_nullを渡すとIllegalArgumentExceptionがスローされること() {
+      assertThatThrownBy(() -> UUIDUtil.fromBytes(null))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("UUIDの形式が不正です");
     }
 
     @Test
-    void toUUID_異常系_16バイト以外の配列を渡すとIllegalArgumentExceptionがスローされること() {
+    void fromBytes_異常系_16バイト以外の配列を渡すとIllegalArgumentExceptionがスローされること() {
       byte[] invalid = new byte[4];
 
-      assertThatThrownBy(() -> UUIDUtil.toUUID(invalid))
+      assertThatThrownBy(() -> UUIDUtil.fromBytes(invalid))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("UUIDの形式が不正です");
     }

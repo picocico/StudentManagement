@@ -35,7 +35,7 @@ public class StudentRepositoryTest {
       String gender,
       String remarks
   ) {
-    byte[] id = UUIDUtil.fromUUID(UUID.randomUUID());
+    byte[] id = UUIDUtil.toBytes(UUID.randomUUID());
 
     Student s = new Student();
     s.setStudentId(id);
@@ -167,7 +167,7 @@ public class StudentRepositoryTest {
   @Test
   void findById_存在しないIDの場合はnullが返ること() {
     UUID unused = UUID.randomUUID();
-    byte[] unusedId = UUIDUtil.fromUUID(unused);
+    byte[] unusedId = UUIDUtil.toBytes(unused);
 
     Student actual = sut.findById(unusedId);
 
@@ -216,7 +216,7 @@ public class StudentRepositoryTest {
   @Test
   void updateStudent_存在しないIDの場合は0件更新となること() {
     // 未使用っぽい ID を生成
-    byte[] unusedId = UUIDUtil.fromUUID(UUID.randomUUID());
+    byte[] unusedId = UUIDUtil.toBytes(UUID.randomUUID());
 
     Student student = new Student();
     student.setStudentId(unusedId);
@@ -276,7 +276,7 @@ public class StudentRepositoryTest {
 
   @Test
   void forceDeleteStudent_存在しないIDの場合は0件削除となること() {
-    byte[] unusedId = UUIDUtil.fromUUID(UUID.randomUUID());
+    byte[] unusedId = UUIDUtil.toBytes(UUID.randomUUID());
 
     int deleted = sut.forceDeleteStudent(unusedId);
 
@@ -289,7 +289,7 @@ public class StudentRepositoryTest {
 
     StudentCourse course = new StudentCourse();
     course.setStudentId(id);
-    course.setCourseId(UUIDUtil.fromUUID(UUID.randomUUID()));
+    course.setCourseId(UUIDUtil.toBytes(UUID.randomUUID()));
     course.setCourseName("Javaコース");
     course.setStartDate(LocalDate.of(2025, 1, 1));
     course.setEndDate(LocalDate.of(2025, 12, 31));

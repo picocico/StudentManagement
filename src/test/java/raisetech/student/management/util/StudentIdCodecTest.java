@@ -3,9 +3,11 @@ package raisetech.student.management.util;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import raisetech.student.management.exception.InvalidIdFormatException;
 
 /**
  * {@link StudentIdCodec} の単体テストクラス。
@@ -28,13 +30,29 @@ public class StudentIdCodecTest {
    * <p>UUID 自体の値はテストの関心事ではなく、再現性のある固定値であればよい前提です。
    */
   private final UUID FIXED_UUID = UUID.fromString("12345678-9abc-def0-1234-56789abcdef0");
-  
+
+  /**
+   * UUID を 16 バイトの配列（BINARY(16)）に変換するテスト用ユーティリティです。
+   *
+   * <p>本番コード側でも、UUID を {@code BINARY(16)} に変換するユーティリティ
+   * （例: {@code UUIDUtil#toBytes(UUID)} 等）が同じ変換を担うことを想定しています。
+   *
+   * @param uuid 変換対象の UUID
+   * @return 引数の UUID を表現する 16 バイト配列
+   */
+  private static byte[] toBytes(UUID uuid) {
+    ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
+    bb.putLong(uuid.getMostSignificantBits());
+    bb.putLong(uuid.getLeastSignificantBits());
+    return bb.array();
+  }
+
   /**
    * FIXED_UUID を BINARY(16) に変換したもの（UUID の生 16 バイト表現）。
    *
    * <p>encode／decode の結果検証に利用します。
    */
-  private final byte[] FIXED_UUID_BYTES = UUIDUtil.fromUUID(FIXED_UUID);
+  private final byte[] FIXED_UUID_BYTES = toBytes(FIXED_UUID);
 
   /**
    * FIXED_UUID の標準的な UUID 文字列表現。
@@ -64,15 +82,15 @@ public class StudentIdCodecTest {
     }
 
     /**
-     * 正常系: 引数に {@code null} を渡した場合に、結果も {@code null} が返されることを検証します。
+     * 正常系: 引数に {@code null} を渡した場合に、{@link IllegalArgumentException} がスローされることを検証します。
      *
-     * <p>「null はそのまま null を返す」という仕様の確認です。
+     * <p>{@code null} は許容されない前提であることをテストで明示します。
      */
     @Test
-    void encodeId_正常系_nullの場合はnullを返すこと() {
-      String result = codec.encodeId(null);
-
-      assertThat(result).isNull();
+    void encodeId_異常系_nullの場合はIllegalArgumentExceptionを投げること() {
+      assertThatThrownBy(() -> codec.encodeId(null))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("IDはnullにできません（UUID）");
     }
 
     /**
@@ -86,7 +104,7 @@ public class StudentIdCodecTest {
 
       assertThatThrownBy(() -> codec.encodeId(invalid))
           .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("UUIDの形式");
+          .hasMessageContaining("IDの形式が不正です");
     }
   }
 
@@ -114,33 +132,33 @@ public class StudentIdCodecTest {
       assertThat(result).hasSize(16);
 
       // 往復させて検証
-      UUID actual = UUIDUtil.toUUID(result);
+      UUID actual = UUIDUtil.fromBytes(result);
       assertThat(actual.toString()).isEqualTo(uuidString);
     }
 
     /**
-     * 異常系: UUID として不正な文字列を渡した場合に、 {@link IllegalArgumentException} がスローされることを検証します。
+     * 異常系: UUID として不正な文字列を渡した場合に、 {@link InvalidIdFormatException} がスローされることを検証します。
      *
      * <p>UUID 形式チェックに失敗したケースのハンドリング確認です。
      */
     @Test
-    void decodeUuidBytesOrThrow_異常系_UUIDとして不正な文字列の場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidBytesOrThrow_異常系_UUIDとして不正な文字列の場合はInvalidIdFormatExceptionがスローされること() {
       String invalid = "%%%invalid-uuid%%%";
 
       assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(invalid))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("(UUID)");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDの形式が不正です（UUID）");
     }
 
     /**
-     * 異常系: 引数が {@code null} の場合に {@link IllegalArgumentException} が スローされることを検証します。
+     * 異常系: 引数が {@code null} の場合に {@link InvalidIdFormatException} が スローされることを検証します。
      *
      * <p>{@code null} は許容されない前提であることをテストで明示します。
      */
     @Test
-    void decodeUuidBytesOrThrow_異常系_nullの場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidBytesOrThrow_異常系_nullの場合はInvalidIdFormatExceptionがスローされること() {
       assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(null))
-          .isInstanceOf(IllegalArgumentException.class);
+          .isInstanceOf(InvalidIdFormatException.class);
     }
   }
 
@@ -165,9 +183,8 @@ public class StudentIdCodecTest {
     void generateNewIdBytes_正常系_16バイト長の配列が返されること() {
       byte[] idBytes = codec.generateNewIdBytes();
 
-      assertThat(idBytes)
-          .isNotNull()
-          .hasSize(16);
+      assertThat(idBytes).isNotNull();
+      assertThat(idBytes).hasSize(16);
     }
   }
 
@@ -194,28 +211,28 @@ public class StudentIdCodecTest {
     }
 
     /**
-     * 異常系: UUID として不正な文字列を渡した場合に、 {@link IllegalArgumentException} がスローされることを検証します。
+     * 異常系: UUID として不正な文字列を渡した場合に、 {@link InvalidIdFormatException} がスローされることを検証します。
      *
      * <p>UUID 形式チェックに失敗した際のエラーハンドリング確認です。
      */
     @Test
-    void decodeUuidOrThrow_異常系_UUIDとして不正な場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidOrThrow_異常系_UUIDとして不正な場合はInvalidIdFormatExceptionがスローされること() {
       String invalid = "###invalid###";
 
       assertThatThrownBy(() -> codec.decodeUuidOrThrow(invalid))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("(UUID)");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDの形式が不正です（UUID）");
     }
 
     /**
-     * 異常系: 引数が {@code null} の場合に、 「null は許容されない」という前提で {@link IllegalArgumentException} が
+     * 異常系: 引数が {@code null} の場合に、 「null は許容されない」という前提で {@link InvalidIdFormatException} が
      * スローされることを検証します。
      */
     @Test
-    void decodeUuidOrThrow_異常系_nullの場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidOrThrow_異常系_nullの場合はInvalidIdFormatExceptionがスローされること() {
       assertThatThrownBy(() -> codec.decodeUuidOrThrow(null))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("studentId(UUID) は null にできません");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDはnullにできません（UUID）");
     }
   }
 
@@ -241,17 +258,17 @@ public class StudentIdCodecTest {
     }
 
     /**
-     * 異常系: UUID として不正な文字列を渡した場合に、 {@link IllegalArgumentException} がスローされることを検証します。
+     * 異常系: UUID として不正な文字列を渡した場合に、 {@link InvalidIdFormatException} がスローされることを検証します。
      *
      * <p>簡易な不正入力パターンに対する防御が機能していることを確認します。
      */
     @Test
-    void decodeUuidBytesOrThrow_異常系_UUIDとして不正な場合はIllegalArgumentExceptionがスローされること() {
+    void decodeUuidBytesOrThrow_異常系_UUIDとして不正な場合はInvalidIdFormatExceptionがスローされること() {
       String invalid = "NG!!";
 
       assertThatThrownBy(() -> codec.decodeUuidBytesOrThrow(invalid))
-          .isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("(UUID)");
+          .isInstanceOf(InvalidIdFormatException.class)
+          .hasMessageContaining("IDの形式が不正です（UUID）");
     }
   }
 }

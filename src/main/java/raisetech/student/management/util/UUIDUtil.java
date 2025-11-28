@@ -4,10 +4,11 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 
 /**
- * UUIDとBase64、byte[]相互の変換を提供するユーティリティクラス。
+ * UUID と byte[16] の相互変換を提供するユーティリティクラス。
  *
- * <p>UUID（128bit）をバイナリ配列（byte[16]）やURLセーフなBase64形式に変換し、 データベース（BINARY(16)）やWeb
- * API（Base64文字列）との整合性を保つために使用されます。
+ * <p>DB では UUID を BINARY(16)（{@code byte[16]}）として保持し、
+ * * アプリケーションや API では UUID 文字列表現（例: {@code 123e4567-e89b-12d3-a456-426614174000}） *
+ * を扱うため、その橋渡しとして利用します。
  */
 public class UUIDUtil {
 
@@ -16,16 +17,18 @@ public class UUIDUtil {
     throw new AssertionError("UUIDUtil should not be instantiated.");
   }
 
+  // ========================
+  // UUID ⇔ byte[16]
+  // ========================
+
   /**
-   * UUIDからbyte[16]（バイナリ形式）に変換します。
+   * UUID から {@code byte[16]}（バイナリ形式）に変換します。
    *
-   * @param uuid UUIDオブジェクト
-   * @return UUIDのバイナリ表現（byte[16]）
+   * @param uuid UUID オブジェクト（null 不可）
+   * @return UUID のバイナリ表現（常に長さ 16 の配列）
+   * @throws IllegalArgumentException {@code uuid} が null の場合
    */
-  /**
-   * UUID -> 16バイト配列
-   */
-  public static byte[] fromUUID(UUID uuid) {
+  public static byte[] toBytes(UUID uuid) {
     if (uuid == null) {
       throw new IllegalArgumentException("UUIDはnullにできません");
     }
@@ -36,13 +39,13 @@ public class UUIDUtil {
   }
 
   /**
-   * byte[16]からUUIDオブジェクトに変換します。
+   * {@code byte[16]} から UUID オブジェクトに変換します。
    *
-   * @param bytes UUIDのバイナリ表現（byte[16]）
-   * @return UUIDオブジェクト
-   * @throws IllegalArgumentException 長さが16バイトでない場合
+   * @param bytes UUID のバイナリ表現（長さ 16 の配列を期待）
+   * @return UUID オブジェクト
+   * @throws IllegalArgumentException {@code bytes} が null または長さ 16 以外の場合
    */
-  public static UUID toUUID(byte[] bytes) {
+  public static UUID fromBytes(byte[] bytes) {
     if (bytes == null || bytes.length != 16) {
       throw new IllegalArgumentException("UUIDの形式が不正です");
     }
