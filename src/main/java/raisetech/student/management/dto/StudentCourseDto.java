@@ -22,7 +22,8 @@ public class StudentCourseDto {
   /**
    * コースID（UUID 文字列表現）。
    *
-   * <p>フロントエンドと通信する際に、BINARY型のUUIDをURLセーフな文字列として扱うために使用されます。
+   * <p>DB では UUID/BINARY(16) で管理し、API との入出力時は
+   * 標準的な UUID 文字列表現（例: 123e4567-e89b-12d3-a456-426614174000）として扱います。
    */
   @Schema(
       description = "コースID（UUID 文字列表現、更新や既存識別用）",

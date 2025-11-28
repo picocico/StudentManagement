@@ -82,15 +82,15 @@ public class StudentIdCodecTest {
     }
 
     /**
-     * 正常系: 引数に {@code null} を渡した場合に、結果も {@code null} が返されることを検証します。
+     * 正常系: 引数に {@code null} を渡した場合に、{@link IllegalArgumentException} がスローされることを検証します。
      *
-     * <p>「null はそのまま null を返す」という仕様の確認です。
+     * <p>{@code null} は許容されない前提であることをテストで明示します。
      */
     @Test
-    void encodeId_正常系_nullの場合はnullを返すこと() {
-      String result = codec.encodeId(null);
-
-      assertThat(result).isNull();
+    void encodeId_異常系_nullの場合はIllegalArgumentExceptionを投げること() {
+      assertThatThrownBy(() -> codec.encodeId(null))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("IDはnullにできません（UUID）");
     }
 
     /**
