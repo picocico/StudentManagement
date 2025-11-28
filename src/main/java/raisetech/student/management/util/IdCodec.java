@@ -3,85 +3,67 @@ package raisetech.student.management.util;
 import java.util.UUID;
 
 /**
- * UUID/BINARY(16) ベースのIDを Base64 文字列と相互変換するためのユーティリティ契約インターフェース。
+ * UUID/BINARY(16) ベースの ID を UUID 文字列表現と相互変換するためのユーティリティ契約インターフェース。
  *
  * <p>契約:
  * <ul>
- *   <li>decodeUuidOrThrow / decodeUuidBytesOrThrow:
- *       <ul>
- *         <li>入力は URL-safe Base64 を前提とする</li>
- *         <li>Base64 として不正、または 16 バイト UUID に復元できない場合は
- *             {@link IllegalArgumentException} をスローする</li>
- *       </ul>
+ *   <li>{@code decodeUuidOrThrow} / {@code decodeUuidBytesOrThrow}:
+ *     <ul>
+ *       <li>入力は標準的な UUID 文字列表現（例: {@code 123e4567-e89b-12d3-a456-426614174000}）を前提とする</li>
+ *       <li>UUID 文字列として不正な場合は {@link IllegalArgumentException} をスローする</li>
+ *     </ul>
  *   </li>
- *   <li>encodeId:
- *       <ul>
- *         <li>引数は UUID/BINARY(16) の 16 バイト配列を前提とする</li>
- *         <li>16 バイト以外が渡された場合は {@link IllegalArgumentException} をスローする</li>
- *       </ul>
+ *   <li>{@code encodeId}:
+ *     <ul>
+ *       <li>引数は UUID/BINARY(16) の 16 バイト配列を前提とする</li>
+ *       <li>16 バイト以外が渡された場合は {@link IllegalArgumentException} をスローする</li>
+ *     </ul>
  *   </li>
- *   <li>decode:
- *       <ul>
- *         <li>長さチェックは行わず、Base64 として不正な場合にのみ {@link IllegalArgumentException} をスローする</li>
- *       </ul>
+ *   <li>{@code generateNewIdBytes}:
+ *     <ul>
+ *       <li>{@link UUID#randomUUID()} 相当のランダム UUID を元にした 16 バイト配列を返す</li>
+ *     </ul>
  *   </li>
  * </ul>
  *
- * <p>ドメイン層では、必要に応じてこれらの例外を {@code InvalidIdFormatException} などにラップして利用します。
+ * <p>ドメイン層では、必要に応じてこれらの例外を {@code InvalidIdFormatException}
+ * などにラップして利用します。
  */
 public interface IdCodec {
 
   /**
-   * URL-safe Base64 文字列から UUID を復元します。
+   * UUID 文字列表現から {@link UUID} を復元します。
    *
-   * <p>Base64 として不正、または UUID の 16 バイト表現に復元できない場合は
-   * {@link IllegalArgumentException} をスローします。
+   * <p>UUID 文字列として不正な場合は {@link IllegalArgumentException} をスローします。
    *
-   * @param base64 URL-safe Base64 形式の UUID 文字列
+   * @param uuidString UUID の文字列表現
    * @return 復元された UUID
-   * @throws IllegalArgumentException 文字列が Base64 として不正、または UUID の 16 バイト表現にならない場合
+   * @throws IllegalArgumentException 文字列が UUID として不正な場合
    */
-  UUID decodeUuidOrThrow(String base64);
+  UUID decodeUuidOrThrow(String uuidString);
 
   /**
-   * URL-safe Base64 文字列から UUID 由来の 16 バイト配列を復元します。
+   * UUID 文字列表現から UUID 由来の 16 バイト配列を復元します。
    *
-   * <p>Base64 として不正、または 16 バイト以外の長さになった場合は
-   * {@link IllegalArgumentException} をスローします。
+   * <p>UUID 文字列として不正な場合は {@link IllegalArgumentException} をスローします。
    *
-   * <p>DB の主キー（学生 ID・コース ID など UUID/BINARY(16) 前提の ID）向けです。
-   *
-   * @param base64 URL-safe Base64 形式の ID 文字列
-   * @return 復元された 16 バイトの配列
-   * @throws IllegalArgumentException Base64 として不正、または 16 バイト長にならない場合
+   * @param uuidString UUID の文字列表現
+   * @return 復元された 16 バイト配列
+   * @throws IllegalArgumentException 文字列が UUID として不正な場合
    */
-  byte[] decodeUuidBytesOrThrow(String base64);
+  byte[] decodeUuidBytesOrThrow(String uuidString);
 
   /**
-   * UUID 由来の 16 バイト配列を URL-safe Base64 文字列にエンコードします。
+   * UUID 由来の 16 バイト配列を UUID 文字列表現にエンコードします。
    *
    * <p>引数が {@code null} の場合は {@code null} を返します。
    * それ以外で 16 バイト以外の長さの配列が渡された場合は {@link IllegalArgumentException} をスローします。
    *
-   * @param id UUID を表す 16 バイト配列（または {@code null}）
-   * @return URL-safe Base64 文字列、または入力が {@code null} の場合は {@code null}
-   * @throws IllegalArgumentException 引数が 16 バイト以外の長さの配列である場合
+   * @param id UUID を表す 16 バイト配列、null や 16 バイト以外は許可しない。
+   * @return UUID 文字列表現
+   * @throws IllegalArgumentException 引数が null または 16 バイト以外の場合
    */
   String encodeId(byte[] id);
-
-  /**
-   * URL-safe Base64 文字列を単純にバイト配列へデコードします。
-   *
-   * <p>引数が {@code null} の場合は {@code null} を返します。
-   * 長さチェックは行いません。Base64 として不正な場合のみ {@link IllegalArgumentException} をスローします。
-   *
-   * <p>UUID 固定長を要求しない汎用的な ID（任意長の文字列 ID など）の復号に利用します。
-   *
-   * @param id URL-safe Base64 文字列（または {@code null}）
-   * @return デコードされたバイト配列、または入力が {@code null} の場合は {@code null}
-   * @throws IllegalArgumentException 文字列が Base64 として不正な場合
-   */
-  byte[] decode(String id);
 
   /**
    * 新規 ID（UUID 由来の 16 バイト配列）を生成します。

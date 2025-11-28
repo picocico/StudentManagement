@@ -4,8 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -15,8 +13,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +37,6 @@ import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentDto;
 import raisetech.student.management.exception.GlobalExceptionHandler;
 import raisetech.student.management.service.StudentService;
-import raisetech.student.management.util.IdCodec;
 
 @AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(controllers = {StudentController.class, DebugStudentController.class})
@@ -77,9 +72,6 @@ abstract class ControllerTestBase {
   @Autowired
   protected StudentConverter converter;
 
-  @Autowired
-  protected IdCodec idCodec;
-
   protected static final boolean DEBUG =
       Boolean.parseBoolean(System.getProperty("debugTests", "false"))
           || "true".equalsIgnoreCase(System.getenv("DEBUG_TESTS"));
@@ -99,8 +91,8 @@ abstract class ControllerTestBase {
   // テスト共通で使う「常に16バイト」のID
   protected static final String VALID_UUID = "123e4567-e89b-12d3-a456-426655440000";
 
-  protected byte[] studentId;
-  protected String base64Id;
+  protected byte[] studentIdBytes;
+  protected String studentById;
 
   protected String fullName;
   protected String furigana;
@@ -152,14 +144,16 @@ abstract class ControllerTestBase {
    * <p>Given:
    *
    * <ul>
-   *   <li>固定の UUID／16 バイト ID／Base64 ID（{@link #VALID_UUID} とその派生値）の生成</li>  // ←★ココを変更: UUID/ID の関係を明示
+   *   <li>固定の UUID／16 バイト ID（{@link #VALID_UUID} とその派生値）の生成</li>
    *   <li>受講生・コースのダミーエンティティおよび DTO の用意</li>
    *   <li>モックの完全リセットと、ID 変換・DTO 変換の共通スタブ再設定
    *     <ul>
-   *       <li>{@link IdCodec#decodeUuidBytesOrThrow(String)} による 16 バイト ID デコード</li>   // ←★ココを変更: decodeUuidBytesOrThrow を明示
-   *       <li>{@link IdCodec#decodeUuidOrThrow(String)} による {@link java.util.UUID} へのデコード</li> // ←★追加
-   *       <li>{@link StudentConverter#encodeBase64(byte[])} による 16 バイト ID → Base64 のエンコード</li> // ←★追加
-   *       <li>{@link #stubConverterHappyPath()} および {@link #stubServiceHappyPath()} による「ハッピーパス」スタブ</li> // ←★ココを変更: 共通スタブの実体を列挙
+   *       <li>{@link StudentConverter#decodeUuidStringToBytesOrThrow(String)} による
+   *       　　　UUID文字列表現から 16 バイト ID へのデコード</li>
+   *       <li>{@link StudentConverter#encodeUuidString(byte[])} による
+   *       　　　16 バイト ID から UUID文字列表現への変換</li>
+   *       <li>{@link #stubConverterHappyPath()} および {@link #stubServiceHappyPath()} による
+   *       「ハッピーパス」スタブの設定</li>
    *     </ul>
    *   </li>
    * </ul>
@@ -172,11 +166,11 @@ abstract class ControllerTestBase {
    */
   @BeforeEach
   void setupAll() {
-    Mockito.reset(service, converter, idCodec);
+    Mockito.reset(service, converter);
 
     // 1) 値の初期化 16バイトIDを必ず使用
-    base64Id = base64FromUuid(VALID_UUID);
-    studentId = bytesFromUuid(VALID_UUID);
+    studentById = VALID_UUID;
+    studentIdBytes = new byte[16];
 
     fullName = "テスト　花子";
     furigana = "てすと　はなこ";
@@ -191,7 +185,7 @@ abstract class ControllerTestBase {
     secondCourseName = "AWSコース";
 
     student = new Student();
-    student.setStudentId(studentId);
+    student.setStudentId(studentIdBytes);
     student.setFullName(fullName);
     student.setFurigana(furigana);
     student.setNickname(nickname);
@@ -204,7 +198,7 @@ abstract class ControllerTestBase {
 
     // 通常の受講生 DTO
     StudentDto s = new StudentDto();
-    s.setStudentId(base64Id); // ← レスポンス検証用
+    s.setStudentId(VALID_UUID); // ← レスポンス検証用
     s.setFullName(fullName);
     s.setFurigana(furigana);
     s.setNickname(nickname);
@@ -218,7 +212,7 @@ abstract class ControllerTestBase {
 
     // コース（entity）
     course1 = new StudentCourse();
-    course1.setStudentId(studentId);
+    course1.setStudentId(new byte[16]);
     course1.setCourseId(new byte[16]);
     course1.setCourseName(courseName);
     course1.setStartDate(LocalDate.of(2024, 3, 1));
@@ -226,7 +220,7 @@ abstract class ControllerTestBase {
     course1.setCreatedAt(LocalDateTime.now());
 
     course2 = new StudentCourse();
-    course2.setStudentId(studentId);
+    course2.setStudentId(new byte[16]);
     course2.setCourseId(new byte[16]);
     course2.setCourseName(secondCourseName);
     course2.setStartDate(LocalDate.of(2024, 7, 1));
@@ -266,24 +260,13 @@ abstract class ControllerTestBase {
 
     // 2) ここで「共通の基本スタブ」を再設定（各テストで上書きしてOK）（UUID/IDを “VALID_UUID” に統一）
     // 例：成功系／500系で使う固定ID
-    // Base64 → UUID（必要なら）
+    // UUID文字列 → byte[16]（Controller が内部で使うID）
+    when(converter.decodeUuidStringToBytesOrThrow(studentById))
+        .thenReturn(studentIdBytes);
 
-    // --- IDデコード系 ---
-    when(idCodec.decodeUuidOrThrow(eq(base64Id))).thenReturn(UUID.fromString(VALID_UUID));
-    // Base64 → 16バイト
-    when(idCodec.decodeUuidBytesOrThrow(eq(base64Id))).thenReturn(studentId); // ダミーのBINARY(16)
-
-    // --- IDエンコード系 ---
-    // IdCodec.encodeId の共通スタブ：VALID_UUID の 16バイト studentId を
-    // Base64 文字列 base64Id にエンコードしたことにする
-    when(idCodec.encodeId(argThat(arr -> Arrays.equals(arr, studentId))))
-        .thenReturn(base64Id);
-
-    // StudentController は converter.encodeBase64(...) を呼ぶので、
-    // テストでは encodeBase64 が IdCodec.encodeId(...) の結果を
-    // そのまま返すようにしておく
-    when(converter.encodeBase64(argThat(arr -> Arrays.equals(arr, studentId))))
-        .thenAnswer(inv -> idCodec.encodeId(inv.getArgument(0)));
+    // byte[16] → UUID文字列（レスポンスに載せるとき）
+    when(converter.encodeUuidString(studentIdBytes))
+        .thenReturn(studentById);
 
     // 共通ハッピーパス・スタブ（必要なら各テストで上書きOK）
     stubConverterHappyPath();
@@ -291,23 +274,8 @@ abstract class ControllerTestBase {
   }
 
   // ←――――――――――――――――――――――――――――――――――――――――――――――
-  //  UUID→16バイト→Base64 変換ユーティリティ
+  //  UUID→16バイト 変換ユーティリティ
   // ―――――――――――――――――――――――――――――――――――――――――――→
-
-  /**
-   * UUID文字列を16バイト配列にエンコードし、URLセーフなBase64（パディング無し）に変換します。
-   *
-   * @param uuid ハイフン区切りのUUID文字列
-   * @return Base64URL形式のID文字列
-   * @throws IllegalArgumentException UUID形式が不正な場合
-   */
-  protected static String base64FromUuid(String uuid) {
-    var u = UUID.fromString(uuid);
-    var bb = ByteBuffer.allocate(16);
-    bb.putLong(u.getMostSignificantBits());
-    bb.putLong(u.getLeastSignificantBits());
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bb.array());
-  }
 
   /**
    * UUID文字列を16バイトの配列に変換します。
@@ -422,21 +390,16 @@ abstract class ControllerTestBase {
     when(converter.toEntityList(anyList(), any())).thenReturn(List.of());
 
     // toDetailDto：最小のダミーを返す
-    // new StudentDetailDto() が無ければ、下の行をコメントアウトして、代わりに mock を返してOK
-    try {
-      when(converter.toDetailDto(any(Student.class), anyList()))
-          .thenAnswer(
-              inv -> {
-                try {
-                  return new StudentDetailDto(); // ← デフォコン無ければ次行に切替
-                } catch (Throwable t) {
-                  return org.mockito.Mockito.mock(StudentDetailDto.class);
-                }
-              });
-    } catch (Throwable ignore) {
-      when(converter.toDetailDto(any(Student.class), anyList()))
-          .thenReturn(org.mockito.Mockito.mock(StudentDetailDto.class));
-    }
+    // シンプルに mock だけ
+    StudentDetailDto dummyDetail = org.mockito.Mockito.mock(StudentDetailDto.class);
+
+    // 2引数版
+    when(converter.toDetailDto(any(Student.class), anyList()))
+        .thenReturn(dummyDetail);
+
+    // 3引数版（UUID文字列付き）
+    when(converter.toDetailDto(any(Student.class), anyList(), anyString()))
+        .thenReturn(dummyDetail);
   }
 
   /**
@@ -469,10 +432,11 @@ abstract class ControllerTestBase {
   /**
    * 「想定外の実行時例外（500/E999 相当）」を能動的に発火させるための補助。
    *
-   * <p>早い段階（例：{@code idCodec.decodeUuidBytesOrThrow(...)}）で
+   * <p>早い段階（例：{@code converter.decodeUuidStringToBytesOrThrow(...)}）で
    * {@link RuntimeException} を投げるようにスタブし、 後続のサービス呼び出しへ到達しない経路を作ります。
    */
   protected void makeConverterThrowEarly() {
-    when(idCodec.decodeUuidBytesOrThrow(anyString())).thenThrow(new RuntimeException("boom"));
+    when(converter.decodeUuidStringToBytesOrThrow(anyString())).thenThrow(
+        new RuntimeException("boom"));
   }
 }

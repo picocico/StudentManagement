@@ -16,7 +16,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.Base64;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -81,7 +80,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
   /**
    * {@code includeDeleted=true} と {@code deletedOnly=true} を同時指定した場合に
-   * 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * 400（E006/INVALID_ID_FORMAT）が返ることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students}<br>
    * Params: {@code includeDeleted=true}, {@code deletedOnly=true}<br> Status:
@@ -102,7 +101,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * <ul>
    *   <li>HTTP ステータス 400 が返る</li>
    *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
    *   <li>{@code message} に「同時指定できません」の文言が含まれる</li>
    * </ul>
    *
@@ -203,73 +202,76 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * Base64 形式でない ID を指定した場合に、 400（E006/INVALID_REQUEST）が返却されることを検証します。
+   * UUID 文字列表現として不正な ID を指定した場合に、 400（E006/INVALID_ID_FORMAT）が返却されることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalid)} が
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(invalid)} が
    *       {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
    *
    * <p>When:
    * <ul>
-   *   <li>パス変数 {@code studentId} に Base64 として不正な文字列を指定し GET を実行する</li>
+   *   <li>パス変数 {@code studentId} に UUID として不正な文字列を指定し GET を実行する</li>
    * </ul>
    *
    * <p>Then:
    * <ul>
    *   <li>{@code status} が {@code 400} である</li>
    *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
-   *   <li>{@code message} に {@code "Base64"} が含まれる</li>
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
+   *   <li>{@code message} に {@code "IDの形式が不正です"} が含まれる</li>
    * </ul>
    *
    * @throws Exception 実行時例外
    */
   @Test
-  public void getStudentDetail_Base64形式でないIDを指定した場合_400エラーが返ること()
+  public void getStudentDetail_UUID形式として不正なIDを指定した場合_400エラーが返ること()
       throws Exception {
 
     String invalid = "@@invalid@@";
-    when(idCodec.decodeUuidBytesOrThrow(invalid)).thenThrow(
-        new IllegalArgumentException("Base64 error"));
+    when(converter.decodeUuidStringToBytesOrThrow(invalid))
+        .thenThrow(new IllegalArgumentException("IDの形式が不正です（UUID）"));
 
     mockMvc
         .perform(get("/api/students/{studentId}", invalid))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
-        .andExpect(jsonPath("$.code").value("E006")) // ← E006 に
+        .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_REQUEST")) // ← error キー
-        .andExpect(jsonPath("$.message").value(containsString("Base64"))); // 文言変更に強く
+        .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
+
+    verify(converter).decodeUuidStringToBytesOrThrow(invalid);
+    verifyNoInteractions(service);
   }
 
   /**
-   * Base64 としては正しいが、デコード後のバイト長が UUID（16 バイト）と異なる ID を指定した場合に、
-   * 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * UUID 文字列表現 としては正しいが、デコード後のバイト長が UUID（16 バイト）と異なる ID を指定した場合に、
+   * 400（E006/INVALID_ID_FORMAT）が返ることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が
-   *       バイト長不正により {@link IllegalArgumentException} を送出するようスタブされている</li>
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)} が
+   *       バイト長不正により {@link InvalidIdFormatException} を送出するようスタブされている</li>
    * </ul>
    *
    * <p>When:
    * <ul>
-   *   <li>上記 Base64 文字列を {@code studentId} に指定して GET を実行する</li>
+   *   <li>上記 UUID 文字列を {@code studentById} に指定して GET を実行する</li>
    * </ul>
    *
    * <p>Then:
    * <ul>
    *   <li>{@code status} が {@code 400} である</li>
    *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
    *   <li>{@code message} に {@code "UUID"} が含まれる</li>
    * </ul>
    *
@@ -279,16 +281,16 @@ class StudentControllerValidationTest extends ControllerTestBase {
   public void getStudentDetail_デコード後のバイト長がUUIDと異なる場合_400エラーが返ること()
       throws Exception {
 
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenThrow(
-        new IllegalArgumentException("UUIDの形式が不正です"));
+    when(converter.decodeUuidStringToBytesOrThrow(studentById))
+        .thenThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
-        .perform(get("/api/students/{studentId}", base64Id))
+        .perform(get("/api/students/{studentId}", studentById))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"))
         .andExpect(jsonPath("$.message").value(containsString("UUID"))); // 文言変更に強く
   }
 
@@ -308,7 +310,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *   <li>{@code status} が {@code 400} である</li>
    *   <li>{@code code} が {@code "E001"} である</li>
    *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
-   *   <li>{@code errors} および {@code details} 配列が存在する</li>
+   *   <li>{@code errors} 配列が存在する</li>
    *   <li>バリデーション段階で失敗するため {@code converter} および {@code service} は呼ばれない</li>
    * </ul>
    *
@@ -336,7 +338,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
     mockMvc
         .perform(
-            put("/api/students/{studentId}", base64Id)
+            put("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(invalid))
         .andExpect(status().isBadRequest())
@@ -356,50 +358,39 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * Base64 形式が不正な ID で更新要求した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * UUID文字列表現として不正なIDで更新要求した場合に、 400（E006/INVALID_ID_FORMAT）が返ることを検証します。
    *
-   * <p>Endpoint: {@code PUT /api/students/{invalidId}}<br>
+   * <p>Endpoint: {@code PUT /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalidId)} が
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(invalidId)} が
    *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
-   * </ul>
-   *
-   * <p>When:
-   * <ul>
-   *   <li>パス変数 {@code invalidId} を指定して PUT を実行する</li>
    * </ul>
    *
    * <p>Then:
    * <ul>
    *   <li>{@code status} が {@code 400} である</li>
    *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
-   *   <li>{@code message} に {@code "Base64"} が含まれる</li>
-   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
+   *   <li>ID変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
-   *
-   * @throws Exception 実行時例外
    */
   @Test
-  void updateStudent_base64形式が不正な場合_400を返すこと() throws Exception {
-    String invalidId = "invalid_base64";
+  void updateStudent_UUID文字列表現が不正な場合_400を返すこと() throws Exception {
+    String invalidId = "invalid-uuid-string";
 
-    // Base64として不正 → 変換時点で独自例外（E006）を投げる前提
-    doThrow(new InvalidIdFormatException("IDの形式が不正です（Base64）"))
-        .when(idCodec)
-        .decodeUuidBytesOrThrow(invalidId);
+    // ID変換時点で InvalidIdFormatException を投げる前提
+    doThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"))
+        .when(converter)
+        .decodeUuidStringToBytesOrThrow(invalidId);
 
     String body =
-        json(
-            new StudentRegistrationRequest() {
-              {
-                setStudent(studentDto);
-                setCourses(List.of(courseDto));
-              }
-            });
+        json(new StudentRegistrationRequest() {{
+          setStudent(studentDto);
+          setCourses(List.of(courseDto));
+        }});
 
     mockMvc
         .perform(
@@ -409,75 +400,12 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(status().isBadRequest())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
-        .andExpect(jsonPath("$.code").value("E006")) // ← 文字列
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
-        .andExpect(jsonPath("$.message").value(containsString("Base64")));
-
-    // 以降は到達しない
-    verifyNoInteractions(service);
-  }
-
-  /**
-   * Base64 としては正しいが UUID 長（16 バイト）ではない ID で更新要求した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
-   *
-   * <p>Endpoint: {@code PUT /api/students/{studentId}}<br>
-   * Status: {@code 400 BAD_REQUEST}
-   *
-   * <p>Given:
-   * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(idWithWrongLength)} が
-   *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
-   * </ul>
-   *
-   * <p>When:
-   * <ul>
-   *   <li>UUID 長と異なる Base64 文字列を {@code studentId} に指定して PUT を実行する</li>
-   * </ul>
-   *
-   * <p>Then:
-   * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
-   *   <li>{@code message} に {@code "UUID"} が含まれる</li>
-   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
-   * </ul>
-   *
-   * @throws Exception 実行時例外
-   */
-  @Test
-  void updateStudent_UUID形式が不正な場合_400を返すこと() throws Exception {
-    // Base64 としては正しいが UUID(16バイト)ではない 10バイトのIDを用意
-    String idWithWrongLength = Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[10]);
-
-    // 長さ不正も decode 時点で InvalidIdFormatException を投げる前提（E006）
-    doThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"))
-        .when(idCodec)
-        .decodeUuidBytesOrThrow(idWithWrongLength);
-
-    // リクエストボディ（バリデーションは通る想定）
-    String body =
-        json(
-            new StudentRegistrationRequest() {
-              {
-                setStudent(studentDto);
-                setCourses(List.of(courseDto));
-              }
-            });
-
-    // 実行：controller 側で「長さ != 16」を検知して 400 を返すはず
-    mockMvc
-        .perform(
-            put("/api/students/{studentId}", idWithWrongLength)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body))
-        .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-        .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
-        .andExpect(jsonPath("$.message").value(containsString("UUID")));
+        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"))
+        .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
 
+    // ID変換で落ちるので service は触られない
+    verify(converter).decodeUuidStringToBytesOrThrow(invalidId);
     verifyNoInteractions(service);
   }
 
@@ -507,7 +435,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
     mockMvc
         .perform(
-            put("/api/students/{studentId}", base64Id)
+            put("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(""))
         .andExpect(status().isBadRequest())
@@ -538,7 +466,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *   <li>{@code code} が {@code "E001"} である</li>
    *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
    *   <li>{@code message} に「入力値」が含まれる</li>
-   *   <li>{@code errors} および {@code details} 配列が存在する</li>
+   *   <li>{@code errors}  配列が存在する</li>
    *   <li>{@code errors[*].field} に {@code "student"} を含む</li>
    *   <li>バリデーションで失敗するため {@code converter} および {@code service} は呼ばれない</li>
    * </ul>
@@ -559,7 +487,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
     mockMvc
         .perform(
-            put("/api/students/{studentId}", base64Id)
+            put("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isBadRequest())
@@ -609,7 +537,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
     // Act & Assert
     mockMvc
         .perform(
-            put("/api/students/{studentId}", base64Id)
+            put("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(req)))
         .andExpect(status().isBadRequest())
@@ -625,104 +553,36 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 部分更新で Base64 形式が不正な ID を指定した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * UUID文字列表現として不正なIDで部分更新した場合に、 400（E006/INVALID_ID_FORMAT）が返ることを検証します。
    *
    * <p>Endpoint: {@code PATCH /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
-   *
-   * <p>Given:
-   * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が
-   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
-   * </ul>
-   *
-   * <p>When:
-   * <ul>
-   *   <li>上記 ID を指定して PATCH を実行する</li>
-   * </ul>
-   *
-   * <p>Then:
-   * <ul>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
-   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
-   * </ul>
-   *
-   * @throws Exception 実行時例外
    */
   @Test
-  public void partialUpdateStudent_base64形式が不正な場合_400を返すこと() throws Exception {
+  public void partialUpdateStudent_UUID文字列表現が不正な場合_400を返すこと() throws Exception {
+
+    String invalidId = "invalid-uuid";
 
     StudentRegistrationRequest request = new StudentRegistrationRequest();
     request.setStudent(studentDto);
     request.setCourses(List.of());
     request.setAppendCourses(false);
 
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenThrow(
-        new IllegalArgumentException("UUIDの形式が不正です"));
+    when(converter.decodeUuidStringToBytesOrThrow(invalidId))
+        .thenThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
         .perform(
-            patch("/api/students/{studentId}", base64Id)
+            patch("/api/students/{studentId}", invalidId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(request)))
         .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"));
+        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"))
+        .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
 
-    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
-    verifyNoMoreInteractions(converter);
-    verifyNoInteractions(service);
-  }
-
-  /**
-   * 部分更新で UUID 長が不正な ID を指定した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
-   *
-   * <p>Endpoint: {@code PATCH /api/students/{studentId}}<br>
-   * Status: {@code 400 BAD_REQUEST}
-   *
-   * <p>Given:
-   * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalidId)} が
-   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
-   * </ul>
-   *
-   * <p>When:
-   * <ul>
-   *   <li>UUID 長と異なる Base64 文字列を {@code studentId} に指定して PATCH を実行する</li>
-   * </ul>
-   *
-   * <p>Then:
-   * <ul>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
-   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
-   * </ul>
-   *
-   * @throws Exception 実行時例外
-   */
-  @Test
-  public void partialUpdateStudent_UUID形式が不正な場合_400を返すこと() throws Exception {
-
-    String invalidId = "AAAAAAAAAAAAAAAAAAAAAA=="; // 長さ不正相当
-    StudentRegistrationRequest request = new StudentRegistrationRequest();
-    request.setStudent(studentDto);
-    request.setCourses(List.of());
-    request.setAppendCourses(false);
-
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenThrow(
-        new IllegalArgumentException("UUIDの形式が不正です"));
-
-    mockMvc
-        .perform(
-            patch("/api/students/{studentId}", base64Id)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json(request)))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"));
-
-    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
+    verify(converter).decodeUuidStringToBytesOrThrow(invalidId);
     verifyNoMoreInteractions(converter);
     verifyNoInteractions(service);
   }
@@ -754,7 +614,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
     mockMvc
         .perform(
-            patch("/api/students/{studentId}", base64Id)
+            patch("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(""))
         .andExpect(status().isBadRequest())
@@ -793,7 +653,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
     mockMvc
         .perform(
-            patch("/api/students/{studentId}", base64Id)
+            patch("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isBadRequest())
@@ -823,7 +683,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *   <li>{@code code} が {@code "E001"} である</li>
    *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
    *   <li>{@code message} に「入力値」が含まれる</li>
-   *   <li>{@code errors} および {@code details} 配列が存在する</li>
+   *   <li>{@code errors}  配列が存在する</li>
    *   <li>バリデーションエラーの詳細に {@code field="student"} を含む</li>
    *   <li>{@code converter} および {@code service} は呼ばれない</li>
    * </ul>
@@ -835,7 +695,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
     mockMvc
         .perform(
-            patch("/api/students/{studentId}", base64Id)
+            patch("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"student\":null,\"courses\":[]}"))
         .andExpect(status().isBadRequest())
@@ -851,88 +711,88 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 論理削除で Base64 形式が不正な ID を指定した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * 論理削除で UUID 形式が不正な ID を指定した場合に、 400（E006/INVALID_ID_FORMAT）が返ることを検証します。
    *
    * <p>Endpoint: {@code DELETE /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalid)} が
-   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(invalid)} が
+   *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
    * </ul>
    *
    * <p>When:
    * <ul>
-   *   <li>Base64 として不正な {@code invalid} を {@code studentId} に指定して DELETE を実行する</li>
+   *   <li>UUID として不正な {@code invalid} を {@code studentId} に指定して DELETE を実行する</li>
    * </ul>
    *
    * <p>Then:
    * <ul>
    *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
    *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
    */
   @Test
-  public void deleteStudent_studentIdのBase64形式が不正な場合_400を返すこと() throws Exception {
+  public void deleteStudent_studentIdのUUID形式が不正な場合_400を返すこと() throws Exception {
 
-    String invalid = "invalid_base64";
-    when(idCodec.decodeUuidBytesOrThrow(invalid)).thenThrow(
-        new IllegalArgumentException("UUIDの形式が不正です"));
+    String invalid = "invalid_UUID";
+    when(converter.decodeUuidStringToBytesOrThrow(invalid)).thenThrow(
+        new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
         .perform(delete("/api/students/{studentId}", invalid))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"));
+        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"));
 
-    verify(idCodec).decodeUuidBytesOrThrow(invalid);
+    verify(converter).decodeUuidStringToBytesOrThrow(invalid);
     verifyNoInteractions(service);
   }
 
   /**
-   * 復元で Base64 形式が不正な ID を指定した場合に、 400（E006/INVALID_REQUEST）が返ることを検証します。
+   * 復元で UUID 形式が不正な ID を指定した場合に、 400（E006/INVALID_ID_FORMAT）が返ることを検証します。
    *
    * <p>Endpoint: {@code PATCH /api/students/{studentId}/restore}}<br>
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(invalid)} が
-   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(invalid)} が
+   *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
    * </ul>
    *
    * <p>When:
    * <ul>
-   *   <li>Base64 として不正な {@code invalid} を {@code studentId} に指定して PATCH を実行する</li>
+   *   <li>UUID として不正な {@code invalid} を {@code studentId} に指定して PATCH を実行する</li>
    * </ul>
    *
    * <p>Then:
    * <ul>
    *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_REQUEST"} である</li>
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
    *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
    * </ul>
    *
    * @throws Exception 実行時例外
    */
   @Test
-  public void restoreStudent_Base64形式が不正の場合_400を返すこと() throws Exception {
+  public void restoreStudent_UUID形式が不正の場合_400を返すこと() throws Exception {
 
-    String invalid = "invalid_base64";
-    when(idCodec.decodeUuidBytesOrThrow(invalid)).thenThrow(
-        new IllegalArgumentException("UUIDの形式が不正です"));
+    String invalid = "invalid_UUID";
+    when(converter.decodeUuidStringToBytesOrThrow(invalid)).thenThrow(
+        new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
         .perform(patch("/api/students/{studentId}/restore", invalid))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"));
+        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"));
 
-    verify(idCodec).decodeUuidBytesOrThrow(invalid);
+    verify(converter).decodeUuidStringToBytesOrThrow(invalid);
     verifyNoInteractions(service);
   }
 }

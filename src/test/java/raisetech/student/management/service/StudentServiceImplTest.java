@@ -13,9 +13,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Base64;
 import java.util.List;
-
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +23,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -32,42 +30,118 @@ import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.exception.ResourceNotFoundException;
 import raisetech.student.management.repository.StudentCourseRepository;
 import raisetech.student.management.repository.StudentRepository;
+import raisetech.student.management.util.UUIDUtil;
 
+/**
+ * {@link StudentServiceImpl} の単体テストクラス。
+ *
+ * <p>UUID を byte[16]（BINARY(16)）として扱うドメイン設計を前提に、
+ * 受講生情報およびコース情報に対するサービス層の振る舞いを検証します。
+ *
+ * <ul>
+ *   <li>リポジトリ層への委譲が正しく行われているか</li>
+ *   <li>コースの更新・追加ロジックが意図通りに呼び出されるか</li>
+ *   <li>論理削除・復元・物理削除における例外処理/メッセージが期待通りか</li>
+ * </ul>
+ */
 @ExtendWith(MockitoExtension.class)
 class StudentServiceImplTest {
 
-  @Mock private StudentRepository studentRepository;
+  /**
+   * 受講生リポジトリのモック。
+   *
+   * <p>受講生情報の永続化や検索の振る舞いをスタブ/検証するために利用します。
+   */
+  @Mock
+  private StudentRepository studentRepository;
 
-  @Mock private StudentCourseRepository courseRepository;
+  /**
+   * 受講生コースリポジトリのモック。
+   *
+   * <p>コース情報の取得・登録・削除などをスタブ/検証するために利用します。
+   */
+  @Mock
+  private StudentCourseRepository courseRepository;
 
-  @Mock private StudentConverter converter;
+  /**
+   * エンティティとDTO間の変換を行うコンバーターのモック。
+   *
+   * <p>サービス層からの呼び出しを検証しつつ、DTOリスト生成などをスタブします。
+   */
+  @Mock
+  private StudentConverter converter;
 
-  @InjectMocks private StudentServiceImpl service;
+  /**
+   * テスト対象のサービス実装。
+   *
+   * <p>{@link InjectMocks} により、上記モックがインジェクションされた状態の
+   * {@link StudentServiceImpl} が生成されます。
+   */
+  @InjectMocks
+  private StudentServiceImpl service;
 
-  private static final String BASE64_ID = "3Jz8kUv2Rgq7Y+DnX3+aRQ==";
+  /**
+   * テストで利用する固定 UUID 文字列表現。
+   *
+   * <p>この値を {@link UUIDUtil#toBytes(UUID)} で byte[16] に変換して
+   * {@code studentId} として利用します。
+   */
+  private static final String UUID_STRING = "123e4567-e89b-12d3-a456-426614174000";
 
+  /**
+   * テスト共通で使用する受講生 ID（UUID を BINARY(16) にした 16バイト配列）。
+   */
   private byte[] studentId;
+
+  /**
+   * テスト共通で使用する受講生エンティティ。
+   */
   private Student student;
+
+  /**
+   * searchAllCourses など、一部メソッドを差し替えて振る舞いを検証するためのスパイ。
+   */
   private StudentServiceImpl spyService;
 
-  // 各種テスト共通オブジェクトを準備
+
+  /**
+   * 各テスト実行前に共通の準備を行います。
+   *
+   * <ul>
+   *   <li>{@link #UUID_STRING} から {@link #studentId} を生成</li>
+   *   <li>{@link #student} の基本情報を初期化</li>
+   *   <li>{@link #spyService} を作成</li>
+   *   <li>必要に応じたダミーの {@link StudentCourse} を生成</li>
+   * </ul>
+   */
   @BeforeEach
   void setUp() {
-    studentId = Base64.getDecoder().decode(BASE64_ID);
+    // UUID文字列 → UUID → byte[16]
+    studentId = UUIDUtil.toBytes(UUID.fromString(UUID_STRING));
 
     student = new Student();
     student.setStudentId(studentId);
     student.setFullName("テスト　花子");
     student.setEmail("test@example.com");
     student.setAge(30);
+
     spyService = Mockito.spy(service);
 
-    // コースを1件追加してcoursesを初期化
+    // コースを1件追加してcoursesを初期化（必要に応じて各テスト内で利用）
     StudentCourse course = new StudentCourse();
     course.setStudentId(studentId);
     course.setCourseId(new byte[16]); // 任意のダミーUUID（16バイト）
   }
 
+  /**
+   * 受講生登録時に、コースリストが空であればコース登録が行われないことを検証します。
+   *
+   * <p>期待する挙動:
+   * <ul>
+   *   <li>{@code insertStudent(student)} は 1 回呼ばれる</li>
+   *   <li>{@code insertCourses(...)} は 1 度も呼ばれない</li>
+   * </ul>
+   */
   @Test
   void 受講生登録時_コースが空ならコースは登録されないこと() {
     // コースが空のケースにする
@@ -82,13 +156,23 @@ class StudentServiceImplTest {
     verify(courseRepository, never()).insertCourses(anyList());
   }
 
+  /**
+   * 受講生情報の全体更新時に、既存のコースが削除され、新しいコースが登録されることを検証します。
+   *
+   * <p>期待する呼び出し順:
+   * <ol>
+   *   <li>{@code studentRepository.updateStudent(student)}</li>
+   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}</li>
+   *   <li>{@code courseRepository.insertCourses(courses)}</li>
+   * </ol>
+   */
   @Test
   void updateStudent_受講生情報更新時_既存コースが削除され_新規コースが登録されること() {
 
     // updateStudent用のオブジェクトを準備
     StudentCourse course = new StudentCourse();
     course.setStudentId(student.getStudentId());
-    course.setCourseId(Base64.getDecoder().decode("aGVsbG8tY291cnNlLWlk")); // 仮のCourse ID
+    course.setCourseId(new byte[16]); // 仮のCourse ID
 
     List<StudentCourse> courses = List.of(course);
 
@@ -105,12 +189,22 @@ class StudentServiceImplTest {
     inOrder.verify(courseRepository).insertCourses(courses);
   }
 
+  /**
+   * 部分更新（partialUpdateStudent）時に、受講生情報が更新され、 既存コース削除 → 新規コース登録が行われることを検証します。
+   *
+   * <p>期待する呼び出し順:
+   * <ol>
+   *   <li>{@code studentRepository.updateStudent(student)}</li>
+   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}</li>
+   *   <li>{@code courseRepository.insertCourses(courses)}</li>
+   * </ol>
+   */
   @Test
   void partialUpdateStudent_部分更新時_受講生情報が更新され_既存コース削除後_新規コースが登録されること() {
 
     // partialUpdateStudent用のオブジェクトを準備
     Student student = new Student();
-    student.setStudentId(Base64.getDecoder().decode("3Jz8kUv2Rgq7Y+DnX3+aRQ=="));
+    student.setStudentId(studentId);
     student.setFullName("検証 太郎");
 
     List<StudentCourse> courses = List.of(new StudentCourse());
@@ -127,6 +221,12 @@ class StudentServiceImplTest {
     inOrder.verify(courseRepository).insertCourses(courses);
   }
 
+  /**
+   * appendCourses 実行時に、既に存在するコースには insert されないことを検証します。
+   *
+   * <p>サービスでは {@code courseRepository.insertIfNotExists(...)} を呼び出し、
+   * リポジトリ側で重複チェックを行う前提です。
+   */
   @Test
   void appendCourses_既に存在するコースにはinsertされないこと() {
 
@@ -146,6 +246,11 @@ class StudentServiceImplTest {
     verify(courseRepository, times(newCourses.size())).insertIfNotExists(any());
   }
 
+  /**
+   * updateStudentInfoOnly が呼び出された際に、リポジトリへ委譲されることを検証します。
+   *
+   * <p>期待する挙動: {@code studentRepository.updateStudent(student)} が 1回呼ばれる。
+   */
   @Test
   void updateStudentInfoOnlyが呼び出されると_リポジトリに委譲されること() {
 
@@ -161,6 +266,11 @@ class StudentServiceImplTest {
     verify(studentRepository).updateStudent(student);
   }
 
+  /**
+   * getStudentList において、通常のふりがな検索時に関連メソッドが順序通り呼ばれ、 期待結果が返却されることを検証します。
+   *
+   * <p>条件: includeDeleted=false, deletedOnly=false
+   */
   @Test
   void getStudentList_ふりがな検索_で関連メソッドが順に呼ばれ結果が返ること() {
 
@@ -195,6 +305,9 @@ class StudentServiceImplTest {
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
   }
 
+  /**
+   * getStudentList において、論理削除を含めて検索する場合 （includeDeleted=true, deletedOnly=false）の振る舞いを検証します。
+   */
   @Test
   void getStudentList_論理削除含めた検索_で関連メソッドが順に呼ばれ結果が返ること() {
 
@@ -229,6 +342,9 @@ class StudentServiceImplTest {
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
   }
 
+  /**
+   * getStudentList において、論理削除された受講生のみを検索する場合 （includeDeleted=false, deletedOnly=true）の振る舞いを検証します。
+   */
   @Test
   void getStudentList_論理削除のみ検索_で関連メソッドが順に呼ばれ結果が返ること() {
 
@@ -263,6 +379,10 @@ class StudentServiceImplTest {
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
   }
 
+  /**
+   * getStudentList において、includeDeleted と deletedOnly を同時に true にした場合、 不正な組み合わせとして
+   * {@link IllegalArgumentException} がスローされることを検証します。
+   */
   @Test
   void getStudentList_論理削除と削除のみ検索が同時指定された場合_例外がスローされる() {
 
@@ -278,6 +398,9 @@ class StudentServiceImplTest {
         .hasMessageContaining("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
   }
 
+  /**
+   * findStudentById で有効な ID を指定した場合に、対応する受講生情報が取得できることを検証します。
+   */
   @Test
   void findStudentById_該当する受講生IDで検索した場合_受講生情報が取得できること() {
 
@@ -292,31 +415,42 @@ class StudentServiceImplTest {
     verify(studentRepository).findById(studentId);
   }
 
+  /**
+   * findStudentById で存在しない ID を指定した場合、 {@link ResourceNotFoundException} がスローされることを検証します。
+   */
   @Test
   void findStudentById_存在しないIDを指定_ResourceNotFoundExceptionがスローされること() {
 
     // 準備（モックの設定）
     when(studentRepository.findById(studentId)).thenReturn(null);
-    when(converter.encodeBase64(studentId)).thenReturn(BASE64_ID);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     // 実行
     assertThatThrownBy(() -> service.findStudentById(studentId))
         // 検証
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessageContaining("受講生ID " + BASE64_ID + " が見つかりません。");
+        .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
   }
 
+  /**
+   * searchCoursesByStudentId で、受講生 ID に紐づくコース一覧が取得できることを検証します。
+   *
+   * <p>{@link StudentCourseRepository#findCoursesByStudentId(byte[])} の委譲と
+   * 戻り値のそのまま返却を確認します。
+   */
   @Test
   void searchCoursesByStudentId_受講生IDで検索_紐づくコース情報を取得できること() {
 
     // 準備
     StudentCourse course1 = new StudentCourse();
     course1.setStudentId(studentId);
-    course1.setCourseId(Base64.getDecoder().decode("Y291cnNlLWlkMQ==")); // 仮のCourse ID 1
+    course1.setCourseId(UUIDUtil.toBytes(
+        UUID.fromString("123e4567-e89b-12d3-a456-426614174001"))); // 仮のCourse ID 1
 
     StudentCourse course2 = new StudentCourse();
     course2.setStudentId(studentId);
-    course2.setCourseId(Base64.getDecoder().decode("Y291cnNlLWlkMg==")); // 仮のCourse ID 2
+    course2.setCourseId(UUIDUtil.toBytes(
+        UUID.fromString("123e4567-e89b-12d3-a456-426614174001"))); // 仮のCourse ID 2
 
     List<StudentCourse> expectedCourses = List.of(course1, course2);
 
@@ -331,16 +465,21 @@ class StudentServiceImplTest {
     verify(courseRepository).findCoursesByStudentId(studentId); // 呼び出されたかも検証
   }
 
+  /**
+   * searchAllCourses で、コース情報が全件取得できることを検証します。
+   *
+   * <p>{@link StudentCourseRepository#findAllCourses()} の結果をそのまま返していることを確認します。
+   */
   @Test
   void searchAllCourses_コース情報を全件取得すること() {
 
     // 準備
     StudentCourse course1 = new StudentCourse();
-    course1.setCourseId(Base64.getDecoder().decode("Y291cnNlLWlkMw=="));
+    course1.setCourseId(UUIDUtil.toBytes(UUID.fromString("123e4567-e89b-12d3-a456-426614174003")));
     course1.setCourseName("Javaコース");
 
     StudentCourse course2 = new StudentCourse();
-    course2.setCourseId(Base64.getDecoder().decode("Y291cnNlLWlkNA=="));
+    course2.setCourseId(UUIDUtil.toBytes(UUID.fromString("123e4567-e89b-12d3-a456-426614174003")));
     course2.setCourseName("AWSコース");
 
     List<StudentCourse> mockCourses = List.of(course1, course2);
@@ -356,20 +495,32 @@ class StudentServiceImplTest {
     verify(courseRepository).findAllCourses(); // 呼び出しがされたかどうかの確認
   }
 
+  /**
+   * softDeleteStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。
+   */
   @Test
   void softDeleteStudent_対象受講生が存在しなければ例外メッセージが投げられること() {
 
     // モックの設定
     when(studentRepository.findById(studentId)).thenReturn(null);
-    when(converter.encodeBase64(studentId)).thenReturn(BASE64_ID);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     // 実行
     assertThatThrownBy(() -> spyService.softDeleteStudent(studentId))
         // 検証
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessageContaining("Student not found for ID: " + BASE64_ID);
+        .hasMessageContaining("Student not found for ID: " + UUID_STRING);
   }
 
+  /**
+   * softDeleteStudent で、まだ論理削除されていない受講生に対して削除処理が実行されることを検証します。
+   *
+   * <p>期待する挙動:
+   * <ul>
+   *   <li>{@code student.softDelete()} が呼ばれる</li>
+   *   <li>{@code studentRepository.updateStudent(student)} が呼ばれる</li>
+   * </ul>
+   */
   @Test
   void softDeleteStudent_論理削除されていなければ削除処理が実行されること() {
 
@@ -388,28 +539,34 @@ class StudentServiceImplTest {
     verify(studentRepository).updateStudent(student);
   }
 
+  /**
+   * restoreStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。
+   */
   @Test
   void restoreStudent_該当の受講生がいなければ例外メッセージが投げられること() {
 
     // モックの設定
     when(studentRepository.findById(studentId)).thenReturn(null);
-    when(converter.encodeBase64(studentId)).thenReturn(BASE64_ID);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     // 実行
     Throwable thrown = catchThrowable(() -> service.restoreStudent(studentId));
     // 検証
     assertThat(thrown)
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessageContaining("受講生ID " + BASE64_ID + " が見つかりません。");
+        .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
   }
 
+  /**
+   * restoreStudent で、論理削除されている受講生が存在する場合に 復元処理と更新処理が実行されることを検証します。
+   */
   @Test
   void restoreStudent_論理削除されている受講生が存在すれば受講生情報を復元すること() {
     Student student = mock(Student.class);
 
     when(student.getDeleted()).thenReturn(true);
     when(studentRepository.findById(studentId)).thenReturn(student);
-    when(converter.encodeBase64(studentId)).thenReturn(BASE64_ID);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     service.restoreStudent(studentId);
 
@@ -417,31 +574,46 @@ class StudentServiceImplTest {
     verify(studentRepository).updateStudent(student);
   }
 
+  /**
+   * restoreStudent で、論理削除されていない受講生に対しては 更新処理が行われないことを検証します。
+   */
   @Test
   void restoreStudent_論理削除されていない場合は更新処理が行われないこと() {
     Student student = mock(Student.class);
 
     when(student.getDeleted()).thenReturn(false);
     when(studentRepository.findById(studentId)).thenReturn(student);
-    when(converter.encodeBase64(studentId)).thenReturn(BASE64_ID);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     service.restoreStudent(studentId);
 
     verify(studentRepository, never()).updateStudent(any());
   }
 
+  /**
+   * forceDeleteStudent で、該当受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。
+   */
   @Test
   void forceDeleteStudent_該当の受講生が存在しない時は例外がスローされること() {
     // モックの設定
     when(studentRepository.findById(studentId)).thenReturn(null);
-    when(converter.encodeBase64(studentId)).thenReturn(BASE64_ID);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     // 実行＆検証
     assertThatThrownBy(() -> service.forceDeleteStudent(studentId))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessageContaining("受講生ID " + BASE64_ID + " が見つかりません。");
+        .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
   }
 
+  /**
+   * forceDeleteStudent で、受講生が存在する場合に 紐づくコースおよび受講生レコードが順序通り削除されることを検証します。
+   *
+   * <p>期待する呼び出し順:
+   * <ol>
+   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}</li>
+   *   <li>{@code studentRepository.forceDeleteStudent(studentId)}</li>
+   * </ol>
+   */
   @Test
   void forceDeleteStudent_受講生が存在する場合はコースと受講生情報が削除されること() {
 
@@ -450,7 +622,7 @@ class StudentServiceImplTest {
 
     // モックの準備
     when(studentRepository.findById(studentId)).thenReturn(student);
-    when(converter.encodeBase64(studentId)).thenReturn(BASE64_ID);
+    when(converter.encodeUuidString(studentId)).thenReturn(UUID_STRING);
 
     // 実行
     service.forceDeleteStudent(studentId);

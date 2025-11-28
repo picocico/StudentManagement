@@ -34,7 +34,6 @@ import raisetech.student.management.dto.StudentCourseDto;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
-import raisetech.student.management.util.IdCodec;
 
 class StudentControllerSuccessTest extends ControllerTestBase {
 
@@ -46,7 +45,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が 16 バイト長の受講生ID（UUIDバイト配列）を返す
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)} が
+   *   16 バイト長の受講生ID（UUIDバイト配列）を返す
    *   <li>{@code service.findStudentById(studentId)} が既存の受講生エンティティを返す
    *   <li>{@code service.searchCoursesByStudentId(studentId)} が 2 件の受講コースを返す
    *   <li>{@code converter.toDetailDto(student, courses)} が期待される {@link StudentDetailDto} を返す
@@ -70,16 +70,16 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   public void getStudentDetail_受講生ID検索した場合_一致する受講生詳細が返ること()
       throws Exception {
 
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
-    when(service.findStudentById(studentId)).thenReturn(student);
-    when(service.searchCoursesByStudentId(studentId)).thenReturn(courses);
+    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(service.findStudentById(studentIdBytes)).thenReturn(student);
+    when(service.searchCoursesByStudentId(studentIdBytes)).thenReturn(courses);
     when(converter.toDetailDto(student, courses))
         .thenReturn(new StudentDetailDto(studentDto, List.of(courseDto1, courseDto2)));
 
     mockMvc
-        .perform(get("/api/students/{studentId}", base64Id))
+        .perform(get("/api/students/{studentId}", studentById))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.student.studentId").value(base64Id))
+        .andExpect(jsonPath("$.student.studentId").value(studentById))
         .andExpect(jsonPath("$.student.fullName").value(fullName))
         .andExpect(jsonPath("$.student.furigana").value(furigana))
         .andExpect(jsonPath("$.student.nickname").value(nickname))
@@ -106,7 +106,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * <p>Given:
    *
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が 16 バイト長の受講生ID（UUIDバイト配列）を返す
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)} が
+   *   16 バイト長の受講生ID（UUIDバイト配列）を返す
    *   <li>{@code service.findStudentById(studentId)} が既存の受講生を返す
    *   <li>{@code service.searchCoursesByStudentId(studentId)} が空リストを返す
    *   <li>{@code converter.toDetailDto(student, emptyList)} が期待される {@link StudentDetailDto} を返す
@@ -131,14 +132,14 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   public void getStudentDetail_受講コースが存在しない場合_空のコースリストが返ること()
       throws Exception {
 
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
-    when(service.findStudentById(studentId)).thenReturn(student);
-    when(service.searchCoursesByStudentId(studentId)).thenReturn(Collections.emptyList());
+    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(service.findStudentById(studentIdBytes)).thenReturn(student);
+    when(service.searchCoursesByStudentId(studentIdBytes)).thenReturn(Collections.emptyList());
     when(converter.toDetailDto(student, Collections.emptyList()))
         .thenReturn(new StudentDetailDto(studentDto, List.of()));
 
     mockMvc
-        .perform(get("/api/students/{studentId}", base64Id))
+        .perform(get("/api/students/{studentId}", studentById))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.student.fullName").value(fullName))
         .andExpect(jsonPath("$.courses.length()").value(0));
@@ -377,7 +378,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     // レスポンス DTO（toDetailDto の戻り値）
     StudentDto outStudent = new StudentDto();
-    outStudent.setStudentId(base64Id);
+    outStudent.setStudentId(studentById);
     outStudent.setFullName(fullName);
     outStudent.setFurigana(furigana);
     outStudent.setNickname(nickname);
@@ -410,7 +411,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
                 .characterEncoding("UTF-8")
                 .content(body))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.student.studentId").value(base64Id))
+        .andExpect(jsonPath("$.student.studentId").value(studentById))
         .andExpect(jsonPath("$.student.fullName").value(fullName))
         .andExpect(jsonPath("$.student.furigana").value(furigana))
         .andExpect(jsonPath("$.student.nickname").value(nickname))
@@ -443,8 +444,9 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *   <li>有効な {@link StudentRegistrationRequest}（student + 1 件の course）が渡される
    *   <li>{@code converter.toEntity(studentDto)} が受講生エンティティを返す
    *   <li>{@code converter.toEntityList(courses, studentId)} が受講コースエンティティを返す
-   *   <li>{@code service.updateStudentWithCourses(student, courses)} が正常終了する（または更新後エンティティを返す）
-   *   <li>{@code converter.encodeBase64(studentId)} と {@code converter.toDetailDto(entity, courses, base64Id)} が
+   *   <li>{@code service.updateStudentWithCourses(student, courses)} が正常終了する
+   *   <li>{@code converter.encodeUuidString(studentIdBytes)} と
+   *       3 引数版{@code converter.toDetailDto(updated, courses, studentIdString)} が
    *       レスポンス用 DTO を生成する
    * </ul>
    *
@@ -457,9 +459,10 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * <ul>
    *   <li>HTTP ステータス 200 が返る
    *   <li>レスポンスの {@code $.student.*} が期待どおりである
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} や各変換メソッドが期待どおり呼び出される
-   *   <li>IDエンコード（{@link IdCodec}）と 3 引数版 {@code toDetailDto(...)} を使って
-   *       レスポンス DTO が組み立てられることを検証する
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)}
+   *   　　や各変換メソッドが期待どおり呼び出される
+   *   <li>UUID ⇔ byte[] の ID 変換と 3 引数版 {@code converter.toDetailDto(...)}
+   *   　　を使ってレスポンス DTO が組み立てられることを検証する
    * </ul>
    *
    * @throws Exception MockMvc 実行時の例外
@@ -476,12 +479,12 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     StudentDetailDto expected = new StudentDetailDto(studentDto, List.of(courseDto));
 
     when(converter.toDetailDto(
-        any(Student.class), anyList(), eq(base64Id) // コントローラがレスポンスIDに使うBase64
+        any(Student.class), anyList(), eq(studentById)
     ))
         .thenReturn(expected);
     when(converter.toEntity(studentDto)).thenReturn(student);
     when(converter.toEntityList(
-        eq(List.of(courseDto)), argThat(arr -> Arrays.equals(arr, studentId))))
+        eq(List.of(courseDto)), argThat(arr -> Arrays.equals(arr, studentIdBytes))))
         .thenReturn(courses);
     // （任意・安全策）サービスが戻り値を返す設計なら
     when(service.updateStudentWithCourses(same(student), anyList())).thenReturn(student);
@@ -489,11 +492,11 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     // Act & Assert
     mockMvc
         .perform(
-            put("/api/students/{studentId}", base64Id)
+            put("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(req)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.student.studentId").value(base64Id))
+        .andExpect(jsonPath("$.student.studentId").value(studentById))
         .andExpect(jsonPath("$.student.fullName").value(fullName))
         .andExpect(jsonPath("$.student.furigana").value(furigana))
         .andExpect(jsonPath("$.student.nickname").value(nickname))
@@ -505,12 +508,12 @@ class StudentControllerSuccessTest extends ControllerTestBase {
         .andExpect(jsonPath("$.student.deleted").value(false));
 
     // （任意）呼び出し検証
-    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
+    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
     verify(converter).toEntity(studentDto);
-    verify(converter).toEntityList(anyList(), argThat(arr -> Arrays.equals(arr, studentId)));
+    verify(converter).toEntityList(anyList(), argThat(arr -> Arrays.equals(arr, studentIdBytes)));
     // verify も3引数に
-    verify(converter).encodeBase64(argThat(arr -> Arrays.equals(arr, studentId))); // 追加
-    verify(converter).toDetailDto(any(Student.class), same(courses), eq(base64Id));
+    verify(converter).encodeUuidString(argThat(arr -> Arrays.equals(arr, studentIdBytes))); // 追加
+    verify(converter).toDetailDto(any(Student.class), same(courses), eq(studentById));
     verifyNoMoreInteractions(converter);
   }
 
@@ -556,19 +559,19 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     List<StudentCourse> updatedCourses = List.of(new StudentCourse());
     StudentDetailDto out = new StudentDetailDto();
 
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
-    when(service.findStudentById(studentId)).thenReturn(existing);
+    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(service.findStudentById(studentIdBytes)).thenReturn(existing);
     when(converter.toEntity(any(StudentDto.class))).thenReturn(merged);
     doNothing().when(converter).mergeStudent(existing, merged);
-    when(converter.toEntityList(List.of(courseDto), studentId)).thenReturn(newCourses);
+    when(converter.toEntityList(List.of(courseDto), studentIdBytes)).thenReturn(newCourses);
     doNothing().when(service).partialUpdateStudent(existing, newCourses);
-    when(service.findStudentById(studentId)).thenReturn(updated);
-    when(service.searchCoursesByStudentId(studentId)).thenReturn(updatedCourses);
+    when(service.findStudentById(studentIdBytes)).thenReturn(updated);
+    when(service.searchCoursesByStudentId(studentIdBytes)).thenReturn(updatedCourses);
     when(converter.toDetailDto(updated, updatedCourses)).thenReturn(out);
 
     mockMvc
         .perform(
-            patch("/api/students/{studentId}", base64Id)
+            patch("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(req)))
         .andExpect(status().isOk());
@@ -597,7 +600,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * <ul>
    *   <li>HTTP ステータス 200 が返る
    *   <li>レスポンスの {@code $.student.fullName} が {@code "新しい名前"} に更新されている
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} が呼び出される
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)} が呼び出される
    *   <li>{@code converter.toEntityList(...)} は呼び出されない
    *   <li>{@code service.updateStudentInfoOnly(existing)} および {@code service.searchCoursesByStudentId(studentId)} が呼び出される
    * </ul>
@@ -617,10 +620,10 @@ class StudentControllerSuccessTest extends ControllerTestBase {
             """;
 
     // --- Mock 準備 ---
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
+    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
 
     Student existing = new Student();
-    when(service.findStudentById(studentId)).thenReturn(existing);
+    when(service.findStudentById(studentIdBytes)).thenReturn(existing);
 
     // student のマージ
     Student merged = new Student();
@@ -629,41 +632,41 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     doNothing().when(converter).mergeStudent(existing, merged);
 
     // courses 変換は空リストを返す
-    when(converter.toEntityList(Collections.emptyList(), studentId))
+    when(converter.toEntityList(Collections.emptyList(), studentIdBytes))
         .thenReturn(Collections.emptyList());
 
     // コース再取得は空を返す想定
-    when(service.searchCoursesByStudentId(studentId)).thenReturn(Collections.emptyList());
+    when(service.searchCoursesByStudentId(studentIdBytes)).thenReturn(Collections.emptyList());
 
     // findStudentById は 2回呼ばれるので、1回目: existing, 2回目: updated を返す
     Student updated = new Student();
-    when(service.findStudentById(studentId)).thenReturn(existing, updated);
+    when(service.findStudentById(studentIdBytes)).thenReturn(existing, updated);
 
     // レスポンスDTOをスタブ（name に "新しい名前" が入るように）
     StudentDto respStudent = new StudentDto();
     respStudent.setFullName("新しい名前"); // ※JSONでは $.student.name を見ている前提
     StudentDetailDto resp = new StudentDetailDto(respStudent, Collections.emptyList());
-    when(converter.toDetailDto(updated, Collections.emptyList(), base64Id)).thenReturn(resp);
+    when(converter.toDetailDto(updated, Collections.emptyList(), studentById)).thenReturn(resp);
 
     // --- 実行 & 検証 ---
     mockMvc
         .perform(
-            patch("/api/students/{studentId}", base64Id)
+            patch("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.student.fullName").value("新しい名前"));
 
     // 期待：サービスは動いている（NoInteractions ではない）
-    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
-    verify(service, times(2)).findStudentById(studentId);
-    verify(converter, never()).toEntityList(anyList(), eq(studentId));
+    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
+    verify(service, times(2)).findStudentById(studentIdBytes);
+    verify(converter, never()).toEntityList(anyList(), eq(studentIdBytes));
 
     // 置換モードなので updateStudentInfoOnly は呼ばれる（空でもOK、Service側が無視）
     verify(service).updateStudentInfoOnly(existing);
 
     // updateStudentInfoOnlyで「既存コースの再取得される
-    verify(service).searchCoursesByStudentId(studentId);
+    verify(service).searchCoursesByStudentId(studentIdBytes);
   }
 
   /**
@@ -674,7 +677,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} により受講生IDがデコードされる
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)} により受講生IDがデコードされる
    *   <li>{@code service.softDeleteStudent(studentId)} が正常終了する
    * </ul>
    *
@@ -695,15 +698,15 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   @Test
   public void deleteStudent_論理削除に成功した場合_204_No_Contentを返すこと() throws Exception {
 
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
+    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
 
     mockMvc
-        .perform(delete("/api/students/{studentId}", base64Id))
+        .perform(delete("/api/students/{studentId}", studentById))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
 
-    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
-    verify(service).softDeleteStudent(eq(studentId));
+    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
+    verify(service).softDeleteStudent(eq(studentIdBytes));
     verifyNoMoreInteractions(service);
   }
 
@@ -715,7 +718,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code idCodec.decodeUuidBytesOrThrow(base64Id)} により受講生IDがデコードされる
+   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)} により受講生IDがデコードされる
    *   <li>{@code service.restoreStudent(studentId)} が正常終了する
    * </ul>
    *
@@ -736,15 +739,15 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   @Test
   public void restoreStudent_復元に成功したら204を返すこと() throws Exception {
 
-    when(idCodec.decodeUuidBytesOrThrow(base64Id)).thenReturn(studentId);
+    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
 
     mockMvc
-        .perform(patch("/api/students/{studentId}/restore", base64Id))
+        .perform(patch("/api/students/{studentId}/restore", studentById))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
 
-    verify(idCodec).decodeUuidBytesOrThrow(base64Id);
-    verify(service).restoreStudent(eq(studentId));
+    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
+    verify(service).restoreStudent(eq(studentIdBytes));
     verifyNoMoreInteractions(service);
   }
 }
