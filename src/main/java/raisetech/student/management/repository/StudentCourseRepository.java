@@ -1,13 +1,14 @@
 package raisetech.student.management.repository;
 
 import java.util.List;
-
+import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-
 import raisetech.student.management.data.StudentCourse;
 
-/** 受講生のコース情報に関するデータベース操作を行うMyBatisリポジトリ。 */
+/**
+ * 受講生のコース情報に関するデータベース操作を行うMyBatisリポジトリ。
+ */
 @Mapper
 public interface StudentCourseRepository {
 
@@ -25,12 +26,18 @@ public interface StudentCourseRepository {
    */
   void insertIfNotExists(StudentCourse course);
 
-  /** 指定された受講生IDに紐づくすべてのコース情報を削除します。 */
-  void deleteCoursesByStudentId(@Param("studentId") byte[] studentId);
+  /**
+   * 指定された受講生IDに紐づくすべてのコース情報を削除します。
+   */
+  void deleteCoursesByStudentId(@Param("studentId") UUID studentId);
 
-  /** 指定された受講生IDに紐づくコース情報を取得します。 */
-  List<StudentCourse> findCoursesByStudentId(@Param("studentId") byte[] studentId);
+  /**
+   * 指定された受講生IDに紐づくコース情報を取得します。
+   */
+  List<StudentCourse> findCoursesByStudentId(@Param("studentId") UUID studentId);
 
-  /** すべての受講生コース情報を取得します。 */
+  /**
+   * すべての受講生コース情報を取得します。
+   */
   List<StudentCourse> findAllCourses();
 }

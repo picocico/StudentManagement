@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
-import raisetech.student.management.util.UUIDUtil;
 
 @MybatisTest
 public class StudentRepositoryTest {
@@ -25,7 +24,7 @@ public class StudentRepositoryTest {
   private StudentCourseRepository courseRepository;
 
   // コア：すべてのフィールドを引数で受け取る（private）
-  private byte[] insertStudent(
+  private UUID insertStudent(
       String fullName,
       String furigana,
       String nickname,
@@ -35,7 +34,7 @@ public class StudentRepositoryTest {
       String gender,
       String remarks
   ) {
-    byte[] id = UUIDUtil.toBytes(UUID.randomUUID());
+    UUID id = UUID.randomUUID();
 
     Student s = new Student();
     s.setStudentId(id);
@@ -54,7 +53,7 @@ public class StudentRepositoryTest {
   }
 
   // 一般用：何も考えずに「まともな1件」が欲しいとき
-  private byte[] insertTestStudentAndReturnId() {
+  private UUID insertTestStudentAndReturnId() {
     String email = "test-" + System.nanoTime() + "@example.com";
     return insertStudent(
         "テスト 太郎",
@@ -62,14 +61,14 @@ public class StudentRepositoryTest {
         "テスト",
         email,
         "東京",
-        20,
+        30,
         "male",
         "テスト用"
     );
   }
 
   // email を指定したいときだけこれを使う
-  private byte[] insertTestStudentAndReturnId(String email) {
+  private UUID insertTestStudentAndReturnId(String email) {
     return insertStudent(
         "テスト 一郎",
         "てすと いちろう",
@@ -136,7 +135,7 @@ public class StudentRepositoryTest {
     int beforeSize = before.size();
 
     // act: 1件INSERT
-    byte[] id = insertTestStudentAndReturnId();
+    UUID id = insertTestStudentAndReturnId();
 
     // assert: 件数が +1 されていること
     List<Student> after = sut.searchStudents(null, true, false);
@@ -144,7 +143,7 @@ public class StudentRepositoryTest {
 
     // さきほどのIDを持つレコードが存在すること
     Student saved = after.stream()
-        .filter(s -> Arrays.equals(s.getStudentId(), id))
+        .filter(s -> Objects.equals(s.getStudentId(), id))
         .findFirst()
         .orElseThrow(() -> new AssertionError("登録した受講生が見つかりません"));
 
@@ -155,7 +154,7 @@ public class StudentRepositoryTest {
 
   @Test
   void findById_既存IDで取得できること() {
-    byte[] id = insertTestStudentAndReturnId(); // ← 引数なし版でOK
+    UUID id = insertTestStudentAndReturnId(); // ← 引数なし版でOK
 
     Student found = sut.findById(id);
 
@@ -166,8 +165,7 @@ public class StudentRepositoryTest {
 
   @Test
   void findById_存在しないIDの場合はnullが返ること() {
-    UUID unused = UUID.randomUUID();
-    byte[] unusedId = UUIDUtil.toBytes(unused);
+    UUID unusedId = UUID.randomUUID();
 
     Student actual = sut.findById(unusedId);
 
@@ -177,7 +175,7 @@ public class StudentRepositoryTest {
   @Test
   void updateStudent_既存受講生の情報を更新できること() {
     // まずテスト用レコードをINSERTして、そのIDをもらう
-    byte[] id = insertTestStudentAndReturnId();
+    UUID id = insertTestStudentAndReturnId();
 
     Student student = sut.findById(id);
     assertThat(student).isNotNull();
@@ -199,7 +197,7 @@ public class StudentRepositoryTest {
 
   @Test
   void updateStudent_必須項目がnullの場合はDataIntegrityViolationExceptionが送出されること() {
-    byte[] id = insertTestStudentAndReturnId();
+    UUID id = insertTestStudentAndReturnId();
 
     // そのレコードを取得
     Student toUpdate = sut.findById(id);
@@ -216,7 +214,7 @@ public class StudentRepositoryTest {
   @Test
   void updateStudent_存在しないIDの場合は0件更新となること() {
     // 未使用っぽい ID を生成
-    byte[] unusedId = UUIDUtil.toBytes(UUID.randomUUID());
+    UUID unusedId = UUID.randomUUID();
 
     Student student = new Student();
     student.setStudentId(unusedId);
@@ -238,10 +236,14 @@ public class StudentRepositoryTest {
     String duplicatedEmail = "dup-update@example.com";
 
     // 1人目 INSERT（data.sql の既存レコードでもOK）
-    byte[] id1 = insertTestStudentAndReturnId(duplicatedEmail);
+    UUID id1 = insertTestStudentAndReturnId(duplicatedEmail);
+
+    Student saved = sut.findById(id1);
+    assertThat(saved).isNotNull();
+    assertThat(saved.getEmail()).isEqualTo(duplicatedEmail);
 
     // 2人目 INSERT
-    byte[] id2 = insertTestStudentAndReturnId("second-update@example.com"); // メールは別のものにしておく
+    UUID id2 = insertTestStudentAndReturnId("second-update@example.com"); // メールは別のものにしておく
     Student student2 = sut.findById(id2);
     assertThat(student2).isNotNull();
 
@@ -254,7 +256,7 @@ public class StudentRepositoryTest {
 
   @Test
   void updateStudent_年齢が負の値の場合はDataIntegrityViolationExceptionになること() {
-    byte[] id = insertTestStudentAndReturnId();
+    UUID id = insertTestStudentAndReturnId();
     Student student = sut.findById(id);
     assertThat(student).isNotNull();
 
@@ -266,7 +268,7 @@ public class StudentRepositoryTest {
 
   @Test
   void forceDeleteStudent_受講生が存在する場合は削除されること() {
-    byte[] id = insertTestStudentAndReturnId();
+    UUID id = insertTestStudentAndReturnId();
 
     int deleted = sut.forceDeleteStudent(id);
 
@@ -276,7 +278,7 @@ public class StudentRepositoryTest {
 
   @Test
   void forceDeleteStudent_存在しないIDの場合は0件削除となること() {
-    byte[] unusedId = UUIDUtil.toBytes(UUID.randomUUID());
+    UUID unusedId = UUID.randomUUID();
 
     int deleted = sut.forceDeleteStudent(unusedId);
 
@@ -285,11 +287,11 @@ public class StudentRepositoryTest {
 
   @Test
   void forceDeleteStudent_受講コースが残っている場合は外部キー制約違反で例外になること() {
-    byte[] id = insertTestStudentAndReturnId();
+    UUID id = insertTestStudentAndReturnId();
 
     StudentCourse course = new StudentCourse();
     course.setStudentId(id);
-    course.setCourseId(UUIDUtil.toBytes(UUID.randomUUID()));
+    course.setCourseId(UUID.randomUUID());
     course.setCourseName("Javaコース");
     course.setStartDate(LocalDate.of(2025, 1, 1));
     course.setEndDate(LocalDate.of(2025, 12, 31));

@@ -19,9 +19,9 @@
     <foreach collection="list" item="course" separator=",">
       (
       #{course.courseId, jdbcType=BINARY,
-      typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
       #{course.studentId, jdbcType=BINARY,
-      typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
       #{course.courseName},
       #{course.startDate},
       #{course.endDate},
@@ -35,8 +35,8 @@
     INSERT INTO student_courses (course_id, student_id, course_name, start_date, end_date,
     created_at)
     SELECT
-    #{courseId, jdbcType=BINARY, typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
-    #{studentId, jdbcType=BINARY, typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
+    #{courseId, jdbcType=BINARY, typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
+    #{studentId, jdbcType=BINARY, typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
     #{courseName},
     #{startDate},
     #{endDate},
@@ -52,14 +52,14 @@
   <!-- 削除 -->
   <delete id="deleteCoursesByStudentId" parameterType="byte[]">
     DELETE FROM student_courses WHERE student_id = #{studentId, jdbcType=BINARY,
-    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler}
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </delete>
 
   <!-- 特定の受講生のコースを取得 -->
   <select id="findCoursesByStudentId" parameterType="byte[]"
     resultType="raisetech.student.management.data.StudentCourse">
     SELECT * FROM student_courses WHERE student_id = #{studentId, jdbcType=BINARY,
-    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler}
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </select>
 
   <!-- 全件取得 -->

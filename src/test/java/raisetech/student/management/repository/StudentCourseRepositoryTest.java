@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
-import raisetech.student.management.util.UUIDUtil;
 
 @MybatisTest
 public class StudentCourseRepositoryTest {
@@ -26,8 +25,8 @@ public class StudentCourseRepositoryTest {
   /**
    * テスト用の受講生を1件INSERTし、そのstudent_id(byte[16])を返すヘルパー。
    */
-  private byte[] insertTestStudentAndReturnId() {
-    byte[] id = UUIDUtil.toBytes(UUID.randomUUID());
+  private UUID insertTestStudentAndReturnId() {
+    UUID id = UUID.randomUUID();
 
     Student s = new Student();
     s.setStudentId(id);
@@ -48,10 +47,10 @@ public class StudentCourseRepositoryTest {
   /**
    * テスト用の StudentCourse を1件生成する共通ヘルパー（フル版）
    */
-  private StudentCourse newCourse(byte[] studentId, String courseName,
+  private StudentCourse newCourse(UUID studentId, String courseName,
       LocalDate start, LocalDate end) {
     StudentCourse c = new StudentCourse();
-    c.setCourseId(UUIDUtil.toBytes(UUID.randomUUID()));
+    c.setCourseId(UUID.randomUUID());
     c.setStudentId(studentId);
     c.setCourseName(courseName);
     c.setStartDate(start);   // ★ここが今回のポイント
@@ -60,7 +59,7 @@ public class StudentCourseRepositoryTest {
   }
 
   // よく使う「お任せ」版（今回のテストではこっちを使う）
-  private StudentCourse newCourse(byte[] studentId, String courseName) {
+  private StudentCourse newCourse(UUID studentId, String courseName) {
     return newCourse(
         studentId,
         courseName,
@@ -80,8 +79,8 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void findCoursesByStudentId_特定受講生のコースのみ取得できること() {
-    byte[] studentId1 = insertTestStudentAndReturnId();
-    byte[] studentId2 = insertTestStudentAndReturnId();
+    UUID studentId1 = insertTestStudentAndReturnId();
+    UUID studentId2 = insertTestStudentAndReturnId();
 
     // ★ コースエンティティを作成（2引数版でOK）
     StudentCourse c1 = newCourse(studentId1, "Javaコース");
@@ -101,7 +100,7 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void insertCourses_複数コースを一括登録できること() {
-    byte[] studentId = insertTestStudentAndReturnId();
+    UUID studentId = insertTestStudentAndReturnId();
 
     StudentCourse c1 = newCourse(
         studentId,
@@ -127,7 +126,7 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void insertCourses_存在しない受講生IDを指定した場合はDataIntegrityViolationException() {
-    byte[] nonExistingStudentId = UUIDUtil.toBytes(UUID.randomUUID());
+    UUID nonExistingStudentId = UUID.randomUUID();
 
     // NOT NULL をすべて満たした上で FK だけ不正にする
     StudentCourse c = newCourse(
@@ -143,7 +142,7 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void insertIfNotExists_存在しない組み合わせなら登録されること() {
-    byte[] studentId = insertTestStudentAndReturnId();
+    UUID studentId = insertTestStudentAndReturnId();
 
     StudentCourse course = newCourse(
         studentId,
@@ -163,7 +162,7 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void insertIfNotExists_同一受講生同一コース名は2回目以降挿入されないこと() {
-    byte[] studentId = insertTestStudentAndReturnId();
+    UUID studentId = insertTestStudentAndReturnId();
 
     StudentCourse course = newCourse(
         studentId,
@@ -187,7 +186,7 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void deleteCoursesByStudentId_紐づくコースが全て削除されること() {
-    byte[] studentId = insertTestStudentAndReturnId();
+    UUID studentId = insertTestStudentAndReturnId();
 
     StudentCourse c1 = newCourse(studentId, "Java基礎");
     StudentCourse c2 = newCourse(studentId, "AWS入門");
@@ -207,7 +206,7 @@ public class StudentCourseRepositoryTest {
 
   @Test
   void deleteCoursesByStudentId_該当コースが無いIDでも例外にならないこと() {
-    byte[] nonExistingStudentId = UUIDUtil.toBytes(UUID.randomUUID());
+    UUID nonExistingStudentId = UUID.randomUUID();
 
     int beforeSize = sut.findAllCourses().size();
 
