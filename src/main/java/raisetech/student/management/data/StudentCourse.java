@@ -3,6 +3,7 @@ package raisetech.student.management.data;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -26,7 +27,7 @@ public class StudentCourse {
   @Schema(
       description = "コースID（UUIDをBINARY形式で格納した16バイト配列）",
       format = "byte")
-  private byte[] courseId;
+  private UUID courseId;
 
   /**
    * 受講生ID（UUID を BINARY(16) として保持する 16 バイト配列）。
@@ -36,7 +37,7 @@ public class StudentCourse {
   @Schema(
       description = "受講生ID（UUIDをBINARY形式で格納した16バイト配列）",
       format = "byte")
-  private byte[] studentId;
+  private UUID studentId;
 
   /**
    * コース名。
