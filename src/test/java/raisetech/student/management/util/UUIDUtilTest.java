@@ -39,9 +39,17 @@ public class UUIDUtilTest {
 
   @Test
   void toBytes_異常系_nullを渡すとIllegalArgumentExceptionがスローされること() {
-    assertThatThrownBy(() -> UUIDUtil.toBytes(null))
+    assertThatThrownBy(() -> UUIDUtil.toBytes((UUID) null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("UUIDはnullにできません");
+  }
+
+  @Test
+  void toBytes_String_異常系_nullを渡すとIllegalArgumentExceptionがスローされること() {
+    assertThatThrownBy(() -> UUIDUtil.toBytes((String) null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("uuidString must not be null");
   }
 
   @Nested
