@@ -1,6 +1,7 @@
 package raisetech.student.management.service;
 
 import java.util.List;
+import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -23,20 +24,20 @@ public interface StudentService {
    * @param student 更新対象の学生エンティティ（studentId は必須）
    * @param courses 更新後に紐づける受講コースの一覧（null/空配列は「0件に置換」）
    * @return 更新後の学生エンティティ
-   * @throws IllegalArgumentException                                         studentId が null の場合
-   * @throws raisetech.student.management.exception.ResourceNotFoundException 指定IDの学生が存在しない場合
+   * @throws IllegalArgumentException  studentId が null の場合
+   * @throws ResourceNotFoundException 指定IDの学生が存在しない場合
    */
   @Transactional
   Student updateStudentWithCourses(Student student, List<StudentCourse> courses);
 
   /**
-   * 学生IDに紐づく受講コース一覧を取得します。
+   * 受講生IDに紐づく受講コース一覧を取得します。
    *
-   * @param studentId 学生ID（BINARY(16)）
+   * @param studentId 受講生ID（UUID）
    * @return 受講コース一覧（0件の場合は空リスト）
    * @throws IllegalArgumentException studentId が null の場合
    */
-  List<StudentCourse> getCoursesByStudentId(byte[] studentId);
+  List<StudentCourse> getCoursesByStudentId(UUID studentId);
 
   // 既存メソッド群（例）
   // Student partialUpdateStudentWithCourses(...);
@@ -83,10 +84,10 @@ public interface StudentService {
    * <p>このメソッドは、すでに存在する {@code student_id + course_name} の組み合わせを 保持したまま、新たなコース情報だけをデータベースに登録します。
    * 既存のコースは削除されず、重複も防止されます。
    *
-   * @param studentId  受講生の識別子（UUID文字列表現）
+   * @param studentId  受講生の識別子（UUID）
    * @param newCourses 追加対象の新しいコース情報のリスト {@code studentId} に紐づけられている必要があります
    */
-  void appendCourses(byte[] studentId, List<StudentCourse> newCourses);
+  void appendCourses(UUID studentId, List<StudentCourse> newCourses);
 
   /**
    * 受講生情報のみを更新します（コース情報は変更しません）。
@@ -98,18 +99,18 @@ public interface StudentService {
   /**
    * 受講生IDにより受講生情報を取得します。
    *
-   * @param studentId 受講生ID
+   * @param studentId 受講生ID（UUID）
    * @return 受講生エンティティ
    */
-  Student findStudentById(byte[] studentId);
+  Student findStudentById(UUID studentId);
 
   /**
    * 受講生IDに紐づくコース情報を取得します。
    *
-   * @param studentId 受講生ID
+   * @param studentId 受講生ID（UUID）
    * @return コースエンティティのリスト
    */
-  List<StudentCourse> searchCoursesByStudentId(byte[] studentId);
+  List<StudentCourse> searchCoursesByStudentId(UUID studentId);
 
   /**
    * 全てのコース情報を取得します。
@@ -121,23 +122,23 @@ public interface StudentService {
   /**
    * 受講生を論理削除します。
    *
-   * @param studentId 受講生ID
+   * @param studentId 受講生ID（UUID）
    */
-  void softDeleteStudent(byte[] studentId);
+  void softDeleteStudent(UUID studentId);
 
   /**
    * 論理削除された受講生を復元します。
    *
-   * @param studentId 受講生ID
+   * @param studentId 受講生ID（UUID）
    */
-  void restoreStudent(byte[] studentId);
+  void restoreStudent(UUID studentId);
 
   /**
    * 受講生情報とそのコース情報を物理削除します（管理者専用）。
    *
-   * @param studentId 削除対象の受講生ID
+   * @param studentId 削除対象の受講生ID（UUID）
    */
-  void forceDeleteStudent(byte[] studentId);
+  void forceDeleteStudent(UUID studentId);
 
   /**
    * 指定した受講生の既存コースを全て削除し、与えられた一覧に置き換えます。
@@ -146,11 +147,11 @@ public interface StudentService {
    * 呼び出し側で {@code updateStudentInfoOnly(...)} 等の基本情報更新を別途行ってください。 また、レスポンスに返す際は最終状態を必ず DB
    * から再取得することを推奨します。
    *
-   * @param studentIdBytes UUID文字列表現の受講生ID（バイナリ）
-   * @param newCourses     置換後に保持するコース一覧（null/空の場合は「全削除のみ」）
+   * @param studentId  受講生ID（UUID）
+   * @param newCourses 置換後に保持するコース一覧（null/空の場合は「全削除のみ」）
    * @throws ResourceNotFoundException 該当受講生が存在しない場合
    * @implNote 各 {@code StudentCourse} の {@code studentId} は本メソッド内で安全のため再セットします。
    * @since 1.0
    */
-  void replaceCourses(byte[] studentIdBytes, List<StudentCourse> newCourses);
+  void replaceCourses(UUID studentId, List<StudentCourse> newCourses);
 }

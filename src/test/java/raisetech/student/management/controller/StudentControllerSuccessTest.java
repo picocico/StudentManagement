@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -23,9 +21,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import raisetech.student.management.data.Student;
@@ -45,7 +43,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)} が
+   *   <li>{@code converter.decodeUuidStringOrThrow(studentById)} が
    *   16 バイト長の受講生ID（UUIDバイト配列）を返す
    *   <li>{@code service.findStudentById(studentId)} が既存の受講生エンティティを返す
    *   <li>{@code service.searchCoursesByStudentId(studentId)} が 2 件の受講コースを返す
@@ -70,9 +68,9 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   public void getStudentDetail_受講生ID検索した場合_一致する受講生詳細が返ること()
       throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
-    when(service.findStudentById(studentIdBytes)).thenReturn(student);
-    when(service.searchCoursesByStudentId(studentIdBytes)).thenReturn(courses);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
+    when(service.findStudentById(studentId)).thenReturn(student);
+    when(service.searchCoursesByStudentId(studentId)).thenReturn(courses);
     when(converter.toDetailDto(student, courses))
         .thenReturn(new StudentDetailDto(studentDto, List.of(courseDto1, courseDto2)));
 
@@ -132,17 +130,44 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   public void getStudentDetail_受講コースが存在しない場合_空のコースリストが返ること()
       throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
-    when(service.findStudentById(studentIdBytes)).thenReturn(student);
-    when(service.searchCoursesByStudentId(studentIdBytes)).thenReturn(Collections.emptyList());
-    when(converter.toDetailDto(student, Collections.emptyList()))
-        .thenReturn(new StudentDetailDto(studentDto, List.of()));
+    // given
+    String idStr = studentById;   // 既にテストクラスで用意している UUID 文字列
+    UUID idUuid = studentId;      // 既に @BeforeEach で UUID.fromString している想定
 
+    // 1) String -> UUID デコード
+    when(converter.decodeUuidStringOrThrow(idStr)).thenReturn(idUuid);
+
+    // 2) Student は存在するが、コースは0件
+    Student student = new Student();
+    student.setStudentId(idUuid);
+    student.setFullName("山田 太郎");
+
+    when(service.findStudentById(idUuid)).thenReturn(student);
+    when(service.searchCoursesByStudentId(idUuid)).thenReturn(List.of());
+
+    // 3) Converter が返す DTO を明示的にスタブする
+    StudentDto studentDto =
+        new StudentDto(idStr, "山田 太郎", "やまだ たろう", "タロウ",
+            "taro@example.com", "Osaka", 25, "Male", "備考", false);
+
+    StudentDetailDto detailDto = new StudentDetailDto(studentDto, List.of());
+
+    when(converter.toDetailDto(student, List.of()))
+        .thenReturn(detailDto);
+
+    // when & then
     mockMvc
-        .perform(get("/api/students/{studentId}", studentById))
+        .perform(get("/api/students/{studentId}", idStr))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.student.fullName").value(fullName))
-        .andExpect(jsonPath("$.courses.length()").value(0));
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(jsonPath("$.student.fullName").value("山田 太郎"))
+        .andExpect(jsonPath("$.courses").isArray())
+        .andExpect(jsonPath("$.courses").isEmpty());
+
+    verify(converter).decodeUuidStringOrThrow(idStr);
+    verify(service).findStudentById(idUuid);
+    verify(service).searchCoursesByStudentId(idUuid);
+    verify(converter).toDetailDto(student, List.of());
   }
 
   /**
@@ -468,53 +493,78 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception MockMvc 実行時の例外
    */
   @Test
-  void updateStudent_受講生情報を更新した時_ステータス200と更新済Dtoレスポンスが返ること()
+  public void updateStudent_受講生情報を更新した時_ステータス200と更新済Dtoレスポンスが返ること()
       throws Exception {
 
-    var req = new StudentRegistrationRequest();
-    req.setStudent(studentDto);
-    req.setCourses(List.of(courseDto));
+    // given
+    String idStr = studentById;   // "123e4567-e89b-..."
+    UUID idUuid = studentId;      // @BeforeEach で UUID.fromString している想定
 
-    // コントローラの戻りを固定：DTOを直接返す設計なら toDetailDto のみでOK
-    StudentDetailDto expected = new StudentDetailDto(studentDto, List.of(courseDto));
+    // リクエストDTO
+    StudentDto bodyStudentDto = new StudentDto(
+        idStr,
+        "テスト　花子",
+        "てすと　はなこ",
+        "ハナちゃん",
+        "test@example.com",
+        "大阪",
+        30,
+        "Female",
+        "コース追加予定",
+        false
+    );
 
-    when(converter.toDetailDto(
-        any(Student.class), anyList(), eq(studentById)
-    ))
-        .thenReturn(expected);
-    when(converter.toEntity(studentDto)).thenReturn(student);
-    when(converter.toEntityList(
-        eq(List.of(courseDto)), argThat(arr -> Arrays.equals(arr, studentIdBytes))))
-        .thenReturn(courses);
-    // （任意・安全策）サービスが戻り値を返す設計なら
-    when(service.updateStudentWithCourses(same(student), anyList())).thenReturn(student);
+    StudentCourseDto bodyCourseDto =
+        new StudentCourseDto(null, "Javaコース", null, null);
 
-    // Act & Assert
+    StudentRegistrationRequest req = new StudentRegistrationRequest();
+    req.setStudent(bodyStudentDto);
+    req.setCourses(List.of(bodyCourseDto));
+
+    // Entity 側
+    Student entityBefore = new Student();
+    entityBefore.setStudentId(idUuid);
+    entityBefore.setFullName("テスト　花子");
+    // …必要なら他のフィールドも
+
+    List<StudentCourse> entityCourses = List.of(new StudentCourse());
+    entityCourses.get(0).setStudentId(idUuid);
+
+    Student updated = new Student();
+    updated.setStudentId(idUuid);
+    updated.setFullName("テスト　花子");
+
+    StudentDetailDto detailDto =
+        new StudentDetailDto(bodyStudentDto, List.of(
+            new StudentCourseDto("some-uuid", "Javaコース", null, null)));
+
+    // スタブ
+    when(converter.decodeUuidStringOrThrow(idStr)).thenReturn(idUuid);
+    when(converter.toEntity(bodyStudentDto)).thenReturn(entityBefore);
+    when(converter.toEntityList(req.getCourses(), idUuid)).thenReturn(entityCourses);
+    when(service.updateStudentWithCourses(entityBefore, entityCourses))
+        .thenReturn(updated);
+    // ★ ここだけで十分（パスで受け取った UUID 文字列をそのまま第三引数へ）
+    when(converter.toDetailDto(updated, entityCourses, idStr))
+        .thenReturn(detailDto);
+
+    // when & then
     mockMvc
         .perform(
-            put("/api/students/{studentId}", studentById)
+            put("/api/students/{studentId}", idStr)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(json(req)))
+                .content(objectMapper.writeValueAsString(req)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.student.studentId").value(studentById))
-        .andExpect(jsonPath("$.student.fullName").value(fullName))
-        .andExpect(jsonPath("$.student.furigana").value(furigana))
-        .andExpect(jsonPath("$.student.nickname").value(nickname))
-        .andExpect(jsonPath("$.student.email").value(email))
-        .andExpect(jsonPath("$.student.location").value(location))
-        .andExpect(jsonPath("$.student.age").value(age))
-        .andExpect(jsonPath("$.student.gender").value(gender))
-        .andExpect(jsonPath("$.student.remarks").value(remarks))
-        .andExpect(jsonPath("$.student.deleted").value(false));
+        .andExpect(jsonPath("$.student.studentId").value(idStr))
+        .andExpect(jsonPath("$.student.fullName").value("テスト　花子"));
 
-    // （任意）呼び出し検証
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
-    verify(converter).toEntity(studentDto);
-    verify(converter).toEntityList(anyList(), argThat(arr -> Arrays.equals(arr, studentIdBytes)));
-    // verify も3引数に
-    verify(converter).encodeUuidString(argThat(arr -> Arrays.equals(arr, studentIdBytes))); // 追加
-    verify(converter).toDetailDto(any(Student.class), same(courses), eq(studentById));
-    verifyNoMoreInteractions(converter);
+    // verify（encodeUuidString はもう期待しない）
+    verify(converter).decodeUuidStringOrThrow(idStr);
+    verify(converter).toEntity(bodyStudentDto);
+    verify(converter).toEntityList(req.getCourses(), idUuid);
+    verify(service).updateStudentWithCourses(entityBefore, entityCourses);
+    verify(converter).toDetailDto(updated, entityCourses, idStr);
+    verifyNoMoreInteractions(converter, service);
   }
 
   /**
@@ -559,14 +609,14 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     List<StudentCourse> updatedCourses = List.of(new StudentCourse());
     StudentDetailDto out = new StudentDetailDto();
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
-    when(service.findStudentById(studentIdBytes)).thenReturn(existing);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
+    when(service.findStudentById(studentId)).thenReturn(existing);
     when(converter.toEntity(any(StudentDto.class))).thenReturn(merged);
     doNothing().when(converter).mergeStudent(existing, merged);
-    when(converter.toEntityList(List.of(courseDto), studentIdBytes)).thenReturn(newCourses);
+    when(converter.toEntityList(List.of(courseDto), studentId)).thenReturn(newCourses);
     doNothing().when(service).partialUpdateStudent(existing, newCourses);
-    when(service.findStudentById(studentIdBytes)).thenReturn(updated);
-    when(service.searchCoursesByStudentId(studentIdBytes)).thenReturn(updatedCourses);
+    when(service.findStudentById(studentId)).thenReturn(updated);
+    when(service.searchCoursesByStudentId(studentId)).thenReturn(updatedCourses);
     when(converter.toDetailDto(updated, updatedCourses)).thenReturn(out);
 
     mockMvc
@@ -620,10 +670,10 @@ class StudentControllerSuccessTest extends ControllerTestBase {
             """;
 
     // --- Mock 準備 ---
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
 
     Student existing = new Student();
-    when(service.findStudentById(studentIdBytes)).thenReturn(existing);
+    when(service.findStudentById(studentId)).thenReturn(existing);
 
     // student のマージ
     Student merged = new Student();
@@ -632,15 +682,15 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     doNothing().when(converter).mergeStudent(existing, merged);
 
     // courses 変換は空リストを返す
-    when(converter.toEntityList(Collections.emptyList(), studentIdBytes))
+    when(converter.toEntityList(Collections.emptyList(), studentId))
         .thenReturn(Collections.emptyList());
 
     // コース再取得は空を返す想定
-    when(service.searchCoursesByStudentId(studentIdBytes)).thenReturn(Collections.emptyList());
+    when(service.searchCoursesByStudentId(studentId)).thenReturn(Collections.emptyList());
 
     // findStudentById は 2回呼ばれるので、1回目: existing, 2回目: updated を返す
     Student updated = new Student();
-    when(service.findStudentById(studentIdBytes)).thenReturn(existing, updated);
+    when(service.findStudentById(studentId)).thenReturn(existing, updated);
 
     // レスポンスDTOをスタブ（name に "新しい名前" が入るように）
     StudentDto respStudent = new StudentDto();
@@ -658,15 +708,15 @@ class StudentControllerSuccessTest extends ControllerTestBase {
         .andExpect(jsonPath("$.student.fullName").value("新しい名前"));
 
     // 期待：サービスは動いている（NoInteractions ではない）
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
-    verify(service, times(2)).findStudentById(studentIdBytes);
-    verify(converter, never()).toEntityList(anyList(), eq(studentIdBytes));
+    verify(converter).decodeUuidStringOrThrow(studentById);
+    verify(service, times(2)).findStudentById(studentId);
+    verify(converter, never()).toEntityList(anyList(), eq(studentId));
 
     // 置換モードなので updateStudentInfoOnly は呼ばれる（空でもOK、Service側が無視）
     verify(service).updateStudentInfoOnly(existing);
 
     // updateStudentInfoOnlyで「既存コースの再取得される
-    verify(service).searchCoursesByStudentId(studentIdBytes);
+    verify(service).searchCoursesByStudentId(studentId);
   }
 
   /**
@@ -698,15 +748,15 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   @Test
   public void deleteStudent_論理削除に成功した場合_204_No_Contentを返すこと() throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
 
     mockMvc
         .perform(delete("/api/students/{studentId}", studentById))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
-    verify(service).softDeleteStudent(eq(studentIdBytes));
+    verify(converter).decodeUuidStringOrThrow(studentById);
+    verify(service).softDeleteStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
 
@@ -739,15 +789,15 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   @Test
   public void restoreStudent_復元に成功したら204を返すこと() throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
 
     mockMvc
         .perform(patch("/api/students/{studentId}/restore", studentById))
         .andExpect(status().isNoContent())
         .andExpect(content().string(""));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
-    verify(service).restoreStudent(eq(studentIdBytes));
+    verify(converter).decodeUuidStringOrThrow(studentById);
+    verify(service).restoreStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
 }

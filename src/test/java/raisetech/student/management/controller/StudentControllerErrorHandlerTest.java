@@ -20,9 +20,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.http.MediaType;
@@ -42,8 +43,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentId)} が 16バイトの受講生IDを返す
-   *   <li>{@code service.findStudentById(studentIdBytes)} が {@link ResourceNotFoundException} を送出する
+   *   <li>{@code converter.decodeUuidStringOrThrow(studentId)} が 16バイトの受講生IDを返す
+   *   <li>{@code service.findStudentById(UUID)} が {@link ResourceNotFoundException} を送出する
    * </ul>
    *
    * <p>When:
@@ -64,18 +65,31 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   @Test
   public void getStudentDetail_存在しないIDを指定した場合_404エラーが返ること() throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
-    when(service.findStudentById(studentIdBytes)).thenThrow(
-        new ResourceNotFoundException("IDが見つかりません"));
+    // given
+    String notFoundId = "123e4567-e89b-12d3-a456-426614174999"; // 適当なUUID文字列
+    UUID notFoundUuid = UUID.fromString(notFoundId);
 
+    // String -> UUID デコード
+    when(converter.decodeUuidStringOrThrow(notFoundId)).thenReturn(notFoundUuid);
+    // その UUID で検索したときに 404 ドメイン例外を投げる
+    when(service.findStudentById(notFoundUuid))
+        .thenThrow(new ResourceNotFoundException("student", "studentId"));
+
+    // when & then
     mockMvc
-        .perform(get("/api/students/{studentId}", studentById))
+        .perform(get("/api/students/{studentId}", notFoundId))
         .andExpect(status().isNotFound())
         .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(404))
-        .andExpect(jsonPath("$.code").value("E404"))
-        .andExpect(jsonPath("$.error").value("NOT_FOUND"))
-        .andExpect(jsonPath("$.message").value(containsString("IDが見つかりません")));
+        .andExpect(jsonPath("$.code").value("E404"))        // あなたの GlobalExceptionHandler の定義に合わせる
+        .andExpect(jsonPath("$.error").value("NOT_FOUND"))  // ← ここもプロジェクトの仕様に合わせて
+        .andExpect(jsonPath("$.message").value(
+            org.hamcrest.Matchers.containsString("student")));
+
+    verify(converter).decodeUuidStringOrThrow(notFoundId);
+    verify(service).findStudentById(notFoundUuid);
+    // 404 なので searchCoursesByStudentId, toDetailDto などは呼ばれないのが理想
+    verifyNoMoreInteractions(service, converter);
   }
 
   /**
@@ -120,7 +134,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentId)} が 16 バイトの受講生IDを返す</li>
+   *   <li>{@code converter.decodeUuidStringOrThrow(studentId)} が UUIDの受講生IDを返す</li>
    *   <li>受講生・コース変換 {@code converter.toEntity(...)} および
    *       {@code converter.toEntityList(...)} は正常に完了する</li>
    *   <li>{@code service.updateStudentWithCourses(...)} が
@@ -153,9 +167,9 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
               }
             });
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     when(converter.toEntity(studentDto)).thenReturn(student);
-    when(converter.toEntityList(eq(List.of()), argThat(arr -> Arrays.equals(arr, studentIdBytes))))
+    when(converter.toEntityList(eq(List.of()), argThat(id -> Objects.equals(id, studentId))))
         .thenReturn(List.of());
 
     // 更新後の再取得で見つからないケースを想定
@@ -176,7 +190,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.error").value("NOT_FOUND"))
         .andExpect(jsonPath("$.message").value(containsString("IDが見つかりません")));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
+    verify(converter).decodeUuidStringOrThrow(studentById);
   }
 
   /**
@@ -187,7 +201,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>受講生IDのデコード（{@code converter.decodeUuidStringToBytesOrThrow(studentId)}）および DTO → エンティティ変換は成功する
+   *   <li>受講生IDのデコード（{@code converter.decodeUuidStringOrThrow(studentId)}）および DTO → エンティティ変換は成功する
    *   <li>{@code service.updateStudentWithCourses(...)} が実行時例外を送出する
    * </ul>
    *
@@ -210,10 +224,10 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     req.setCourses(List.of(courseDto)); // null ではなく、1件以上を入れて通過
 
     // 変換系のモック（ここまでは正常に進む）
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     when(converter.toEntity(studentDto)).thenReturn(student);
     when(converter.toEntityList(
-        eq(List.of(courseDto)), argThat(arr -> Arrays.equals(arr, studentIdBytes))))
+        eq(List.of(courseDto)), argThat(id -> Objects.equals(id, studentId))))
         .thenReturn(courses);
 
     // Service の更新時に想定外例外を発生させる
@@ -235,14 +249,14 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.message").value(containsString("エラー")));
 
     // 呼び出し検証（更新で落ちたので DTO 化までは行かない）
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
+    verify(converter).decodeUuidStringOrThrow(studentById);
     verify(converter).toEntity(studentDto);
-    verify(converter).toEntityList(anyList(), argThat(arr -> Arrays.equals(arr, studentIdBytes)));
+    verify(converter).toEntityList(anyList(), argThat(id -> id.equals(studentId)));
 
     verify(service).updateStudentWithCourses(any(Student.class), anyList());
 
     // ★到達しないことを明示
-    verify(converter, never()).encodeUuidString(any(byte[].class));
+    verify(converter, never()).encodeUuidString(any(UUID.class));
     verify(converter, never()).toDetailDto(any(), anyList(), anyString());
 
     // 余計な呼び出しが無いこと
@@ -257,8 +271,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentId)} により受講生IDが正しくデコードされる
-   *   <li>{@code service.findStudentById(studentIdBytes)} が {@link ResourceNotFoundException} を送出する
+   *   <li>{@code converter.decodeUuidStringOrThrow(studentId)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.findStudentById(studentId)} が {@link ResourceNotFoundException} を送出する
    * </ul>
    *
    * <p>Then:
@@ -279,8 +293,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     request.setCourses(List.of(courseDto));
     request.setAppendCourses(false);
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
-    when(service.findStudentById(studentIdBytes))
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
+    when(service.findStudentById(studentId))
         .thenThrow(new ResourceNotFoundException("該当する受講生が見つかりません"));
 
     mockMvc
@@ -314,7 +328,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    * <ul>
    *   <li>HTTP ステータス 500 が返る
    *   <li>{@code service.replaceCourses(...)} が期待通りの引数で呼び出されることを検証する
-   *   <li>想定外例外発生のため {@code updateStudentInfoOnly(...)} や {@code searchCoursesByStudentId(...)} が呼び出されないことを検証する
+   *   <li>想定外例外発生のため {@code updateStudentInfoOnly(...)} や
+   *   {@code searchCoursesByStudentId(...)} が呼び出されないことを検証する
    * </ul>
    *
    * @throws Exception MockMvc 実行時の例外
@@ -324,21 +339,21 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
 
     String body = json(Map.of("student", studentDto, "courses", List.of(courseDto)));
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     Student existing = new Student();
-    when(service.findStudentById(studentIdBytes)).thenReturn(existing);
+    when(service.findStudentById(studentId)).thenReturn(existing);
 
     Student merged = new Student();
     when(converter.toEntity(studentDto)).thenReturn(merged);
     doNothing().when(converter).mergeStudent(existing, merged);
 
     List<StudentCourse> newCourses = List.of(new StudentCourse());
-    when(converter.toEntityList(List.of(courseDto), studentIdBytes)).thenReturn(newCourses);
+    when(converter.toEntityList(List.of(courseDto), studentId)).thenReturn(newCourses);
 
     // append 未指定 → デフォルト false（置換ルート）で「想定外例外」を発生させる
     doThrow(new RuntimeException("Unexpected failure"))
         .when(service)
-        .replaceCourses(eq(studentIdBytes), ArgumentMatchers.anyList());
+        .replaceCourses(eq(studentId), ArgumentMatchers.anyList());
 
     mockMvc
         .perform(
@@ -350,7 +365,7 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
     // appendCourses 未指定 ⇒ デフォルト(false) ⇒ 置換モード
     verify(service)
         .replaceCourses(
-            eq(studentIdBytes),
+            eq(studentId),
             argThat(
                 list ->
                     list != null
@@ -371,8 +386,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentId)} により受講生IDが正しくデコードされる
-   *   <li>{@code service.softDeleteStudent(studentIdBytes)} が {@link ResourceNotFoundException} を送出する
+   *   <li>{@code converter.decodeUuidStringOrThrow(studentId)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.softDeleteStudent(studentId)} が {@link ResourceNotFoundException} を送出する
    * </ul>
    *
    * <p>Then:
@@ -387,10 +402,10 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   @Test
   public void deleteStudent_対象受講生が存在しない場合_404を返すこと() throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     doThrow(new ResourceNotFoundException("IDが見つかりません"))
         .when(service)
-        .softDeleteStudent(eq(studentIdBytes));
+        .softDeleteStudent(eq(studentId));
 
     mockMvc
         .perform(delete("/api/students/{studentId}", studentById))
@@ -398,8 +413,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E404"))
         .andExpect(jsonPath("$.error").value("NOT_FOUND"));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
-    verify(service).softDeleteStudent(eq(studentIdBytes));
+    verify(converter).decodeUuidStringOrThrow(studentById);
+    verify(service).softDeleteStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
 
@@ -411,14 +426,15 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentId)} により受講生IDが正しくデコードされる
-   *   <li>{@code service.softDeleteStudent(studentIdBytes)} が実行時例外を送出する
+   *   <li>{@code converter.decodeUuidStringOrThrow(studentId)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.softDeleteStudent(studentId)} が実行時例外を送出する
    * </ul>
    *
    * <p>Then:
    * <ul>
    *   <li>HTTP ステータス 500 が返る
-   *   <li>レスポンスボディの {@code code} が {@code "E999"}、{@code error} が {@code "INTERNAL_SERVER_ERROR"} である
+   *   <li>レスポンスボディの {@code code} が {@code "E999"}、{@code error} が
+   *   {@code "INTERNAL_SERVER_ERROR"} である
    *   <li>{@code softDeleteStudent} 以外に余計なサービス呼び出しが行われないことを検証する
    * </ul>
    *
@@ -427,10 +443,10 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   @Test
   public void deleteStudent_想定外の例外が発生した場合_500を返すこと() throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     doThrow(new RuntimeException("Unexpected failure"))
         .when(service)
-        .softDeleteStudent(eq(studentIdBytes));
+        .softDeleteStudent(eq(studentId));
 
     mockMvc
         .perform(delete("/api/students/{studentId}", studentById))
@@ -438,8 +454,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.error").value("INTERNAL_SERVER_ERROR"))
         .andExpect(jsonPath("$.code").value("E999"));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
-    verify(service).softDeleteStudent(eq(studentIdBytes));
+    verify(converter).decodeUuidStringOrThrow(studentById);
+    verify(service).softDeleteStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
 
@@ -451,8 +467,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentId)} により受講生IDが正しくデコードされる
-   *   <li>{@code service.restoreStudent(studentIdBytes)} が {@link ResourceNotFoundException} を送出する
+   *   <li>{@code converter.decodeUuidStringOrThrow(studentId)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.restoreStudent(studentId)} が {@link ResourceNotFoundException} を送出する
    * </ul>
    *
    * <p>Then:
@@ -468,10 +484,10 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   public void restoreStudent_対象受講生が存在しないまたは未削除の場合_404を返すこと()
       throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     doThrow(new ResourceNotFoundException("IDが見つかりません"))
         .when(service)
-        .restoreStudent(eq(studentIdBytes));
+        .restoreStudent(eq(studentId));
 
     mockMvc
         .perform(MockMvcRequestBuilders.patch("/api/students/{studentId}/restore", studentById))
@@ -479,8 +495,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E404"))
         .andExpect(jsonPath("$.error").value("NOT_FOUND"));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
-    verify(service).restoreStudent(eq(studentIdBytes));
+    verify(converter).decodeUuidStringOrThrow(studentById);
+    verify(service).restoreStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
 
@@ -492,14 +508,15 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentId)} により受講生IDが正しくデコードされる
-   *   <li>{@code service.restoreStudent(studentIdBytes)} が実行時例外を送出する
+   *   <li>{@code converter.decodeUuidStringOrThrow(studentId)} により受講生IDが正しくデコードされる
+   *   <li>{@code service.restoreStudent(studentId)} が実行時例外を送出する
    * </ul>
    *
    * <p>Then:
    * <ul>
    *   <li>HTTP ステータス 500 が返る
-   *   <li>レスポンスボディの {@code code} が {@code "E999"}、{@code error} が {@code "INTERNAL_SERVER_ERROR"} である
+   *   <li>レスポンスボディの {@code code} が {@code "E999"}、{@code error} が
+   *   {@code "INTERNAL_SERVER_ERROR"} である
    *   <li>{@code restoreStudent} 以外に余計なサービス呼び出しが行われないことを検証する
    * </ul>
    *
@@ -508,9 +525,9 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
   @Test
   public void restoreStudent_想定外の例外が発生した場合_500を返すこと() throws Exception {
 
-    when(converter.decodeUuidStringToBytesOrThrow(studentById)).thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     doThrow(new RuntimeException("Unexpected failure")).when(service)
-        .restoreStudent(eq(studentIdBytes));
+        .restoreStudent(eq(studentId));
 
     mockMvc
         .perform(patch("/api/students/{studentId}/restore", studentById))
@@ -518,8 +535,8 @@ class StudentControllerErrorHandlerTest extends ControllerTestBase {
         .andExpect(jsonPath("$.error").value("INTERNAL_SERVER_ERROR"))
         .andExpect(jsonPath("$.code").value("E999"));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(studentById);
-    verify(service).restoreStudent(eq(studentIdBytes));
+    verify(converter).decodeUuidStringOrThrow(studentById);
+    verify(service).restoreStudent(eq(studentId));
     verifyNoMoreInteractions(service);
   }
 
