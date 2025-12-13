@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import raisetech.student.management.config.TestMockConfig;
+import raisetech.student.management.controller.admin.AdminStudentController;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -39,7 +40,8 @@ import raisetech.student.management.exception.GlobalExceptionHandler;
 import raisetech.student.management.service.StudentService;
 
 @AutoConfigureMockMvc(addFilters = false)
-@WebMvcTest(controllers = {StudentController.class, DebugStudentController.class})
+@WebMvcTest(controllers = {StudentController.class, DebugStudentController.class,
+    AdminStudentController.class})
 @Import({GlobalExceptionHandler.class, TestMockConfig.class})
 @ImportAutoConfiguration(exclude = {GsonAutoConfiguration.class})
 @ActiveProfiles("test")
@@ -89,9 +91,9 @@ abstract class ControllerTestBase {
   }
 
   // テスト共通で使う「常に16バイト」のID
-  protected static final String VALID_UUID = "123e4567-e89b-12d3-a456-426655440000";
+  protected static final String UUID_STRING = "123e4567-e89b-12d3-a456-426655440000";
 
-  protected byte[] studentIdBytes;
+  protected UUID studentId;
   protected String studentById;
 
   protected String fullName;
@@ -102,6 +104,11 @@ abstract class ControllerTestBase {
   protected int age;
   protected String gender;
   protected String remarks;
+
+  protected static final UUID COURSE_ID_1 =
+      UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
+  protected static final UUID COURSE_ID_2 =
+      UUID.fromString("123e4567-e89b-12d3-a456-426614174002");
 
   protected String courseName;
   protected String secondCourseName;
@@ -144,13 +151,13 @@ abstract class ControllerTestBase {
    * <p>Given:
    *
    * <ul>
-   *   <li>固定の UUID／16 バイト ID（{@link #VALID_UUID} とその派生値）の生成</li>
+   *   <li>固定の UUID／16 バイト ID（{@link #UUID_STRING} とその派生値）の生成</li>
    *   <li>受講生・コースのダミーエンティティおよび DTO の用意</li>
    *   <li>モックの完全リセットと、ID 変換・DTO 変換の共通スタブ再設定
    *     <ul>
-   *       <li>{@link StudentConverter#decodeUuidStringToBytesOrThrow(String)} による
+   *       <li>{@link StudentConverter#decodeUuidStringOrThrow(String)} による
    *       　　　UUID文字列表現から 16 バイト ID へのデコード</li>
-   *       <li>{@link StudentConverter#encodeUuidString(byte[])} による
+   *       <li>{@link StudentConverter#encodeUuidString(UUID)} による
    *       　　　16 バイト ID から UUID文字列表現への変換</li>
    *       <li>{@link #stubConverterHappyPath()} および {@link #stubServiceHappyPath()} による
    *       「ハッピーパス」スタブの設定</li>
@@ -169,8 +176,8 @@ abstract class ControllerTestBase {
     Mockito.reset(service, converter);
 
     // 1) 値の初期化 16バイトIDを必ず使用
-    studentById = VALID_UUID;
-    studentIdBytes = new byte[16];
+    studentById = UUID_STRING;
+    studentId = UUID.fromString(UUID_STRING);
 
     fullName = "テスト　花子";
     furigana = "てすと　はなこ";
@@ -185,7 +192,7 @@ abstract class ControllerTestBase {
     secondCourseName = "AWSコース";
 
     student = new Student();
-    student.setStudentId(studentIdBytes);
+    student.setStudentId(studentId);
     student.setFullName(fullName);
     student.setFurigana(furigana);
     student.setNickname(nickname);
@@ -198,7 +205,7 @@ abstract class ControllerTestBase {
 
     // 通常の受講生 DTO
     StudentDto s = new StudentDto();
-    s.setStudentId(VALID_UUID); // ← レスポンス検証用
+    s.setStudentId(UUID_STRING); // ← レスポンス検証用
     s.setFullName(fullName);
     s.setFurigana(furigana);
     s.setNickname(nickname);
@@ -212,16 +219,16 @@ abstract class ControllerTestBase {
 
     // コース（entity）
     course1 = new StudentCourse();
-    course1.setStudentId(new byte[16]);
-    course1.setCourseId(new byte[16]);
+    course1.setStudentId(studentId);
+    course1.setCourseId(COURSE_ID_1);
     course1.setCourseName(courseName);
     course1.setStartDate(LocalDate.of(2024, 3, 1));
     course1.setEndDate(LocalDate.of(2024, 9, 30));
     course1.setCreatedAt(LocalDateTime.now());
 
     course2 = new StudentCourse();
-    course2.setStudentId(new byte[16]);
-    course2.setCourseId(new byte[16]);
+    course2.setStudentId(studentId);
+    course2.setCourseId(COURSE_ID_2);
     course2.setCourseName(secondCourseName);
     course2.setStartDate(LocalDate.of(2024, 7, 1));
     course2.setEndDate(null);
@@ -261,11 +268,11 @@ abstract class ControllerTestBase {
     // 2) ここで「共通の基本スタブ」を再設定（各テストで上書きしてOK）（UUID/IDを “VALID_UUID” に統一）
     // 例：成功系／500系で使う固定ID
     // UUID文字列 → byte[16]（Controller が内部で使うID）
-    when(converter.decodeUuidStringToBytesOrThrow(studentById))
-        .thenReturn(studentIdBytes);
+    when(converter.decodeUuidStringOrThrow(studentById))
+        .thenReturn(studentId);
 
     // byte[16] → UUID文字列（レスポンスに載せるとき）
-    when(converter.encodeUuidString(studentIdBytes))
+    when(converter.encodeUuidString(studentId))
         .thenReturn(studentById);
 
     // 共通ハッピーパス・スタブ（必要なら各テストで上書きOK）
@@ -436,7 +443,7 @@ abstract class ControllerTestBase {
    * {@link RuntimeException} を投げるようにスタブし、 後続のサービス呼び出しへ到達しない経路を作ります。
    */
   protected void makeConverterThrowEarly() {
-    when(converter.decodeUuidStringToBytesOrThrow(anyString())).thenThrow(
+    when(converter.decodeUuidStringOrThrow(anyString())).thenThrow(
         new RuntimeException("boom"));
   }
 }
