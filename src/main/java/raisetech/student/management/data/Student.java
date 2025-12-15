@@ -19,12 +19,12 @@ import lombok.NoArgsConstructor;
 public class Student {
 
   /**
-   * 学生ID（BINARY型、UUIDの16バイト配列）
+   * 受講生ID（UUID（DBではBINARY(16)として格納））
    */
   @Schema(
-      description = "学生ID（UUIDをBINARY形式で格納した16バイト配列）",
-      format = "byte",
-      example = "MTIzNDU2Nzg5MGFiY2RlZg==")
+      description = "受講生ID（DBではBINARY(16)で格納）",
+      format = "uuid",
+      example = "3fa85f64-5717-4562-b3fc-2c963f66afa6")
   private UUID studentId;
 
   /**
