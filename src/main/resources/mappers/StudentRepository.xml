@@ -42,7 +42,7 @@
   </select>
 
   <!-- ID検索 -->
-  <select id="findById" resultMap="StudentResultMap" parameterType="byte[]">
+  <select id="findById" resultMap="StudentResultMap">
     SELECT * FROM students WHERE student_id = #{studentId, jdbcType=BINARY,
     typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </select>
@@ -75,7 +75,7 @@
   </update>
 
   <!-- 物理削除 -->
-  <delete id="forceDeleteStudent" parameterType="byte[]">
+  <delete id="forceDeleteStudent">
     DELETE FROM students WHERE student_id = #{studentId, jdbcType=BINARY,
     typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </delete>
