@@ -3,6 +3,7 @@ package raisetech.student.management.data;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -19,24 +20,29 @@ import lombok.NoArgsConstructor;
 public class StudentCourse {
 
   /**
-   * コースID（UUID を BINARY(16) として保持する 16 バイト配列）。
+   * コースID（UUID（DBではBINARY(16)として格納））。
    *
-   * <p>データベースでは BINARY(16) で格納され、API 層では UUID 文字列表現に変換して扱われます。
+   * <p>データベースでは BINARY(16) で格納され、アプリケーション内部では UUID型 として扱います。
+   * API（JSON）では UUIDは文字列形式 で送受信されます。
    */
   @Schema(
-      description = "コースID（UUIDをBINARY形式で格納した16バイト配列）",
-      format = "byte")
-  private byte[] courseId;
+      description = "コースID（DBではBINARY(16)で格納）",
+      format = "uuid",
+      example = "550e8400-e29b-41d4-a716-446655440000"
+  )
+  private UUID courseId;
 
   /**
-   * 受講生ID（UUID を BINARY(16) として保持する 16 バイト配列）。
+   * 受講生ID（UUID（DBではBINARY(16)として格納））。
    *
    * <p>このコースに紐づく受講生のID。
    */
   @Schema(
-      description = "受講生ID（UUIDをBINARY形式で格納した16バイト配列）",
-      format = "byte")
-  private byte[] studentId;
+      description = "受講生ID（DBではBINARY(16)で格納）",
+      format = "uuid",
+      example = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+  )
+  private UUID studentId;
 
   /**
    * コース名。

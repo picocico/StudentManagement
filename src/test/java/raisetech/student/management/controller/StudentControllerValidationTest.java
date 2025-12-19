@@ -209,7 +209,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(invalid)} が
+   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が
    *       {@link IllegalArgumentException} を送出するようスタブされている</li>
    * </ul>
    *
@@ -233,7 +233,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
       throws Exception {
 
     String invalid = "@@invalid@@";
-    when(converter.decodeUuidStringToBytesOrThrow(invalid))
+    when(converter.decodeUuidStringOrThrow(invalid))
         .thenThrow(new IllegalArgumentException("IDの形式が不正です（UUID）"));
 
     mockMvc
@@ -245,53 +245,8 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.error").value("INVALID_REQUEST")) // ← error キー
         .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(invalid);
+    verify(converter).decodeUuidStringOrThrow(invalid);
     verifyNoInteractions(service);
-  }
-
-  /**
-   * UUID 文字列表現 としては正しいが、デコード後のバイト長が UUID（16 バイト）と異なる ID を指定した場合に、
-   * 400（E006/INVALID_ID_FORMAT）が返ることを検証します。
-   *
-   * <p>Endpoint: {@code GET /api/students/{studentId}}<br>
-   * Status: {@code 400 BAD_REQUEST}
-   *
-   * <p>Given:
-   * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(studentById)} が
-   *       バイト長不正により {@link InvalidIdFormatException} を送出するようスタブされている</li>
-   * </ul>
-   *
-   * <p>When:
-   * <ul>
-   *   <li>上記 UUID 文字列を {@code studentById} に指定して GET を実行する</li>
-   * </ul>
-   *
-   * <p>Then:
-   * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
-   *   <li>{@code message} に {@code "UUID"} が含まれる</li>
-   * </ul>
-   *
-   * @throws Exception 実行時例外
-   */
-  @Test
-  public void getStudentDetail_デコード後のバイト長がUUIDと異なる場合_400エラーが返ること()
-      throws Exception {
-
-    when(converter.decodeUuidStringToBytesOrThrow(studentById))
-        .thenThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"));
-
-    mockMvc
-        .perform(get("/api/students/{studentId}", studentById))
-        .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-        .andExpect(jsonPath("$.status").value(400))
-        .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"))
-        .andExpect(jsonPath("$.message").value(containsString("UUID"))); // 文言変更に強く
   }
 
   /**
@@ -365,7 +320,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(invalidId)} が
+   *   <li>{@code converter.decodeUuidStringOrThrow(invalidId)} が
    *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
    * </ul>
    *
@@ -378,13 +333,13 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * </ul>
    */
   @Test
-  void updateStudent_UUID文字列表現が不正な場合_400を返すこと() throws Exception {
+  void updateStudent_UUID文字列が不正な場合_400を返すこと() throws Exception {
     String invalidId = "invalid-uuid-string";
 
     // ID変換時点で InvalidIdFormatException を投げる前提
     doThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"))
         .when(converter)
-        .decodeUuidStringToBytesOrThrow(invalidId);
+        .decodeUuidStringOrThrow(invalidId);
 
     String body =
         json(new StudentRegistrationRequest() {{
@@ -405,7 +360,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
 
     // ID変換で落ちるので service は触られない
-    verify(converter).decodeUuidStringToBytesOrThrow(invalidId);
+    verify(converter).decodeUuidStringOrThrow(invalidId);
     verifyNoInteractions(service);
   }
 
@@ -559,7 +514,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    */
   @Test
-  public void partialUpdateStudent_UUID文字列表現が不正な場合_400を返すこと() throws Exception {
+  public void partialUpdateStudent_UUID文字列が不正な場合_400を返すこと() throws Exception {
 
     String invalidId = "invalid-uuid";
 
@@ -568,7 +523,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
     request.setCourses(List.of());
     request.setAppendCourses(false);
 
-    when(converter.decodeUuidStringToBytesOrThrow(invalidId))
+    when(converter.decodeUuidStringOrThrow(invalidId))
         .thenThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
@@ -582,7 +537,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"))
         .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(invalidId);
+    verify(converter).decodeUuidStringOrThrow(invalidId);
     verifyNoMoreInteractions(converter);
     verifyNoInteractions(service);
   }
@@ -718,7 +673,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(invalid)} が
+   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が
    *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
    * </ul>
    *
@@ -740,7 +695,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
   public void deleteStudent_studentIdのUUID形式が不正な場合_400を返すこと() throws Exception {
 
     String invalid = "invalid_UUID";
-    when(converter.decodeUuidStringToBytesOrThrow(invalid)).thenThrow(
+    when(converter.decodeUuidStringOrThrow(invalid)).thenThrow(
         new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
@@ -749,7 +704,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(invalid);
+    verify(converter).decodeUuidStringOrThrow(invalid);
     verifyNoInteractions(service);
   }
 
@@ -761,7 +716,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *
    * <p>Given:
    * <ul>
-   *   <li>{@code converter.decodeUuidStringToBytesOrThrow(invalid)} が
+   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が
    *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
    * </ul>
    *
@@ -783,7 +738,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
   public void restoreStudent_UUID形式が不正の場合_400を返すこと() throws Exception {
 
     String invalid = "invalid_UUID";
-    when(converter.decodeUuidStringToBytesOrThrow(invalid)).thenThrow(
+    when(converter.decodeUuidStringOrThrow(invalid)).thenThrow(
         new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
@@ -792,7 +747,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"));
 
-    verify(converter).decodeUuidStringToBytesOrThrow(invalid);
+    verify(converter).decodeUuidStringOrThrow(invalid);
     verifyNoInteractions(service);
   }
 }

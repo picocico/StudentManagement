@@ -7,7 +7,8 @@
 
   <!-- 共通のマッピング -->
   <resultMap id="StudentResultMap" type="raisetech.student.management.data.Student">
-    <result property="studentId" column="student_id"/>
+    <result property="studentId" column="student_id" jdbcType="BINARY"
+      typeHandler="raisetech.student.management.config.typehandler.UUIDTypeHandler"/>
     <result property="fullName" column="full_name"/>
     <result property="furigana" column="furigana"/>
     <result property="nickname" column="nickname"/>
@@ -41,9 +42,9 @@
   </select>
 
   <!-- ID検索 -->
-  <select id="findById" resultMap="StudentResultMap" parameterType="byte[]">
+  <select id="findById" resultMap="StudentResultMap">
     SELECT * FROM students WHERE student_id = #{studentId, jdbcType=BINARY,
-    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler}
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </select>
 
   <!-- 挿入 -->
@@ -51,7 +52,7 @@
     INSERT INTO students (student_id, full_name, furigana, nickname, email, location,
     age, gender, remarks, created_at, is_deleted)
     VALUES (#{studentId, jdbcType=BINARY,
-    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler},
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
     #{fullName}, #{furigana}, #{nickname}, #{email}, #{location}, #{age}, #{gender}, #{remarks},
     now(), #{deleted})
   </insert>
@@ -70,13 +71,13 @@
     is_deleted = #{deleted},
     deleted_at = #{deletedAt}
     WHERE student_id = #{studentId, jdbcType=BINARY,
-    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler}
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </update>
 
   <!-- 物理削除 -->
-  <delete id="forceDeleteStudent" parameterType="byte[]">
+  <delete id="forceDeleteStudent">
     DELETE FROM students WHERE student_id = #{studentId, jdbcType=BINARY,
-    typeHandler=raisetech.student.management.config.typehandler.ByteArrayTypeHandler}
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </delete>
 
 </mapper>

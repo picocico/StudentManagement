@@ -54,4 +54,28 @@ public class UUIDUtil {
     long leastSigBits = buffer.getLong();
     return new UUID(mostSigBits, leastSigBits);
   }
+
+  /**
+   * 文字列表現の UUID を BINARY(16) 用の byte 配列に変換します。
+   *
+   * @param uuidString 標準形式の UUID 文字列（例: 550e8400-e29b-41d4-a716-446655440000）
+   * @return UUID を表す 16 バイトの配列
+   */
+  public static byte[] toBytes(String uuidString) {
+    if (uuidString == null) {
+      throw new IllegalArgumentException("uuidString must not be null");
+    }
+    return toBytes(UUID.fromString(uuidString));
+  }
+
+  /**
+   * BINARY(16) の byte 配列を標準形式の UUID 文字列に変換します。
+   *
+   * @param bytes 16 バイトの配列
+   * @return 標準形式の UUID 文字列（例: 550e8400-e29b-41d4-a716-446655440000）
+   */
+  public static String toString(byte[] bytes) {
+    UUID uuid = fromBytes(bytes);
+    return uuid != null ? uuid.toString() : null;
+  }
 }

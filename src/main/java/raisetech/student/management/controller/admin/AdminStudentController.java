@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,10 +40,10 @@ public class AdminStudentController {
    *
    * <p>処理の流れ:
    * <ul>
-   *   <li>パス変数 {@code studentId}（UUID 文字列表現）を
-   *   {@link StudentConverter#decodeUuidStringToBytesOrThrow(String)} でデコードして
+   *   <li>パス変数 {@code studentId}（UUID 文字列）を
+   *   {@link StudentConverter#decodeUuidStringOrThrow(String)} でデコードして
    *   UUID 由来の 16 バイト配列に変換する</li>
-   *   <li>デコード済みの ID を用いて {@link StudentService#forceDeleteStudent(byte[])} を呼び出し、
+   *   <li>デコード済みの ID を用いて {@link StudentService#forceDeleteStudent(UUID)} を呼び出し、
    *   該当レコードを物理削除する</li>
    * </ul>
    *
@@ -86,8 +87,8 @@ public class AdminStudentController {
   @DeleteMapping("/{studentId}")
   @PreAuthorize("hasAuthority('ROLE_ADMIN')") // 管理者のみアクセス可能
   public ResponseEntity<Void> forceDeleteStudent(@PathVariable String studentId) {
-    byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
-    studentService.forceDeleteStudent(studentIdBytes);
+    UUID studentUuid = converter.decodeUuidStringOrThrow(studentId);
+    studentService.forceDeleteStudent(studentUuid);
     return ResponseEntity.noContent().build();
   }
 }

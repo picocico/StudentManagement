@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -112,14 +113,14 @@ public class StudentController {
     log.debug("student={}, courses={}", request.getStudent(), request.getCourses());
 
     Student student = converter.toEntity(request.getStudent());
-    byte[] studentIdBytes = student.getStudentId();
+    UUID studentId = student.getStudentId();
 
-    List<StudentCourse> courses = converter.toEntityList(request.getCourses(), studentIdBytes);
+    List<StudentCourse> courses = converter.toEntityList(request.getCourses(), studentId);
 
     log.debug(
         "POST - Registering new student: {}, ID(UUID): {}",
         student.getFullName(),
-        converter.encodeUuidString(studentIdBytes));
+        converter.encodeUuidString(studentId));
     service.registerStudent(student, courses);
 
     StudentDetailDto responseDto = converter.toDetailDto(student, courses);
@@ -209,10 +210,10 @@ public class StudentController {
   @GetMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> getStudentDetail(@PathVariable String studentId) {
     log.debug("GET - Fetching student detail: {}", studentId);
-    byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
+    UUID studentUuid = converter.decodeUuidStringOrThrow(studentId);
 
-    Student student = service.findStudentById(studentIdBytes);
-    List<StudentCourse> courses = service.searchCoursesByStudentId(studentIdBytes);
+    Student student = service.findStudentById(studentUuid);
+    List<StudentCourse> courses = service.searchCoursesByStudentId(studentUuid);
     return ResponseEntity.ok(converter.toDetailDto(student, courses));
   }
 
@@ -258,7 +259,7 @@ public class StudentController {
       @PathVariable("studentId") String studentId,
       @Valid @RequestBody(required = false) StudentRegistrationRequest req // ← required=false
   ) {
-    // ★ ここでまず「実質空更新」チェック（nullではないが全フィールド空）
+    // ★ 0) リクエストボディの存在／中身チェック
     if (req == null) {
       throw new MissingParameterException("リクエストボディが必要です"); // → E003
     }
@@ -266,22 +267,26 @@ public class StudentController {
       throw new EmptyObjectException("更新対象のフィールドがありません"); // → E003
     }
 
-    // 1) IDデコード（UUID文字列として不正な場合は InvalidIdFormatException → E006）
-    final byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
+    // 1) パスの ID(String) → UUID に変換
+    final UUID studentUuid = converter.decodeUuidStringOrThrow(studentId);
 
-    // 2) 変換（@Valid 済みなのでここに到達している）
+    // 2) StudentDto → Student（UUID 付きエンティティ）に変換
     final Student toUpdate = converter.toEntity(req.getStudent());
-    // パスのIDを最優先に統一（ボディのIDが入っていても上書き）
-    toUpdate.setStudentId(studentIdBytes);
+    // パスのIDを最優先で上書き
+    toUpdate.setStudentId(studentUuid);
 
-    final List<StudentCourse> courses = converter.toEntityList(req.getCourses(), studentIdBytes);
+    // 3) CourseDto → Course（エンティティ）に変換
+    final List<StudentCourse> courses =
+        (req.getCourses() != null)
+            ? converter.toEntityList(req.getCourses(), studentUuid)
+            : List.of();
 
-    // 3) 再取得→DTO化（レスポンスの studentId はパスの UUID 文字列で上書き）
+    // 4) サービスで「学生 + コースの全体更新」
     final Student updated = service.updateStudentWithCourses(toUpdate, courses);
 
-    // 表示用の UUID 文字列（必要なら事前生成して渡す。内部で再デコードさせない）
-    final String studentIdString = converter.encodeUuidString(studentIdBytes);
-    final StudentDetailDto dto = converter.toDetailDto(updated, courses, studentIdString);
+    // 5) レスポンス用 DTO に変換
+    //    学生IDはパスで受け取った UUID 文字列をそのまま使いたいので override 版を利用
+    final StudentDetailDto dto = converter.toDetailDto(updated, courses, studentId);
 
     return ResponseEntity.ok(dto);
   }
@@ -386,7 +391,7 @@ public class StudentController {
     }
 
     // 2) UUID文字列 → BINARY(16)
-    final byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
+    final UUID studentUuid = converter.decodeUuidStringOrThrow(studentId);
 
     // 3) Map → DTO
     final StudentRegistrationRequest req =
@@ -398,7 +403,7 @@ public class StudentController {
     }
 
     // 5) 既存取得＆マージ（基本情報のみのときはここで更新）
-    final Student existing = service.findStudentById(studentIdBytes);
+    final Student existing = service.findStudentById(studentUuid);
     final Student update = converter.toEntity(req.getStudent());
     converter.mergeStudent(existing, update);
 
@@ -407,19 +412,19 @@ public class StudentController {
     if (hasCourses) {
       final boolean append = Boolean.TRUE.equals(req.getAppendCourses());
       final List<StudentCourse> newCourses = converter.toEntityList(req.getCourses(),
-          studentIdBytes);
+          studentUuid);
       if (append) {
-        service.appendCourses(studentIdBytes, newCourses);
+        service.appendCourses(studentUuid, newCourses);
       } else {
-        service.replaceCourses(studentIdBytes, newCourses);
+        service.replaceCourses(studentUuid, newCourses);
       }
     }
     // 7) 基本情報の更新は1回だけ（重複呼出しを避ける）
     service.updateStudentInfoOnly(existing);
 
     // 8) 常に最新をDBから取り直してDTO化（空レス回避）
-    final Student latest = service.findStudentById(studentIdBytes);
-    final List<StudentCourse> latestCourses = service.searchCoursesByStudentId(studentIdBytes);
+    final Student latest = service.findStudentById(studentUuid);
+    final List<StudentCourse> latestCourses = service.searchCoursesByStudentId(studentUuid);
     final StudentDetailDto dto = converter.toDetailDto(latest, latestCourses, studentId);
     return ResponseEntity.ok(dto);
   }
@@ -459,9 +464,9 @@ public class StudentController {
   @DeleteMapping("/{studentId}")
   public ResponseEntity<Void> deleteStudent(@PathVariable String studentId) {
     log.debug("DELETE - Logically deleting student: {}", studentId);
-    byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(
+    UUID studentUuid = converter.decodeUuidStringOrThrow(
         studentId); // ← UUID文字列から byte[16] へ変換
-    service.softDeleteStudent(studentIdBytes);
+    service.softDeleteStudent(studentUuid);
     return ResponseEntity.noContent().build();
   }
 
@@ -498,8 +503,8 @@ public class StudentController {
   @PatchMapping("/{studentId}/restore")
   public ResponseEntity<Void> restoreStudent(@PathVariable String studentId) {
     log.debug("PATCH - Restoring student: {}", studentId);
-    byte[] studentIdBytes = converter.decodeUuidStringToBytesOrThrow(studentId);
-    service.restoreStudent(studentIdBytes);
+    UUID studentUuid = converter.decodeUuidStringOrThrow(studentId);
+    service.restoreStudent(studentUuid);
     return ResponseEntity.noContent().build();
   }
 
@@ -526,7 +531,7 @@ public class StudentController {
       })
   @GetMapping("/test-missing-param")
   public ResponseEntity<String> testMissing(
-      @RequestParam(name = "keyword", required = true) String keyword) {
+      @RequestParam(name = "keyword") String keyword) {
     return ResponseEntity.ok("受け取った keyword: " + keyword);
   }
 

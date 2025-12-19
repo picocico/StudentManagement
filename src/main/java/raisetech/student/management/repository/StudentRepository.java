@@ -1,10 +1,9 @@
 package raisetech.student.management.repository;
 
 import java.util.List;
-
+import java.util.UUID;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-
 import raisetech.student.management.data.Student;
 
 /**
@@ -18,9 +17,9 @@ public interface StudentRepository {
   /**
    * 動的な検索条件（ふりがな、削除状態）に基づいて受講生情報を検索します。
    *
-   * @param furigana ふりがなによる部分一致検索条件（nullまたは空文字は無視）
+   * @param furigana       ふりがなによる部分一致検索条件（nullまたは空文字は無視）
    * @param includeDeleted 論理削除された受講生も含めるかどうか
-   * @param deletedOnly 論理削除された受講生のみ取得するかどうか
+   * @param deletedOnly    論理削除された受講生のみ取得するかどうか
    * @return 条件に一致する受講生情報のリスト
    */
   List<Student> searchStudents(
@@ -34,7 +33,7 @@ public interface StudentRepository {
    * @param studentId 受講生ID
    * @return 該当する受講生情報（存在しない場合は null）
    */
-  Student findById(@Param("studentId") byte[] studentId);
+  Student findById(@Param("studentId") UUID studentId);
 
   /**
    * 新しい受講生情報を登録します。
@@ -48,12 +47,12 @@ public interface StudentRepository {
    *
    * @param student 更新する受講生情報
    */
-  void updateStudent(Student student);
+  int updateStudent(Student student);
 
   /**
    * 受講生IDで該当する受講生情報を物理削除します。
    *
    * @param studentId 物理削除対象の受講生ID
    */
-  void forceDeleteStudent(@Param("studentId") byte[] studentId);
+  int forceDeleteStudent(@Param("studentId") UUID studentId);
 }
