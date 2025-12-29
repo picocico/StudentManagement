@@ -222,7 +222,8 @@ class StudentConverterTest {
           null, // ★ CourseId を null に設定
           "Javaコース",
           start,
-          end
+          end,
+          null
       );
 
       // --- When (変換実行) ---
@@ -251,13 +252,15 @@ class StudentConverterTest {
           UUID_STRING,
           "Javaコース",
           start,
-          start.plusMonths(6)
+          start.plusMonths(6),
+          null
       );
       StudentCourseDto dto2 = new StudentCourseDto(
           UUID_STRING_B,
           "SQLコース",
           start,
-          start.plusMonths(3)
+          start.plusMonths(3),
+          null
       );
 
       UUID studentId = UUID.randomUUID();
@@ -295,13 +298,15 @@ class StudentConverterTest {
           UUID_STRING,          // ★ 既存の CourseId（UUID）
           "Javaコース",
           start,
-          start.plusMonths(6)
+          start.plusMonths(6),
+          null
       );
       StudentCourseDto dto2 = new StudentCourseDto(
           UUID_STRING_B,        // ★ 別の CourseId（UUID）
           "SQLコース",
           start,
-          start.plusMonths(3)
+          start.plusMonths(3),
+          null
       );
       return List.of(dto1, dto2);
     }
@@ -322,7 +327,8 @@ class StudentConverterTest {
           null,                 // ★ CourseId なし
           "Javaコース",
           start,
-          end
+          end,
+          null
       );
       List<StudentCourseDto> dtoList = List.of(dto);
 
@@ -381,21 +387,13 @@ class StudentConverterTest {
         );
 
         // 3. コースA (学生Aに紐づくコース)
-        StudentCourse courseA1 = new StudentCourse(
-            // コースID自体の値は本テストの関心外なので、ゼロ埋め16バイトで十分
-            UUID.randomUUID(), studentIdA, "Javaコース",
-            S, S.plusMonths(6), null
-        );
+        StudentCourse courseA1 = course(studentIdA, "Javaコース", S, S.plusMonths(6));
+        // コースID自体の値は本テストの関心外なので、ゼロ埋め16バイトで十分
 
         // 4. コースB (学生Bに紐づくコース)
-        StudentCourse courseB1 = new StudentCourse(
-            UUID.randomUUID(), studentIdB, "Pythonコース",
-            S, S.plusMonths(3), null
-        );
-        StudentCourse courseB2 = new StudentCourse(
-            UUID.randomUUID(), studentIdB, "SQLコース",
-            S, S.plusMonths(1), null
-        );
+        StudentCourse courseB1 = course(studentIdB, "Pythonコース", S, S.plusMonths(3));
+
+        StudentCourse courseB2 = course(studentIdB, "SQLコース", S, S.plusMonths(1));
 
         // 入力リストの作成
         List<Student> students = List.of(studentA, studentB);
@@ -454,11 +452,7 @@ class StudentConverterTest {
             "hana@example.com", "Osaka", 30, "Female", "備考", null, null, null
         );
         // 3. コースA (学生Aに紐づくコース)
-        StudentCourse courseA1 = new StudentCourse(
-            UUID.randomUUID(),             // courseId 適当でOK
-            studentIdA, "Javaコース",
-            S, S.plusMonths(6), null
-        );
+        StudentCourse courseA1 = course(studentIdA, "Javaコース", S, S.plusMonths(6));
 
         // 入力リストの作成
         List<Student> students = List.of(studentA, studentB);
@@ -532,5 +526,21 @@ class StudentConverterTest {
         assertThat(existing.getGender()).isEqualTo("Male"); // スキップ
       }
     }
+  }
+
+  // ------------------------------------------------------------
+//  テスト用ヘルパーメソッド
+// ------------------------------------------------------------
+  private StudentCourse course(
+      UUID studentId, String name, LocalDate start, LocalDate end) {
+    StudentCourse c = new StudentCourse();
+    c.setCourseId(UUID.randomUUID());
+    c.setStudentId(studentId);
+    c.setCourseName(name);
+    c.setStartDate(start);
+    c.setEndDate(end);
+    c.setApplicationStatus(null);
+    c.setCreatedAt(null);
+    return c;
   }
 }

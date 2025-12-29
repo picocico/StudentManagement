@@ -5,6 +5,7 @@
 
 <mapper namespace="raisetech.student.management.repository.StudentCourseRepository">
 
+  <!-- StudentCourse 基本マッピング（UUIDTypeHandlerでBINARY(16)⇔UUID） -->
   <resultMap id="StudentCourseResultMap" type="raisetech.student.management.data.StudentCourse">
     <result property="courseId" column="course_id" jdbcType="BINARY"
       typeHandler="raisetech.student.management.config.typehandler.UUIDTypeHandler"/>
@@ -13,7 +14,16 @@
     <result property="courseName" column="course_name"/>
     <result property="startDate" column="start_date"/>
     <result property="endDate" column="end_date"/>
+    <result property="applicationStatus" column="application_status"/>
     <result property="createdAt" column="created_at"/>
+  </resultMap>
+
+  <!-- StudentCourse 申込状況つきマッピング -->
+  <resultMap id="StudentCourseWithStatusResultMap"
+    type="raisetech.student.management.data.StudentCourse"
+    extends="StudentCourseResultMap">
+    <!-- JOINで拾った status を StudentCourse.applicationStatus に詰める -->
+    <result property="applicationStatus" column="application_status"/>
   </resultMap>
 
   <!-- 登録 -->
@@ -66,11 +76,23 @@
     typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </delete>
 
-  <!-- 特定の受講生のコースを取得 -->
+  <!-- 特定受講生のコース一覧を申込状況つきで取得（LEFT JOIN）  -->
   <select id="findCoursesByStudentId"
-    resultType="raisetech.student.management.data.StudentCourse">
-    SELECT * FROM student_courses WHERE student_id = #{studentId, jdbcType=BINARY,
+    resultMap="StudentCourseWithStatusResultMap">
+    SELECT
+    sc.course_id,
+    sc.student_id,
+    sc.course_name,
+    sc.start_date,
+    sc.end_date,
+    sc.created_at,
+    scas.status AS application_status
+    FROM student_courses sc
+    LEFT JOIN student_courses_application_status scas
+    ON scas.course_id = sc.course_id
+    WHERE sc.student_id = #{studentId, jdbcType=BINARY,
     typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+    ORDER BY sc.created_at DESC
   </select>
 
   <!-- 全件取得 -->

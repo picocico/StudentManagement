@@ -515,7 +515,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     );
 
     StudentCourseDto bodyCourseDto =
-        new StudentCourseDto(null, "Javaコース", null, null);
+        new StudentCourseDto(null, "Javaコース", null, null, null);
 
     StudentRegistrationRequest req = new StudentRegistrationRequest();
     req.setStudent(bodyStudentDto);
@@ -536,7 +536,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     StudentDetailDto detailDto =
         new StudentDetailDto(bodyStudentDto, List.of(
-            new StudentCourseDto("some-uuid", "Javaコース", null, null)));
+            new StudentCourseDto("some-uuid", "Javaコース", null, null, null)));
 
     // スタブ
     when(converter.decodeUuidStringOrThrow(idStr)).thenReturn(idUuid);

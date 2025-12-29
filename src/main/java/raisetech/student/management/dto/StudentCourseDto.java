@@ -50,4 +50,10 @@ public class StudentCourseDto {
    */
   @Schema(description = "コースの終了日（形式：yyyy-MM-dd）", example = "2025-06-30")
   private LocalDate endDate;
+
+  /**
+   * コースの申込状況（ステータス）
+   */
+  @Schema(description = "申込状況", example = "PROVISIONAL")
+  private String applicationStatus;
 }

@@ -24,7 +24,7 @@ public interface StudentCourseRepository {
    *
    * @param course 追加対象のコース情報
    */
-  void insertIfNotExists(StudentCourse course);
+  int insertIfNotExists(StudentCourse course);
 
   /**
    * 指定された受講生IDに紐づくすべてのコース情報を削除します。

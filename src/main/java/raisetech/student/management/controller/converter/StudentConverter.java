@@ -147,20 +147,21 @@ public class StudentConverter {
     UUID courseId =
         Optional.ofNullable(dto.getCourseId())
             .filter(id -> !id.isBlank())
-            .map(this::decodeUuidStringOrThrow) //ラッパー経由で必ずInvalidIdFormatExceptionが飛ぶ
+            .map(this::decodeUuidStringOrThrow) // ラッパー経由で必ずInvalidIdFormatExceptionが飛ぶ
             .orElseGet(this::generateRandomUuid);
 
     // studentId: パスから渡されるIDなので、必ず UUID 16バイトであることを保証する
     UUID studentIdBytes = decodeUuidStringOrThrow(studentId); // ★ ここもラッパー経由
 
-    return new StudentCourse(
-        courseId,
-        studentIdBytes,
-        dto.getCourseName(),
-        dto.getStartDate(),
-        dto.getEndDate(),
-        null // createdAt（DB側）
-    );
+    StudentCourse course = new StudentCourse();
+    course.setCourseId(courseId);
+    course.setStudentId(studentIdBytes);
+    course.setCourseName(dto.getCourseName());
+    course.setStartDate(dto.getStartDate());
+    course.setEndDate(dto.getEndDate());
+    course.setApplicationStatus(null); // DBのJOINで取得するのでここでは未設定
+    course.setCreatedAt(null);         // DB側で生成
+    return course;
   }
 
   /**
@@ -179,13 +180,15 @@ public class StudentConverter {
                       .filter(id -> !id.isBlank())
                       .map(this::decodeUuidStringOrThrow)
                       .orElseGet(this::generateRandomUuid);
-              return new StudentCourse(
-                  courseId,
-                  studentId,
-                  dto.getCourseName(),
-                  dto.getStartDate(),
-                  dto.getEndDate(),
-                  null);
+              StudentCourse course = new StudentCourse();
+              course.setCourseId(courseId);
+              course.setStudentId(studentId);
+              course.setCourseName(dto.getCourseName());
+              course.setStartDate(dto.getStartDate());
+              course.setEndDate(dto.getEndDate());
+              course.setApplicationStatus(null); // JOINで埋まる
+              course.setCreatedAt(null);         // DB側
+              return course;
             })
         .collect(Collectors.toList());
   }
@@ -202,7 +205,8 @@ public class StudentConverter {
         encodeUuidString(entity.getCourseId()),
         entity.getCourseName(),
         entity.getStartDate(),
-        entity.getEndDate());
+        entity.getEndDate(),
+        entity.getApplicationStatus());
   }
 
   /**

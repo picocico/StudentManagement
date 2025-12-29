@@ -63,6 +63,14 @@ public class StudentCourse {
   private LocalDate endDate;
 
   /**
+   * 申込状況（仮申込・本申込・受講中・受講終了）。
+   *
+   * <p>DBの student_courses_application_status.status から取得します。
+   */
+  @Schema(description = "申込状況", example = "PROVISIONAL")
+  private String applicationStatus;
+
+  /**
    * このエントリが作成された日時。
    */
   @Schema(description = "データ作成日時", example = "2025-04-01 10:15:30")
