@@ -28,3 +28,18 @@ CREATE TABLE IF NOT EXISTS student_courses (
   CONSTRAINT idx_student_courses_student_id FOREIGN KEY (student_id)
     REFERENCES students(student_id)
 );
+
+CREATE TABLE student_courses_application_status (
+  application_status_id BINARY(16) NOT NULL,
+  course_id             BINARY(16) NOT NULL,
+  status                VARCHAR(20) NOT NULL,
+  created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (application_status_id),
+  CONSTRAINT uq_course_id UNIQUE (course_id),
+  CONSTRAINT fk_status_course
+  FOREIGN KEY (course_id)
+  REFERENCES student_courses (course_id)
+  ON DELETE CASCADE
+);
+

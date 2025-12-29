@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -18,6 +20,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -28,6 +31,7 @@ import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.exception.ResourceNotFoundException;
+import raisetech.student.management.repository.StudentCourseApplicationStatusRepository;
 import raisetech.student.management.repository.StudentCourseRepository;
 import raisetech.student.management.repository.StudentRepository;
 
@@ -61,6 +65,14 @@ class StudentServiceImplTest {
    */
   @Mock
   private StudentCourseRepository courseRepository;
+
+  /**
+   * 受講生コースの申請状況のリポジトリのモック。
+   *
+   * <p>コースの申請状況の取得・登録・削除などをスタブ/検証するために利用します。
+   */
+  @Mock
+  private StudentCourseApplicationStatusRepository statusRepository;
 
   /**
    * エンティティとDTO間の変換を行うコンバーターのモック。
@@ -178,13 +190,17 @@ class StudentServiceImplTest {
     service.updateStudent(student, courses);
 
     // 検証 メソッドの呼び出しが順序通り行えているか？
-    InOrder inOrder = inOrder(studentRepository, courseRepository);
+    InOrder inOrder = inOrder(studentRepository, courseRepository, statusRepository);
     // studentRepository.updateStudent(student)メソッドが呼び出されているかどうか？
     inOrder.verify(studentRepository).updateStudent(student);
     // studentId に紐づく受講コースを 一括削除する処理が実行されたかどうか？
     inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
     // 新たにcoursesをDBに登録する処理が呼び出されたかどうか？
     inOrder.verify(courseRepository).insertCourses(courses);
+    // courses が2件なら2回呼ばれる、みたいに
+    inOrder.verify(statusRepository, times(courses.size()))
+        .insertProvisionalIfAbsent(any(UUID.class), any(UUID.class));
+
   }
 
   /**
@@ -231,16 +247,31 @@ class StudentServiceImplTest {
     // ★件数 1 を返すようにスタブ
     when(studentRepository.updateStudent(student)).thenReturn(1);
 
+    // ArgumentCaptor（insertCourses の実引数を捕まえる）
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<StudentCourse>> coursesCaptor =
+        (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+
     // 実行
     service.partialUpdateStudent(student, courses);
 
     // 検証
-    InOrder inOrder = inOrder(studentRepository, courseRepository);
+    InOrder inOrder = inOrder(studentRepository, courseRepository, statusRepository);
     // studentRepository.updateStudent(student)メソッドが呼び出されているかどうか？
     inOrder.verify(studentRepository).updateStudent(student);
     // studentId に紐づく受講コースを 一括削除する処理が実行されたかどうか？
     inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
-    inOrder.verify(courseRepository).insertCourses(courses);
+    inOrder.verify(courseRepository).insertCourses(coursesCaptor.capture());
+    inOrder.verify(statusRepository).insertProvisionalIfAbsent(any(UUID.class),
+        eq(course.getCourseId()));
+
+    // 捕まえた引数の中身を検証
+    List<StudentCourse> insertedCourses = coursesCaptor.getValue();
+    // 1件だけの想定
+    assertThat(insertedCourses).hasSize(1);
+    StudentCourse inserted = insertedCourses.get(0);
+    assertThat(inserted.getStudentId()).isEqualTo(studentId);
+    assertThat(inserted.getCourseId()).isEqualTo(course.getCourseId());
   }
 
   /**
@@ -274,11 +305,13 @@ class StudentServiceImplTest {
 
     List<StudentCourse> newCourses = List.of(course);
 
+    when(courseRepository.insertIfNotExists(any(StudentCourse.class))).thenReturn(0);
     // 実行
     service.appendCourses(student.getStudentId(), newCourses);
 
     // insertIfNotExists が正しく呼ばれているか?
-    verify(courseRepository).insertIfNotExists(course);
+    verify(courseRepository, times(1)).insertIfNotExists(any(StudentCourse.class));
+    verifyNoInteractions(statusRepository); // inserted==0 なので status は作られない
   }
 
   /**

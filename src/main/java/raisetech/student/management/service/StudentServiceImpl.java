@@ -12,6 +12,7 @@ import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.exception.ResourceNotFoundException;
+import raisetech.student.management.repository.StudentCourseApplicationStatusRepository;
 import raisetech.student.management.repository.StudentCourseRepository;
 import raisetech.student.management.repository.StudentRepository;
 
@@ -27,6 +28,7 @@ public class StudentServiceImpl implements StudentService {
 
   private final StudentRepository studentRepository;
   private final StudentCourseRepository courseRepository;
+  private final StudentCourseApplicationStatusRepository statusRepository;
   private final StudentConverter converter;
 
   /**
@@ -46,6 +48,10 @@ public class StudentServiceImpl implements StudentService {
         c.setStudentId(studentId); // 念のため上書き
       }
       courseRepository.insertCourses(courses);
+
+      for (StudentCourse c : courses) {
+        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
+      }
     }
   }
 
@@ -74,6 +80,10 @@ public class StudentServiceImpl implements StudentService {
         c.setStudentId(studentId);
       }
       courseRepository.insertCourses(courses);
+
+      for (StudentCourse c : courses) {
+        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
+      }
     }
   }
 
@@ -106,6 +116,9 @@ public class StudentServiceImpl implements StudentService {
       }
       courseRepository.deleteCoursesByStudentId(studentId);
       courseRepository.insertCourses(courses);
+      for (StudentCourse c : courses) {
+        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
+      }
     }
   }
 
@@ -122,7 +135,11 @@ public class StudentServiceImpl implements StudentService {
     }
     for (StudentCourse course : newCourses) {
       course.setStudentId(studentId);
-      courseRepository.insertIfNotExists(course); // 存在しないときだけinsert
+      
+      int inserted = courseRepository.insertIfNotExists(course);
+      if (inserted == 1) {
+        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), course.getCourseId());
+      }
     }
   }
 
@@ -340,6 +357,9 @@ public class StudentServiceImpl implements StudentService {
         sc.setStudentId(studentId); // 念のため上書き
       }
       courseRepository.insertCourses(courses);
+      for (StudentCourse c : courses) {
+        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
+      }
     }
 
     // 3) 最新の学生を再取得（null返し仕様に合わせる）
@@ -378,6 +398,9 @@ public class StudentServiceImpl implements StudentService {
         c.setStudentId(studentId); // 念のためセット
       }
       courseRepository.insertCourses(newCourses);
+      for (StudentCourse c : newCourses) {
+        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
+      }
     }
   }
 }

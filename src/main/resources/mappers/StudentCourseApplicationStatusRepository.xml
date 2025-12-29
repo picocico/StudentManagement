@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper
+  namespace="raisetech.student.management.repository.StudentCourseApplicationStatusRepository">
+
+  <!-- 申込状況を未作成なら作成（デフォルト：PROVISIONAL） -->
+  <insert id="insertProvisionalIfAbsent">
+    INSERT INTO student_courses_application_status (
+    application_status_id,
+    course_id,
+    status,
+    created_at,
+    updated_at
+    )
+    SELECT
+    #{applicationStatusId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
+    #{courseId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
+    'PROVISIONAL',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+    FROM DUAL
+    WHERE NOT EXISTS (
+    SELECT 1
+    FROM student_courses_application_status
+    WHERE course_id = #{courseId, jdbcType=BINARY,
+        typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+    )
+  </insert>
+
+  <!-- 受講生のコースに紐づく申込状況を削除（コース削除の前に実行する想定） -->
+  <delete id="deleteByStudentId">
+    DELETE scas
+    FROM student_courses_application_status scas
+    INNER JOIN student_courses sc
+    ON sc.course_id = scas.course_id
+    WHERE sc.student_id = #{studentId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+  </delete>
+
+</mapper>
