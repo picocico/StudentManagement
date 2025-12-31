@@ -18,14 +18,6 @@
     <result property="createdAt" column="created_at"/>
   </resultMap>
 
-  <!-- StudentCourse 申込状況つきマッピング -->
-  <resultMap id="StudentCourseWithStatusResultMap"
-    type="raisetech.student.management.data.StudentCourse"
-    extends="StudentCourseResultMap">
-    <!-- JOINで拾った status を StudentCourse.applicationStatus に詰める -->
-    <result property="applicationStatus" column="application_status"/>
-  </resultMap>
-
   <!-- 登録 -->
   <insert id="insertCourses" parameterType="java.util.List">
     INSERT INTO student_courses (
@@ -77,8 +69,7 @@
   </delete>
 
   <!-- 特定受講生のコース一覧を申込状況つきで取得（LEFT JOIN）  -->
-  <select id="findCoursesByStudentId"
-    resultMap="StudentCourseWithStatusResultMap">
+  <select id="findCoursesByStudentId" resultMap="StudentCourseResultMap">
     SELECT
     sc.course_id,
     sc.student_id,

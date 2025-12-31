@@ -86,7 +86,8 @@ public class StudentRepositoryTest {
     List<Student> actual = sut.searchStudents(
         null,   // furigana 検索条件なし
         true,   // includeDeleted: 論理削除済みも含める
-        false   // deletedOnly: 削除済みのみではない
+        false,   // deletedOnly: 削除済みのみではない
+        null
     );
     // 検証
     assertThat(actual).hasSize(16);
@@ -97,7 +98,8 @@ public class StudentRepositoryTest {
     List<Student> actual = sut.searchStudents(
         null,
         false, // includeDeleted: 削除済みは含めない
-        false  // deletedOnly: 削除済みのみではない
+        false, // deletedOnly: 削除済みのみではない
+        null
     );
 
     assertThat(actual).hasSize(14); // 16件中、2件が is_deleted = 1 の想定
@@ -108,7 +110,8 @@ public class StudentRepositoryTest {
     List<Student> actual = sut.searchStudents(
         null,
         true,  // ※ 全件＋下の deletedOnly 条件で削除のみになるはず
-        true   // deletedOnly: 削除済みのみ
+        true,   // deletedOnly: 削除済みのみ
+        null
     );
 
     assertThat(actual).hasSize(2);
@@ -119,7 +122,8 @@ public class StudentRepositoryTest {
     List<Student> actual = sut.searchStudents(
         "やまだ", // data.sql 上のふりがなに合わせて
         true,     // 削除も含める
-        false
+        false,
+        null
     );
 
     assertThat(actual)
@@ -131,14 +135,14 @@ public class StudentRepositoryTest {
   @Test
   void insertStudent_受講生の登録が行えること() {
     // arrange: INSERT前の件数を取得
-    List<Student> before = sut.searchStudents(null, true, false);
+    List<Student> before = sut.searchStudents(null, true, false, null);
     int beforeSize = before.size();
 
     // act: 1件INSERT
     UUID id = insertTestStudentAndReturnId();
 
     // assert: 件数が +1 されていること
-    List<Student> after = sut.searchStudents(null, true, false);
+    List<Student> after = sut.searchStudents(null, true, false, null);
     assertThat(after.size()).isEqualTo(beforeSize + 1);
 
     // さきほどのIDを持つレコードが存在すること

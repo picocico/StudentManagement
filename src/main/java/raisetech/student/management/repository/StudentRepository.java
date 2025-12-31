@@ -25,7 +25,9 @@ public interface StudentRepository {
   List<Student> searchStudents(
       @Param("furigana") String furigana,
       @Param("includeDeleted") boolean includeDeleted,
-      @Param("deletedOnly") boolean deletedOnly);
+      @Param("deletedOnly") boolean deletedOnly,
+      @Param("applicationStatus") String applicationStatus
+  );
 
   /**
    * 受講生IDで受講生情報を取得します。

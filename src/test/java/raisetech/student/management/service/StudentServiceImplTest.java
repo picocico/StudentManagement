@@ -373,7 +373,7 @@ class StudentServiceImplTest {
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly))
+    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, null))
         .thenReturn(mockStudents);
 
     // searchAllCourses() の戻り値を差し替え
@@ -390,7 +390,7 @@ class StudentServiceImplTest {
 
     // 呼び出し検証（順序付き）
     InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
+    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly, null);
     inOrder.verify(spyService).searchAllCourses();
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
   }
@@ -410,7 +410,7 @@ class StudentServiceImplTest {
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly))
+    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, null))
         .thenReturn(mockStudents);
 
     // searchAllCourses() の戻り値を差し替え
@@ -427,7 +427,7 @@ class StudentServiceImplTest {
 
     // 呼び出し検証（順序付き）
     InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
+    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly, null);
     inOrder.verify(spyService).searchAllCourses();
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
   }
@@ -447,7 +447,7 @@ class StudentServiceImplTest {
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly))
+    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, null))
         .thenReturn(mockStudents);
 
     // searchAllCourses() の戻り値を差し替え
@@ -464,7 +464,7 @@ class StudentServiceImplTest {
 
     // 呼び出し検証（順序付き）
     InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
+    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly, null);
     inOrder.verify(spyService).searchAllCourses();
     inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
   }

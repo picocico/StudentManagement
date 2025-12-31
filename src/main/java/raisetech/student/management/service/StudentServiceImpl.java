@@ -135,7 +135,7 @@ public class StudentServiceImpl implements StudentService {
     }
     for (StudentCourse course : newCourses) {
       course.setStudentId(studentId);
-      
+
       int inserted = courseRepository.insertIfNotExists(course);
       if (inserted == 1) {
         statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), course.getCourseId());
@@ -191,7 +191,7 @@ public class StudentServiceImpl implements StudentService {
     }
     // 動的SQLにより1本化されたリポジトリメソッドを呼び出し
     List<Student> students =
-        studentRepository.searchStudents(furigana, includeDeleted, deletedOnly); // 1本化！
+        studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, null); // 1本化！
     List<StudentCourse> courses = searchAllCourses();
     return converter.toDetailDtoList(students, courses);
   }

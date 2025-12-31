@@ -22,13 +22,27 @@
     <result property="deleted" column="is_deleted"/>
   </resultMap>
 
-  <!-- 動的検索 -->
+  <!-- 動的検索（status対応） -->
   <select id="searchStudents" resultMap="StudentResultMap">
     SELECT * FROM students
     WHERE 1=1
     <if test="furigana != null and furigana != ''">
       AND furigana LIKE CONCAT('%', #{furigana}, '%')
     </if>
+
+    <!-- ★追加：申込状況で絞る（重複回避のため EXISTS 方式） -->
+    <if test="applicationStatus != null and applicationStatus != ''">
+      AND EXISTS (
+      SELECT 1
+      FROM student_courses sc
+      JOIN students s
+      LEFT JOIN student_courses_application_status scas
+      ON scas.course_id = sc.course_id
+      WHERE sc.student_id = students.student_id
+      AND scas.status = #{applicationStatus}
+      )
+    </if>
+
     <choose>
       <when test="deletedOnly">
         AND is_deleted = true
