@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.exception.EmptyObjectException;
@@ -131,9 +132,10 @@ public class StudentController {
   /**
    * 条件付きで受講生一覧を取得します（ふりがな、削除状態）。
    *
-   * @param furigana       ふりがな検索（省略可能）
-   * @param includeDeleted 論理削除済みも含めるか
-   * @param deletedOnly    論理削除された学生のみ取得するか
+   * @param furigana          ふりがな検索（省略可能）
+   * @param includeDeleted    論理削除済みも含めるか
+   * @param deletedOnly       論理削除された学生のみ取得するか
+   * @param applicationStatus コースの申し込み状況で絞り込み
    * @return 条件に一致する受講生詳細DTOリスト
    */
   @Operation(
@@ -142,7 +144,9 @@ public class StudentController {
       parameters = {
           @Parameter(name = "furigana", description = "ふりがなで部分一致検索（任意）"),
           @Parameter(name = "includeDeleted", description = "論理削除済みも含める（デフォルト: false)"),
-          @Parameter(name = "deletedOnly", description = "論理削除された受講生のみ取得（デフォルト: false)")
+          @Parameter(name = "deletedOnly", description = "論理削除された受講生のみ取得（デフォルト: false)"),
+          @Parameter(name = "applicationStatus", description = "申込状況で絞り込み"
+              + "（例: IN_PROGRESS(受講中) / COMPLETED(受講終了) / PROVISIONAL(仮申込) / FORMAL(本申込)）")
       },
       responses = {
           @ApiResponse(
@@ -163,15 +167,11 @@ public class StudentController {
   public ResponseEntity<List<StudentDetailDto>> getStudentList(
       @RequestParam(required = false) String furigana,
       @RequestParam(required = false, defaultValue = "false") boolean includeDeleted,
-      @RequestParam(required = false, defaultValue = "false") boolean deletedOnly) {
+      @RequestParam(required = false, defaultValue = "false") boolean deletedOnly,
+      @RequestParam(required = false) ApplicationStatus applicationStatus) {
 
-    log.debug(
-        "GET - Fetching students list. furigana={}, includeDeleted={}, deletedOnly={}",
-        furigana,
-        includeDeleted,
-        deletedOnly);
-
-    List<StudentDetailDto> students = service.getStudentList(furigana, includeDeleted, deletedOnly);
+    List<StudentDetailDto> students =
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
 
     return ResponseEntity.ok(students);
   }

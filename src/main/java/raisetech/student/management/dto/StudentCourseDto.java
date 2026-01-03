@@ -56,4 +56,13 @@ public class StudentCourseDto {
    */
   @Schema(description = "申込状況", example = "PROVISIONAL")
   private String applicationStatus;
+
+  /**
+   * 申込状況の表示用ラベル。
+   *
+   * <p>例：IN_PROGRESS → 受講中
+   */
+  @Schema(description = "申込状況（表示用ラベル）", example = "受講中",
+      accessMode = Schema.AccessMode.READ_ONLY)
+  private String applicationStatusLabel;
 }
