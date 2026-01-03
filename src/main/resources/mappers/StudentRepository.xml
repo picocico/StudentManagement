@@ -35,8 +35,7 @@
       AND EXISTS (
       SELECT 1
       FROM student_courses sc
-      JOIN students s
-      LEFT JOIN student_courses_application_status scas
+      INNER JOIN student_courses_application_status scas
       ON scas.course_id = sc.course_id
       WHERE sc.student_id = students.student_id
       AND scas.status = #{applicationStatus}

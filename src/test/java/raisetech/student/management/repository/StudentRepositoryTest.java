@@ -11,8 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 
 @MybatisTest
 public class StudentRepositoryTest {
@@ -22,6 +24,9 @@ public class StudentRepositoryTest {
 
   @Autowired
   private StudentCourseRepository courseRepository;
+
+  @Autowired
+  private JdbcTemplate jdbcTemplate;
 
   // コア：すべてのフィールドを引数で受け取る（private）
   private UUID insertStudent(
@@ -89,8 +94,20 @@ public class StudentRepositoryTest {
         false,   // deletedOnly: 削除済みのみではない
         null
     );
-    // 検証
-    assertThat(actual).hasSize(16);
+    // DB裏取り（students総数）
+    Integer expectedBoxed = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM students",
+        Integer.class
+    );
+
+    int expected = Objects.requireNonNull(expectedBoxed, "count must not be null");
+
+    assertThat(actual).hasSize(expected);
+
+    // studentIdが重複していないこと（念のため）
+    assertThat(actual)
+        .extracting(Student::getStudentId)
+        .doesNotHaveDuplicates();
   }
 
   @Test
@@ -102,7 +119,15 @@ public class StudentRepositoryTest {
         null
     );
 
-    assertThat(actual).hasSize(14); // 16件中、2件が is_deleted = 1 の想定
+    Integer expectedBoxed = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM students WHERE is_deleted = false",
+        Integer.class
+    );
+
+    int expected = Objects.requireNonNull(expectedBoxed, "count must not be null");
+
+    assertThat(actual).hasSize(expected);
+    assertThat(actual).allSatisfy(s -> assertThat(s.getDeleted()).isFalse());
   }
 
   @Test
@@ -114,7 +139,15 @@ public class StudentRepositoryTest {
         null
     );
 
-    assertThat(actual).hasSize(2);
+    Integer expectedBoxed = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM students WHERE is_deleted = true",
+        Integer.class
+    );
+
+    int expected = Objects.requireNonNull(expectedBoxed, "count must not be null");
+
+    assertThat(actual).hasSize(expected);
+    assertThat(actual).allSatisfy(s -> assertThat(s.getDeleted()).isTrue());
   }
 
   @Test
@@ -130,6 +163,39 @@ public class StudentRepositoryTest {
         .singleElement()
         .extracting(Student::getFullName)
         .isEqualTo("Yamada Taro");
+  }
+
+  @Test
+  void searchStudents_status指定で対象学生だけ返ること() {
+
+    String applicationStatus = ApplicationStatus.IN_PROGRESS.getCode(); // "IN_PROGRESS"
+
+    List<Student> actual = sut.searchStudents(
+        null,
+        false,
+        false,
+        applicationStatus
+    );
+    assertThat(actual).isNotEmpty();
+
+    // 返ってきた学生が「少なくとも1つ」IN_PROGRESSコースを持つことをDBで検証
+    for (Student s : actual) {
+      Integer cnt = jdbcTemplate.queryForObject("""
+              SELECT COUNT(*)
+              FROM student_courses sc
+              INNER JOIN student_courses_application_status scas
+                ON scas.course_id = sc.course_id
+              WHERE sc.student_id = ?
+                AND scas.status = ?
+              """, Integer.class,
+          s.getStudentId(), applicationStatus
+      );
+
+      assertThat(cnt)
+          .as("studentId=%s should have %s course", s.getStudentId(), applicationStatus)
+          .isNotNull()
+          .isGreaterThan(0);
+    }
   }
 
   @Test

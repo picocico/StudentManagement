@@ -37,6 +37,7 @@ public interface StudentRepository {
    */
   Student findById(@Param("studentId") UUID studentId);
 
+
   /**
    * 新しい受講生情報を登録します。
    *
