@@ -86,6 +86,32 @@
     ORDER BY sc.created_at DESC
   </select>
 
+  <!-- 特定受講生のコース一覧を申込状況つきで取得（複数＋任意でstatus絞り）  -->
+  <select id="findCoursesByStudentIds" resultMap="StudentCourseResultMap">
+    SELECT
+    sc.course_id,
+    sc.student_id,
+    sc.course_name,
+    sc.start_date,
+    sc.end_date,
+    sc.created_at,
+    scas.status AS application_status
+    FROM student_courses sc
+    LEFT JOIN student_courses_application_status scas
+    ON scas.course_id = sc.course_id
+    WHERE sc.student_id IN
+    <foreach collection="studentIds" item="id" open="(" separator="," close=")">
+      #{id, jdbcType=BINARY,
+        typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+    </foreach>
+
+    <if test="applicationStatus != null and applicationStatus != ''">
+      AND scas.status = #{applicationStatus}
+    </if>
+
+    ORDER BY sc.created_at DESC
+  </select>
+
   <!-- 全件取得 -->
   <select id="findAllCourses" resultMap="StudentCourseResultMap">
     SELECT * FROM student_courses

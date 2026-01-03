@@ -37,6 +37,18 @@ public interface StudentCourseRepository {
   List<StudentCourse> findCoursesByStudentId(@Param("studentId") UUID studentId);
 
   /**
+   * コース申し込み状況にに基づいて受講生情報を検索します。
+   *
+   * @param studentIds        ふりがなによる部分一致検索条件（nullまたは空文字は無視）
+   * @param applicationStatus 論理削除された受講生も含めるかどうか
+   * @return 条件に一致する受講生情報のリスト
+   */
+  List<StudentCourse> findCoursesByStudentIds(
+      @Param("studentIds") List<UUID> studentIds,
+      @Param("applicationStatus") String applicationStatus
+  );
+
+  /**
    * すべての受講生コース情報を取得します。
    */
   List<StudentCourse> findAllCourses();
