@@ -110,7 +110,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
   @Test
   public void getStudentList_論理削除と削除のみ指定が同時にtrueの場合_例外が返ること()
       throws Exception {
-    when(service.getStudentList(null, true, true))
+    when(service.getStudentList(null, true, true, null))
         .thenThrow(
             new IllegalArgumentException(
                 "includeDeleted=true と deletedOnly=true は同時指定できません"));

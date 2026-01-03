@@ -206,7 +206,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
       throws Exception {
 
     // when: service.getStudentList のモック化
-    when(service.getStudentList(furigana, false, false)).thenReturn(List.of(detailDto));
+    when(service.getStudentList(furigana, false, false, null)).thenReturn(List.of(detailDto));
 
     // then: MockMvc で GETリクエストを送信
     mockMvc
@@ -221,7 +221,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
         .andExpect(jsonPath("$[0].courses[0].courseName").value(courseName));
 
     // serviceが呼ばれたか検証
-    verify(service).getStudentList(furigana, false, false);
+    verify(service).getStudentList(furigana, false, false, null);
   }
 
   /**
@@ -259,7 +259,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   public void getStudentList_論理削除を含めた検索をした場合_一致する受講生リストが返ること()
       throws Exception {
 
-    when(service.getStudentList(null, true, false)).thenReturn(List.of(detailDto1, detailDto2));
+    when(service.getStudentList(null, true, false, null)).thenReturn(
+        List.of(detailDto1, detailDto2));
 
     mockMvc
         .perform(get("/api/students").param("includeDeleted", "true"))
@@ -275,7 +276,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
         .andExpect(jsonPath("$[1].courses[0].courseName").value(courseDto1.getCourseName()))
         .andExpect(jsonPath("$[1].courses[1].courseName").value(courseDto2.getCourseName()));
 
-    verify(service).getStudentList(null, true, false);
+    verify(service).getStudentList(null, true, false, null);
   }
 
   /**
@@ -313,7 +314,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
   public void getStudentList_論理削除のみ検索した場合_削除済の受講生リストのみが返ること()
       throws Exception {
 
-    when(service.getStudentList(null, false, true)).thenReturn(List.of(detailDto2));
+    when(service.getStudentList(null, false, true, null)).thenReturn(List.of(detailDto2));
 
     mockMvc
         .perform(get("/api/students").param("deletedOnly", "true"))
@@ -325,7 +326,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
         .andExpect(jsonPath("$[0].courses[0].courseName").value(courseDto1.getCourseName()))
         .andExpect(jsonPath("$[0].courses[1].courseName").value(courseDto2.getCourseName()));
 
-    verify(service).getStudentList(null, false, true);
+    verify(service).getStudentList(null, false, true, null);
   }
 
   /**
@@ -515,7 +516,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     );
 
     StudentCourseDto bodyCourseDto =
-        new StudentCourseDto(null, "Javaコース", null, null, null);
+        new StudentCourseDto(null, "Javaコース", null, null, null, null);
 
     StudentRegistrationRequest req = new StudentRegistrationRequest();
     req.setStudent(bodyStudentDto);
@@ -536,7 +537,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     StudentDetailDto detailDto =
         new StudentDetailDto(bodyStudentDto, List.of(
-            new StudentCourseDto("some-uuid", "Javaコース", null, null, null)));
+            new StudentCourseDto("some-uuid", "Javaコース", null, null, null, null)));
 
     // スタブ
     when(converter.decodeUuidStringOrThrow(idStr)).thenReturn(idUuid);
