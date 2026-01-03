@@ -223,6 +223,7 @@ class StudentConverterTest {
           "Javaコース",
           start,
           end,
+          null,
           null
       );
 
@@ -253,6 +254,7 @@ class StudentConverterTest {
           "Javaコース",
           start,
           start.plusMonths(6),
+          null,
           null
       );
       StudentCourseDto dto2 = new StudentCourseDto(
@@ -260,6 +262,7 @@ class StudentConverterTest {
           "SQLコース",
           start,
           start.plusMonths(3),
+          null,
           null
       );
 
@@ -299,6 +302,7 @@ class StudentConverterTest {
           "Javaコース",
           start,
           start.plusMonths(6),
+          null,
           null
       );
       StudentCourseDto dto2 = new StudentCourseDto(
@@ -306,6 +310,7 @@ class StudentConverterTest {
           "SQLコース",
           start,
           start.plusMonths(3),
+          null,
           null
       );
       return List.of(dto1, dto2);
@@ -328,6 +333,7 @@ class StudentConverterTest {
           "Javaコース",
           start,
           end,
+          null,
           null
       );
       List<StudentCourseDto> dtoList = List.of(dto);

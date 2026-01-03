@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 import raisetech.student.management.domain.StudentDetail;
 import raisetech.student.management.dto.StudentCourseDto;
 import raisetech.student.management.dto.StudentDetailDto;
@@ -201,12 +202,19 @@ public class StudentConverter {
    * @throws InvalidIdFormatException エンティティに保持されている ID のバイト長が 16 バイト以外など、 ID の形式が不正な場合
    */
   public StudentCourseDto toDto(StudentCourse entity) {
+    String code = entity.getApplicationStatus(); // "IN_PROGRESS" 等（nullもあり得る）
+    String label = ApplicationStatus.fromCode(code)
+        .map(ApplicationStatus::getLabel)
+        .orElse(null);
+    
     return new StudentCourseDto(
         encodeUuidString(entity.getCourseId()),
         entity.getCourseName(),
         entity.getStartDate(),
         entity.getEndDate(),
-        entity.getApplicationStatus());
+        code,
+        label
+    );
   }
 
   /**
