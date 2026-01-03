@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.exception.ResourceNotFoundException;
 import raisetech.student.management.repository.StudentCourseApplicationStatusRepository;
@@ -179,20 +180,29 @@ public class StudentServiceImpl implements StudentService {
    */
   @Override
   public List<StudentDetailDto> getStudentList(
-      String furigana, boolean includeDeleted, boolean deletedOnly) {
-    log.debug(
-        "Searching students with furigana={}, includeDeleted={}, deletedOnly={}",
-        furigana,
-        includeDeleted,
-        deletedOnly);
+      String furigana, boolean includeDeleted, boolean deletedOnly,
+      ApplicationStatus applicationStatus) {
+
     if (includeDeleted && deletedOnly) {
       throw new IllegalArgumentException(
           "includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
     }
+
+    String statusCode = (applicationStatus == null) ? null : applicationStatus.name();
+
     // 動的SQLにより1本化されたリポジトリメソッドを呼び出し
     List<Student> students =
-        studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, null); // 1本化！
-    List<StudentCourse> courses = searchAllCourses();
+        studentRepository.searchStudents(furigana, includeDeleted, deletedOnly,
+            statusCode); // 1本化！
+
+    List<UUID> studentIds = students.stream()
+        .map(Student::getStudentId)
+        .filter(Objects::nonNull)
+        .toList();
+
+    List<StudentCourse> courses = studentIds.isEmpty()
+        ? List.of()
+        : courseRepository.findCoursesByStudentIds(studentIds, statusCode);
     return converter.toDetailDtoList(students, courses);
   }
 

@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.exception.ResourceNotFoundException;
 
@@ -52,7 +53,8 @@ public interface StudentService {
    * @return 受講生詳細情報のリスト
    */
   List<StudentDetailDto> getStudentList(
-      String furigana, boolean includeDeleted, boolean deletedOnly);
+      String furigana, boolean includeDeleted, boolean deletedOnly,
+      ApplicationStatus applicationStatus);
 
   /**
    * 受講生情報とそのコース情報を登録します。

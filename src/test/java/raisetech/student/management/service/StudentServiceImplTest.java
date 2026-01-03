@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -21,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -29,6 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.exception.ResourceNotFoundException;
 import raisetech.student.management.repository.StudentCourseApplicationStatusRepository;
@@ -111,6 +112,12 @@ class StudentServiceImplTest {
    */
   private StudentServiceImpl spyService;
 
+  // ArgumentCaptor（insertCourses の実引数を捕まえる）
+  @Captor
+  ArgumentCaptor<List<StudentCourse>> coursesCaptor;
+
+  @Captor
+  ArgumentCaptor<List<UUID>> studentIdsCaptor;
 
   /**
    * 各テスト実行前に共通の準備を行います。
@@ -247,11 +254,6 @@ class StudentServiceImplTest {
     // ★件数 1 を返すようにスタブ
     when(studentRepository.updateStudent(student)).thenReturn(1);
 
-    // ArgumentCaptor（insertCourses の実引数を捕まえる）
-    @SuppressWarnings("unchecked")
-    ArgumentCaptor<List<StudentCourse>> coursesCaptor =
-        (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
-
     // 実行
     service.partialUpdateStudent(student, courses);
 
@@ -262,8 +264,8 @@ class StudentServiceImplTest {
     // studentId に紐づく受講コースを 一括削除する処理が実行されたかどうか？
     inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
     inOrder.verify(courseRepository).insertCourses(coursesCaptor.capture());
-    inOrder.verify(statusRepository).insertProvisionalIfAbsent(any(UUID.class),
-        eq(course.getCourseId()));
+    inOrder.verify(statusRepository, times(courses.size()))
+        .insertProvisionalIfAbsent(any(UUID.class), any(UUID.class));
 
     // 捕まえた引数の中身を検証
     List<StudentCourse> insertedCourses = coursesCaptor.getValue();
@@ -368,31 +370,44 @@ class StudentServiceImplTest {
     String furigana = "やまだ　たかし";
     boolean includeDeleted = false;
     boolean deletedOnly = false;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
 
-    List<Student> mockStudents = List.of(new Student());
+    UUID studentId = UUID.randomUUID();
+    Student s = new Student();
+    s.setStudentId(studentId);
+    List<Student> mockStudents = List.of(s);
+
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, null))
+    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly,
+        applicationStatus.name()))
         .thenReturn(mockStudents);
 
-    // searchAllCourses() の戻り値を差し替え
-    doReturn(mockCourses).when(spyService).searchAllCourses();
+    // ★ searchAllCourses() ではなく、studentIds でまとめてコース取得する想定
+    when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
+        .thenReturn(mockCourses);
 
     when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
 
     // 実行
     List<StudentDetailDto> result =
-        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
 
     // 呼び出し検証（順序付き）
-    InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly, null);
-    inOrder.verify(spyService).searchAllCourses();
-    inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
+    InOrder inOrder = inOrder(studentRepository, courseRepository, converter);
+    inOrder.verify(studentRepository)
+        .searchStudents(furigana, includeDeleted, deletedOnly, applicationStatus.name());
+
+    inOrder.verify(courseRepository)
+        .findCoursesByStudentIds(studentIdsCaptor.capture(), eq(applicationStatus.name()));
+    // ★ studentIds がちゃんと作られているか検証
+    assertThat(studentIdsCaptor.getValue()).containsExactly(studentId);
+
+    inOrder.verify(converter).toDetailDtoList(eq(mockStudents), eq(mockCourses));
   }
 
   /**
@@ -405,31 +420,43 @@ class StudentServiceImplTest {
     String furigana = "さとう　じろう";
     boolean includeDeleted = true;
     boolean deletedOnly = false;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
 
-    List<Student> mockStudents = List.of(new Student());
+    UUID studentId = UUID.randomUUID();
+    Student s = new Student();
+    s.setStudentId(studentId);
+    List<Student> mockStudents = List.of(s);
+
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, null))
+    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly,
+        applicationStatus.name()))
         .thenReturn(mockStudents);
 
-    // searchAllCourses() の戻り値を差し替え
-    doReturn(mockCourses).when(spyService).searchAllCourses();
+    when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
+        .thenReturn(mockCourses);
 
-    when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
+    when(converter.toDetailDtoList(eq(mockStudents), anyList()))
+        .thenReturn(expectedDtoList);
 
     // 実行
     List<StudentDetailDto> result =
-        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
 
     // 呼び出し検証（順序付き）
-    InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly, null);
-    inOrder.verify(spyService).searchAllCourses();
-    inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
+    InOrder inOrder = inOrder(studentRepository, courseRepository, converter);
+    inOrder.verify(studentRepository)
+        .searchStudents(furigana, includeDeleted, deletedOnly, "IN_PROGRESS");
+    inOrder.verify(courseRepository)
+        .findCoursesByStudentIds(studentIdsCaptor.capture(), eq(applicationStatus.name()));
+    assertThat(studentIdsCaptor.getValue()).containsExactly(studentId);
+
+    inOrder.verify(converter)
+        .toDetailDtoList(eq(mockStudents), anyList());
   }
 
   /**
@@ -442,31 +469,43 @@ class StudentServiceImplTest {
     String furigana = "たかぎ　あかね";
     boolean includeDeleted = false;
     boolean deletedOnly = true;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
 
-    List<Student> mockStudents = List.of(new Student());
+    UUID studentId = UUID.randomUUID();
+    Student s = new Student();
+    s.setStudentId(studentId);
+    List<Student> mockStudents = List.of(s);
+
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, null))
+    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly,
+        applicationStatus.name()))
         .thenReturn(mockStudents);
 
-    // searchAllCourses() の戻り値を差し替え
-    doReturn(mockCourses).when(spyService).searchAllCourses();
+    when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
+        .thenReturn(mockCourses);
 
-    when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
+    when(converter.toDetailDtoList(eq(mockStudents), anyList()))
+        .thenReturn(expectedDtoList);
 
     // 実行
     List<StudentDetailDto> result =
-        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
 
     // 呼び出し検証（順序付き）
-    InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly, null);
-    inOrder.verify(spyService).searchAllCourses();
-    inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
+    InOrder inOrder = inOrder(studentRepository, courseRepository, converter);
+    inOrder.verify(studentRepository)
+        .searchStudents(furigana, includeDeleted, deletedOnly, applicationStatus.name());
+    inOrder.verify(courseRepository)
+        .findCoursesByStudentIds(studentIdsCaptor.capture(), eq(applicationStatus.name()));
+    assertThat(studentIdsCaptor.getValue()).containsExactly(studentId);
+
+    inOrder.verify(converter)
+        .toDetailDtoList(eq(mockStudents), anyList());
   }
 
   /**
@@ -480,12 +519,68 @@ class StudentServiceImplTest {
     String furigana = "たかはし　あや";
     boolean includeDeleted = true;
     boolean deletedOnly = true;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
 
     // 実行
-    assertThatThrownBy(() -> spyService.getStudentList(furigana, includeDeleted, deletedOnly))
+    assertThatThrownBy(
+        () -> service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus))
         // 検証
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
+  }
+
+  /**
+   * 申込状況（applicationStatus）を指定した場合に、
+   * {@link raisetech.student.management.repository.StudentRepository#searchStudents(String,
+   * boolean, boolean, String)} へ指定したステータスが引数として渡されることを検証します。
+   *
+   * <p>本テストは「検索条件として status が適切に下層（Repository）へ伝播する」ことに焦点を当てます。
+   * 取得した学生一覧に対してコース一覧を取得し、DTOへ変換する一連の流れ （searchAllCourses →
+   * converter.toDetailDtoList）も呼ばれることを合わせて確認します。
+   *
+   * <p>※検索条件を status のみに絞るため、furigana は null を使用します。
+   */
+  @Test
+  void getStudentList_status指定_でsearchStudentsにstatusが渡されること() {
+    // 準備
+    String furigana = null; // statusだけ見たいなら null でもOK
+    boolean includeDeleted = false;
+    boolean deletedOnly = false;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
+
+    UUID studentId = UUID.randomUUID();
+    Student s = new Student();
+    s.setStudentId(studentId);
+    List<Student> mockStudents = List.of(s);
+
+    List<StudentCourse> mockCourses = List.of(new StudentCourse());
+    List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
+
+    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly,
+        applicationStatus.name()))
+        .thenReturn(mockStudents);
+
+    when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
+        .thenReturn(mockCourses);
+
+    when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
+
+    // 実行
+    List<StudentDetailDto> result =
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
+
+    // 主張
+    assertThat(result).isEqualTo(expectedDtoList);
+
+    InOrder inOrder = inOrder(studentRepository, courseRepository, converter);
+    // 呼び出し検証
+    inOrder.verify(studentRepository)
+        .searchStudents(furigana, includeDeleted, deletedOnly, applicationStatus.name());
+    inOrder.verify(courseRepository)
+        .findCoursesByStudentIds(studentIdsCaptor.capture(), eq(applicationStatus.name()));
+
+    assertThat(studentIdsCaptor.getValue()).containsExactly(studentId);
+    inOrder.verify(converter).toDetailDtoList(eq(mockStudents), eq(mockCourses));
   }
 
   /**
