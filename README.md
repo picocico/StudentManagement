@@ -45,6 +45,60 @@
 - **受講開始日**
 - **受講終了予定日**
 
+### API仕様（REST）
+
+本システムは以下のエンドポイントを提供します。
+
+- POST `/api/students`：受講生登録（受講生＋コース）
+- GET `/api/students`：受講生一覧検索（ふりがな／削除状態／申込状況）
+- GET `/api/students/{studentId}`：受講生詳細取得（受講生＋コース）
+- PUT `/api/students/{studentId}`：受講生更新（全体更新：受講生＋コースを全置換）
+- PATCH `/api/students/{studentId}`：受講生更新（部分更新：指定項目のみ反映）
+- DELETE `/api/students/{studentId}`：受講生論理削除
+- PATCH `/api/students/{studentId}/restore`：論理削除から復元
+
+#### PATCH `/api/students/{studentId}`（部分更新）の更新ルール
+
+PATCH は「指定されたフィールドのみ更新し、未指定のフィールドは変更しない」方針です。
+ただし `courses` は「未指定」と「空配列」で意味が変わるため、以下のルールに従います。
+
+##### student の扱い
+
+- `student`：指定されたフィールドのみ反映（未指定は変更しない）
+
+##### courses の扱い
+
+- `courses` の指定が **ない**（キー自体が無い / `courses: null`）
+  → **コースは変更しない**
+- `courses` を **配列で指定**
+  → **コース更新を実施**（追加/更新/差し替えの挙動は `appendCourses` に従う）
+
+##### appendCourses の扱い（省略時は true）
+
+- `appendCourses: true`（または省略）
+  → **追加/更新のみ**（既存でリクエストに含まれないコースは残す）
+  → `courses: []` は **no-op（変更なし）**
+- `appendCourses: false`
+  → **差し替え**（既存 - リクエスト を削除して、リクエストの内容で揃える）
+  → `courses: []` は **全削除** を意味する
+
+##### 実質空更新（E003）
+
+以下は「更新の意図がない」とみなし、HTTP 400（`E003`）を返します。
+
+- `student` に変更がない（指定されていない／または全フィールド空）
+- かつ `courses` も変更意図がない
+    - `courses` が未指定、または
+    - `courses: []` かつ `appendCourses: true`（省略含む）
+
+例：
+
+- `{"courses":[]}`
+  → 変更なし（E003）
+
+- `{"courses":[],"appendCourses":false}`
+  → コース全削除（200）
+
 ## DB設計
 
 ### テーブル構成
