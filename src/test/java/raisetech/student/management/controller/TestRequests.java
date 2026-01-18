@@ -2,6 +2,7 @@ package raisetech.student.management.controller;
 
 import java.time.LocalDate;
 import java.util.List;
+
 import raisetech.student.management.dto.StudentCourseDto;
 import raisetech.student.management.dto.StudentDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
@@ -23,7 +24,11 @@ final class TestRequests {
             false);
     var course =
         new StudentCourseDto(
-            null, "Javaコース", LocalDate.parse("2024-03-01"), LocalDate.parse("2024-09-30"), null,
+            null,
+            "Javaコース",
+            LocalDate.parse("2024-03-01"),
+            LocalDate.parse("2024-09-30"),
+            null,
             null);
     var req = new StudentRegistrationRequest(); // ← デフォルトコンストラクタ
     req.setStudent(dto);
@@ -45,6 +50,5 @@ final class TestRequests {
   // appendCourses は未指定（null）で「デフォルト false 扱い」を検証してもOK
   // return req;}
 
-  private TestRequests() {
-  }
+  private TestRequests() {}
 }

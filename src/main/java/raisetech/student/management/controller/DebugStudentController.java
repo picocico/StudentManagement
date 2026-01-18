@@ -1,14 +1,16 @@
 package raisetech.student.management.controller;
 
-import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.LinkedHashMap;
 import java.util.Map;
+
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 
 // Note: このエンドポイントは @Profile("test") のみで有効。
@@ -39,9 +41,7 @@ public class DebugStudentController {
     return m;
   }
 
-  /**
-   * 一時デバッグ用: 生のJSONがどう届いているか確認
-   */
+  /** 一時デバッグ用: 生のJSONがどう届いているか確認 */
   @PostMapping(
       path = "/debug-raw",
       consumes = MediaType.APPLICATION_JSON_VALUE,
