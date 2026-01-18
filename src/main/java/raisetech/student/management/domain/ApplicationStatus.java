@@ -2,6 +2,7 @@ package raisetech.student.management.domain;
 
 import java.util.Arrays;
 import java.util.Optional;
+
 import lombok.Getter;
 
 @Getter
@@ -17,24 +18,16 @@ public enum ApplicationStatus {
     this.label = label;
   }
 
-  /**
-   * API/DBで扱うステータスコード（例: "IN_PROGRESS"）。
-   */
+  /** API/DBで扱うステータスコード（例: "IN_PROGRESS"）。 */
   public String getCode() {
     return name();
   }
 
-  /**
-   * コード文字列から ApplicationStatus を取得します（不正/空なら empty）。
-   */
+  /** コード文字列から ApplicationStatus を取得します（不正/空なら empty）。 */
   public static Optional<ApplicationStatus> fromCode(String code) {
     if (code == null || code.isBlank()) {
       return Optional.empty();
     }
-    return Arrays.stream(values())
-        .filter(v -> v.name().equals(code))
-        .findFirst();
+    return Arrays.stream(values()).filter(v -> v.name().equals(code)).findFirst();
   }
 }
-
-

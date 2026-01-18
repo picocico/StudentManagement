@@ -3,15 +3,18 @@ package raisetech.student.management.service;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.domain.ApplicationStatus;
 import raisetech.student.management.dto.StudentDetailDto;
+import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.exception.ResourceNotFoundException;
 import raisetech.student.management.repository.StudentCourseApplicationStatusRepository;
 import raisetech.student.management.repository.StudentCourseRepository;
@@ -57,92 +60,207 @@ public class StudentServiceImpl implements StudentService {
   }
 
   /**
-   * 受講生とコース情報を全体更新します。
+   * 受講生情報と受講コース情報を「全体更新（全置換）」します。
    *
-   * @param student 更新対象の受講生エンティティ
-   * @param courses 更新するコースリスト
+   * <p>本メソッドは、指定された受講生IDのレコードに対して以下を同一トランザクションで実行します。
+   *
+   * <ol>
+   *   <li><b>受講生（student）</b>：{@code studentRepository.updateStudent(student)} により更新します。
+   *   <li><b>受講コース（courses）</b>：いったん当該受講生に紐づくコースを全削除し、 引数 {@code courses} の内容で再登録（置換）します。
+   * </ol>
+   *
+   * <h3>コース置換のルール</h3>
+   *
+   * <ul>
+   *   <li>{@code courses == null} または {@code courses.isEmpty()} の場合：コースは全削除され、0件になります。
+   *   <li>コースが存在する場合：各 {@link StudentCourse} に {@code studentId} を再セットしてから一括登録します。
+   * </ul>
+   *
+   * <h3>申込状況（application status）の登録</h3>
+   *
+   * <p>コース登録後、各コースについて「仮申込（PROVISIONAL）」を未登録の場合のみ登録します （既に存在する場合は何もしません）。
+   *
+   * <p><b>存在しない受講生ID</b>の場合、更新件数が0となるため {@link ResourceNotFoundException} を送出します。
+   *
+   * <p><b>トランザクション</b>：本処理は {@link Transactional} により同一トランザクションで実行されます。
+   * 途中で例外が発生した場合、学生更新・コース削除/挿入・申込状況登録はロールバックされます。
+   *
+   * @param student 更新対象の受講生エンティティ（{@code studentId} 必須）
+   * @param courses 更新後に紐づける受講コースの一覧（{@code null} / 空の場合は「全削除のみ」）
+   * @return 更新後の受講生エンティティ（DBから再取得した最新状態）
+   * @throws NullPointerException {@code student} が {@code null} の場合
+   * @throws IllegalArgumentException {@code student.getStudentId()} が {@code null} の場合
+   * @throws ResourceNotFoundException 指定IDの受講生が存在しない場合、または整合性確保のため再取得に失敗した場合
    */
   @Override
   @Transactional
-  public void updateStudent(Student student, List<StudentCourse> courses) {
-    // 1. まず学生情報を更新
-    int updated = studentRepository.updateStudent(student);
-    // 2. 1件も更新されなければ「存在しないID」とみなして404系例外を投げる
-    if (updated == 0) {
-      UUID studentId = student.getStudentId();
-      String idForLog = (studentId != null) ? studentId.toString() : "null";
-      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
-    }
-    // 3. 学生の更新が成功した場合だけ、コース側を更新
-    UUID studentId = student.getStudentId();
-    courseRepository.deleteCoursesByStudentId(student.getStudentId());
-    if (courses != null && !courses.isEmpty()) {
-      for (StudentCourse c : courses) {
-        c.setStudentId(studentId);
-      }
-      courseRepository.insertCourses(courses);
-
-      for (StudentCourse c : courses) {
-        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
-      }
-    }
-  }
-
-  /**
-   * 受講生とコース情報を部分更新します。
-   *
-   * @param student 部分更新対象の受講生エンティティ
-   * @param courses 更新するコースリスト（省略可能）
-   */
-  @Override
-  @Transactional
-  public void partialUpdateStudent(Student student, List<StudentCourse> courses) {
+  public Student updateStudentWithCourses(Student student, List<StudentCourse> courses) {
     Objects.requireNonNull(student, "student must not be null");
-
     UUID studentId = student.getStudentId();
     if (studentId == null) {
-      throw new IllegalArgumentException("UUIDの形式が不正です");
+      throw new IllegalArgumentException("studentId must not be null");
     }
 
-    int updated = studentRepository.updateStudent(student);
-    if (updated == 0) {
+    // 1) いきなり UPDATE して件数を見る
+    int updatedCount = studentRepository.updateStudent(student);
+    if (updatedCount == 0) {
       String idForLog = studentId.toString();
       throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
     }
 
+    // 2) コース全削除 → 一括Insert（メソッド名：deleteCoursesByStudentId / insertCourses）
+    courseRepository.deleteCoursesByStudentId(studentId);
     if (courses != null && !courses.isEmpty()) {
-      // 念のため studentId を統一
-      for (StudentCourse c : courses) {
-        c.setStudentId(studentId);
+      for (StudentCourse sc : courses) {
+        sc.setStudentId(studentId); // 念のため上書き
       }
-      courseRepository.deleteCoursesByStudentId(studentId);
       courseRepository.insertCourses(courses);
       for (StudentCourse c : courses) {
         statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
       }
     }
+
+    // 3) 最新の学生を再取得（null返し仕様に合わせる）
+    Student updated = studentRepository.findById(studentId);
+    if (updated == null) {
+      // 直前で更新しているので通常起きないが、整合性確保のため
+      throw new ResourceNotFoundException("student", "studentId");
+    }
+    return updated;
   }
 
   /**
-   * 既存の受講生に新しいコースのみを追加します（既存のコースは保持）。
+   * 受講生情報を部分更新（PATCH）します。
    *
-   * @param studentId  受講生ID（UUID）
-   * @param newCourses 追加するコースリスト
+   * <p>本メソッドは、リクエスト内容に応じて「受講生の基本情報」と「受講コース情報」を部分的に更新し、 最終状態（学生＋コース）を再取得して返却します。
+   *
+   * <h3>処理概要</h3>
+   *
+   * <ol>
+   *   <li><b>存在確認</b>：指定された {@code studentId} の受講生が存在することを確認します（存在しない場合は404）。
+   *   <li><b>学生本体の更新</b>：{@code req.getStudent() != null} の場合のみ、既存情報にマージして {@code
+   *       updateStudentSelective} により部分更新します（null値による上書きを防止）。
+   *   <li><b>コースの更新</b>：{@code req.getCourses() == null} の場合はコースを一切変更しません。 {@code req.getCourses()
+   *       != null} の場合のみ、{@code appendCourses} の値により動作を切り替えます。
+   *   <li><b>再取得</b>：更新後にDBから最新の学生・コース情報を再取得し、DTOに変換して返します。
+   * </ol>
+   *
+   * <h3>appendCourses の意味</h3>
+   *
+   * <ul>
+   *   <li>{@code true}（または未指定＝デフォルト）：<b>追加・更新</b>のみを行い、リクエストに含まれない既存コースは保持します。
+   *   <li>{@code false}：<b>差し替え</b>（既存 - リクエスト を削除）を行い、リクエスト内容に合わせて追加・更新します。
+   * </ul>
+   *
+   * <h3>courses の null / 空配列の扱い</h3>
+   *
+   * <ul>
+   *   <li>{@code courses == null}：フィールド未指定扱いとして<b>コースは触りません</b>。
+   *   <li>{@code courses.isEmpty()}：
+   *       <ul>
+   *         <li>{@code appendCourses == false} の場合：<b>全削除</b>（0件に置換）。
+   *         <li>{@code appendCourses == true} の場合：<b>no-op</b>（変更なし）。
+   *       </ul>
+   * </ul>
+   *
+   * <h3>コース更新の詳細</h3>
+   *
+   * <ul>
+   *   <li>{@code courseId == null}：新規追加として本メソッド側で {@link UUID#randomUUID()} を採番し、コースを登録します。
+   *   <li>{@code courseId != null}：既存コース更新として、指定の {@code courseId} が当該受講生に紐づくことを確認したうえで更新します。
+   *   <li>申込状況（application status）は、指定がある場合に更新します。新規追加時に未指定の場合は {@code "PROVISIONAL"}
+   *       をデフォルトとして登録します。
+   * </ul>
+   *
+   * <p><b>トランザクション</b>：本処理は {@link Transactional} により同一トランザクションで実行されます。
+   *
+   * @param studentId 更新対象の受講生ID（UUID）
+   * @param req 部分更新リクエスト（student / courses / appendCourses を含む）
+   * @param studentIdString レスポンスDTOに設定する受講生ID文字列（パスで受け取ったUUID文字列表現など）
+   * @return 更新後の受講生詳細DTO（学生＋コース）
+   * @throws IllegalArgumentException {@code studentId} が {@code null} の場合（{@code findStudentById}
+   *     実装に依存）
+   * @throws ResourceNotFoundException 受講生が存在しない場合、または指定した {@code courseId} が当該受講生に紐づかない場合
    */
   @Override
-  public void appendCourses(UUID studentId, List<StudentCourse> newCourses) {
-    if (newCourses == null || newCourses.isEmpty()) {
+  @Transactional
+  public StudentDetailDto patchStudent(
+      UUID studentId, StudentRegistrationRequest req, String studentIdString) {
+
+    // 1) 存在確認（404）
+    findStudentById(studentId);
+
+    // 2) student が来ていれば更新
+    patchStudentEntityIfPresent(studentId, req);
+
+    // 3) courses が来ていれば更新（nullなら触らない）
+    patchCoursesIfPresent(studentId, req);
+
+    // 4) 最新を返す
+    return loadLatestDetail(studentId, studentIdString);
+  }
+
+  // --------------------
+  // private helpers
+  // --------------------
+
+  private void patchStudentEntityIfPresent(UUID studentId, StudentRegistrationRequest req) {
+    if (req.getStudent() == null) {
       return;
     }
-    for (StudentCourse course : newCourses) {
-      course.setStudentId(studentId);
 
-      int inserted = courseRepository.insertIfNotExists(course);
-      if (inserted == 1) {
-        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), course.getCourseId());
+    Student existing = findStudentById(studentId);
+    Student update = converter.toEntity(req.getStudent());
+
+    converter.mergeStudent(existing, update);
+    studentRepository.updateStudentSelective(existing);
+  }
+
+  private void patchCoursesIfPresent(UUID studentId, StudentRegistrationRequest req) {
+    if (req.getCourses() == null) {
+      return; // フィールド未指定 → 触らない
+    }
+
+    final boolean append = req.isAppendCourses(); // null -> true ルール
+    final List<?> courses = req.getCourses();
+
+    // ★空配列の扱いを明示
+    if (courses.isEmpty()) {
+      if (!append) {
+        // 差し替えモードで空配列 → 全削除
+        courseRepository.deleteCoursesByStudentId(studentId);
+      }
+      // append=true で空配列 → no-op
+      return;
+    }
+
+    // 既存コース（所有チェック＆差し替え削除に使う）
+    List<StudentCourse> existingCourses = courseRepository.findCoursesByStudentId(studentId);
+    List<UUID> existingIds = existingCourses.stream().map(StudentCourse::getCourseId).toList();
+
+    // リクエストを entity 化（studentId強制セット / courseId nullはnullのまま）
+    List<StudentCourse> reqCourses = converter.toCourseEntities(studentId, req.getCourses());
+
+    List<StudentCourse> toInsert =
+        reqCourses.stream().filter(c -> c.getCourseId() == null).toList();
+    List<StudentCourse> toUpdate =
+        reqCourses.stream().filter(c -> c.getCourseId() != null).toList();
+
+    // append=false なら差し替え削除（existing - request）
+    if (!append) {
+      List<UUID> requestIds = toUpdate.stream().map(StudentCourse::getCourseId).toList();
+
+      List<UUID> deleteIds = existingIds.stream().filter(id -> !requestIds.contains(id)).toList();
+
+      if (!deleteIds.isEmpty()) {
+        courseRepository.deleteCoursesByCourseIds(studentId, deleteIds);
       }
     }
-  }
+
+    // 追加（courseId==null）
+    for (StudentCourse c : toInsert) {
+      insertCourseWithStatus(studentId, c);
+    }
 
   /**
    * 受講生の基本情報のみを更新します。
@@ -158,51 +276,87 @@ public class StudentServiceImpl implements StudentService {
   public void updateStudentInfoOnly(Student student) {
     Objects.requireNonNull(student, "student must not be null");
 
-    UUID studentId = student.getStudentId();
-    if (studentId == null) {
-      throw new IllegalArgumentException("UUIDの形式が不正です");
+  private void insertCourseWithStatus(UUID studentId, StudentCourse c) {
+    c.setStudentId(studentId);
+    c.setCourseId(UUID.randomUUID());
+
+    courseRepository.insertCourses(List.of(c));
+
+    String status = (c.getApplicationStatus() != null) ? c.getApplicationStatus() : "PROVISIONAL";
+    statusRepository.upsertStatus(UUID.randomUUID(), c.getCourseId(), status);
+  }
+
+  private void updateCourseWithOptionalStatus(
+      UUID studentId, List<UUID> existingIds, StudentCourse c) {
+    c.setStudentId(studentId);
+
+    // 所有チェック（他人courseId更新の事故防止）
+    if (!existingIds.contains(c.getCourseId())) {
+      throw new ResourceNotFoundException("courseId " + c.getCourseId() + " はこの受講生に紐づきません");
     }
 
-    int updated = studentRepository.updateStudent(student);
-    if (updated == 0) {
-      String idForLog = studentId.toString();
-      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
+    boolean hasCourseFields =
+        c.getCourseName() != null || c.getStartDate() != null || c.getEndDate() != null;
+    boolean hasStatus = c.getApplicationStatus() != null;
+
+    // A) ステータスだけ更新（コース情報は触らない）
+    if (!hasCourseFields) {
+      if (hasStatus) {
+        statusRepository.upsertStatus(UUID.randomUUID(), c.getCourseId(), c.getApplicationStatus());
+      }
+      return;
     }
+
+    // B) コース情報も更新（Selective）
+    int updated = courseRepository.updateCourseSelective(c);
+    if (updated == 0) {
+      throw new ResourceNotFoundException("courseId " + c.getCourseId() + " が見つかりません");
+    }
+
+    // status もあれば更新
+    if (hasStatus) {
+      statusRepository.upsertStatus(UUID.randomUUID(), c.getCourseId(), c.getApplicationStatus());
+    }
+  }
+
+  private StudentDetailDto loadLatestDetail(UUID studentId, String studentIdString) {
+    Student latest = findStudentById(studentId);
+    List<StudentCourse> latestCourses = searchCoursesByStudentId(studentId);
+    return converter.toDetailDto(latest, latestCourses, studentIdString);
   }
 
   /**
    * 検索条件に基づいて受講生詳細情報リストを取得します。
    *
-   * @param furigana       ふりがな検索（省略可能）
+   * @param furigana ふりがな検索（省略可能）
    * @param includeDeleted 論理削除済みも含めるか
-   * @param deletedOnly    論理削除済みのみ取得するか
+   * @param deletedOnly 論理削除済みのみ取得するか
    * @return 受講生詳細DTOリスト
    */
   @Override
   public List<StudentDetailDto> getStudentList(
-      String furigana, boolean includeDeleted, boolean deletedOnly,
+      String furigana,
+      boolean includeDeleted,
+      boolean deletedOnly,
       ApplicationStatus applicationStatus) {
 
     if (includeDeleted && deletedOnly) {
-      throw new IllegalArgumentException(
-          "includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
+      throw new IllegalArgumentException("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
     }
 
     String statusCode = (applicationStatus == null) ? null : applicationStatus.name();
 
     // 動的SQLにより1本化されたリポジトリメソッドを呼び出し
     List<Student> students =
-        studentRepository.searchStudents(furigana, includeDeleted, deletedOnly,
-            statusCode); // 1本化！
+        studentRepository.searchStudents(furigana, includeDeleted, deletedOnly, statusCode); // 1本化！
 
-    List<UUID> studentIds = students.stream()
-        .map(Student::getStudentId)
-        .filter(Objects::nonNull)
-        .toList();
+    List<UUID> studentIds =
+        students.stream().map(Student::getStudentId).filter(Objects::nonNull).toList();
 
-    List<StudentCourse> courses = studentIds.isEmpty()
-        ? List.of()
-        : courseRepository.findCoursesByStudentIds(studentIds, statusCode);
+    List<StudentCourse> courses =
+        studentIds.isEmpty()
+            ? List.of()
+            : courseRepository.findCoursesByStudentIds(studentIds, statusCode);
     return converter.toDetailDtoList(students, courses);
   }
 

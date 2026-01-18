@@ -2,13 +2,15 @@ package raisetech.student.management.dto;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import java.util.List;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -59,40 +61,40 @@ public class StudentRegistrationRequest {
    *
    * <p>true の場合、新しいコースを既存のコースに追加する。 false の場合、既存のコースを上書きして新しいコースに置き換える。
    */
-  @Schema(description = "courses を差し込み追加するか（true=追加/更新のみ, false=差し替え）",
-      defaultValue = "true")
+  @Schema(description = "courses を差し込み追加するか（true=追加/更新のみ, false=差し替え）", defaultValue = "true")
   @JsonProperty("appendCourses")
   // ★ Boolean にして @Getter/@Setter を付与
   private Boolean appendCourses; // ← trueならコースを追加、falseなら置き換え
 
-  /**
-   * 部分更新リクエストが空かどうか判定 （student, courses, appendCourses すべて未指定）
-   */
+  /** 部分更新リクエストが空かどうか判定 （student, courses, appendCourses すべて未指定） */
   public boolean isPatchEmpty() {
     // 1) student の中身
     final var s = this.getStudent();
     final boolean hasStudentChanges =
         s != null
             && (!isBlank(s.getFullName())
-            || !isBlank(s.getFurigana())
-            || !isBlank(s.getNickname())
-            || !isBlank(s.getEmail())
-            || !isBlank(s.getLocation())
-            || s.getAge() != null
-            || !isBlank(s.getGender())
-            || !isBlank(s.getRemarks()));
+                || !isBlank(s.getFurigana())
+                || !isBlank(s.getNickname())
+                || !isBlank(s.getEmail())
+                || !isBlank(s.getLocation())
+                || s.getAge() != null
+                || !isBlank(s.getGender())
+                || !isBlank(s.getRemarks()));
 
     // 2) courses の中身（1件でもあれば“変更あり”）
     final var cs = this.getCourses();
-    final boolean hasCourseChanges = (cs != null); // 空でも「変更あり」
+    final boolean append = isAppendCourses(); // null->true ルールを利用
+    final boolean hasCourseChanges = cs != null && (!cs.isEmpty() || !append);
+    // cs != null かつ
+    // - 1件でもあれば変更あり
+    // - 空でも append=false（差し替え）なら「全削除」の意味があるので変更あり
 
-    // 3) 判定（appendCourses は空判定には使わない）
+    // 3) 判定（appendCourses 単体では変更扱いにしない）
+    //    ※ただし courses=[] の場合は appendCourses=false を「全削除の意図」として変更扱いにする
     return !(hasStudentChanges || hasCourseChanges);
   }
 
-  /**
-   * Jackson が必ずこのコンストラクタで JSON → オブジェクトを作るように明示。
-   */
+  /** Jackson が必ずこのコンストラクタで JSON → オブジェクトを作るように明示。 */
   @JsonCreator(mode = JsonCreator.Mode.PROPERTIES)
   public StudentRegistrationRequest(
       @JsonProperty("student") StudentDto student,
@@ -105,11 +107,7 @@ public class StudentRegistrationRequest {
     this.appendCourses = (appendCourses == null) ? Boolean.TRUE : appendCourses;
   }
 
-  /*
-   このメソッドは不要 （@Dataがあるため、手動Getterは不要）
-   public boolean isAppendCourses() {
-   return appendCourses;
-   }
-  */
-
+  public boolean isAppendCourses() {
+    return appendCourses == null || appendCourses;
+  }
 }
