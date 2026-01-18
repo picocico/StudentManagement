@@ -2,7 +2,9 @@ package raisetech.student.management.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -10,15 +12,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+
 import raisetech.student.management.config.TestSecurityConfig;
 import raisetech.student.management.data.Student;
+import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.exception.GlobalExceptionHandler;
 import raisetech.student.management.web.RawBodyCaptureFilter;
 
@@ -189,7 +196,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    * @throws Exception MockMvc実行時例外
    */
   @Test
-  void patch_emptyJson_returns_400_emptyObject_schemaLocked() throws Exception {
+  void patch_スキーマが固定の状態で_空のJSONをリクエスト_400_空のオブジェクトが返ること() throws Exception {
     mockMvc
         .perform(
             patch("/api/students/{id}", studentById)
@@ -211,7 +218,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    * @throws Exception MockMvc実行時例外
    */
   @Test
-  void patch_malformedJson_returns_400_invalidJson_schemaLocked() throws Exception {
+  void patch_スキーマが固定の状態で_不正なJSONをリクエスト_400_無効なJSONが返ること() throws Exception {
     mockMvc
         .perform(
             patch("/api/students/{id}", studentById)
@@ -233,7 +240,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
    * @throws Exception MockMvc実行時例外
    */
   @Test
-  void notFound_returns_E404_schema() throws Exception {
+  void スキーマが見つからない場合_E404_データが存在しないエラーを返すこと() throws Exception {
     mockMvc
         .perform(get("/no/such/path"))
         .andExpect(status().isNotFound())
@@ -248,32 +255,35 @@ class ErrorContractSmokeTest extends ControllerTestBase {
 
   // 500: 想定外例外 → INTERNAL_SERVER_ERROR / E999（makeConverterThrowEarly を利用）
   @Test
-  void patch_unexpectedException_returns_500_internal_schemaLocked() throws Exception {
-    // Arrange: まず落としたい地点にスタブを先に仕込む
-    doThrow(new RuntimeException("boom")).when(converter).toEntityList(any(), any());
+  void patch_スキーマが固定されている状態で_予期せぬ例外が発生した場合_500エラーを返すこと() throws Exception {
+    Mockito.reset(service, converter);
 
-    // hasCourses を true にするため courses を1件入れる
+    // ★ decode を通す（resetしたので必須）
+    when(converter.decodeUuidStringOrThrow(anyString())).thenReturn(UUID.fromString(studentById));
+
+    // ★ service入口で確実に落とす
+    doThrow(new RuntimeException("boom"))
+        .when(service)
+        .patchStudent(any(UUID.class), any(StudentRegistrationRequest.class), anyString());
+
     String json =
         """
             {
-              "student": { "name": "ok" },
-              "courses": [ { "courseId": "AAAA", "status": "ENROLLED" } ]
+              "student": { "fullName":"x" }
             }
             """;
 
     // Act & Assert
     mockMvc
         .perform(
-            patch("/api/students/{id}", studentById)
+            patch("/api/students/{studentId}", studentById)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.error").value("INTERNAL_SERVER_ERROR"))
-        .andExpect(jsonPath("$.code").value("E999"))
-        .andExpect(jsonPath("$.message").isNotEmpty())
-        .andExpect(jsonPath("$.errors").doesNotExist())
-        .andExpect(jsonPath("$.details").doesNotExist())
-        .andExpect(jsonPath("$.errorCode").doesNotExist())
-        .andExpect(jsonPath("$.errorType").doesNotExist());
+        .andExpect(jsonPath("$.code").value("E999"));
+
+    verify(service)
+        .patchStudent(any(UUID.class), any(StudentRegistrationRequest.class), anyString());
   }
 }
