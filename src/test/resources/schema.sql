@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS student_courses (
   created_at   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT pk_student_courses PRIMARY KEY (course_id),
   CONSTRAINT idx_student_courses_student_id FOREIGN KEY (student_id)
-    REFERENCES students(student_id)
+    REFERENCES students(student_id),
+    CONSTRAINT uq_student_course_name UNIQUE (student_id, course_name)
 );
 
 CREATE TABLE student_courses_application_status (

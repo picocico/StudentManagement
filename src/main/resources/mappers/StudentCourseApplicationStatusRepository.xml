@@ -6,7 +6,7 @@
 <mapper
   namespace="raisetech.student.management.repository.StudentCourseApplicationStatusRepository">
 
-  <!-- 申込状況を未作成なら作成（デフォルト：PROVISIONAL） -->
+  <!-- 申込状況が未登録の場合のみ作成（デフォルト：PROVISIONAL）。既に存在する場合は何も更新しない（updated_atも据え置き） -->
   <insert id="insertProvisionalIfAbsent">
     INSERT INTO student_courses_application_status (
     application_status_id,
@@ -14,8 +14,7 @@
     status,
     created_at,
     updated_at
-    )
-    SELECT
+    ) VALUES (
     #{applicationStatusId, jdbcType=BINARY,
       typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
     #{courseId, jdbcType=BINARY,
@@ -23,23 +22,42 @@
     'PROVISIONAL',
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
-    FROM DUAL
-    WHERE NOT EXISTS (
-    SELECT 1
-    FROM student_courses_application_status
-    WHERE course_id = #{courseId, jdbcType=BINARY,
-        typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
     )
+    ON DUPLICATE KEY UPDATE
+    updated_at = updated_at
+  </insert>
+
+  <!-- 申込状況を登録または更新（course_idが既存ならstatusとupdated_atを更新、未登録なら新規作成） -->
+  <insert id="upsertStatus">
+    INSERT INTO student_courses_application_status (
+    application_status_id,
+    course_id,
+    status,
+    created_at,
+    updated_at
+    ) VALUES (
+    #{applicationStatusId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
+    #{courseId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
+    #{status},
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+    )
+    ON DUPLICATE KEY UPDATE
+    status = #{status},
+    updated_at = CURRENT_TIMESTAMP
   </insert>
 
   <!-- 受講生のコースに紐づく申込状況を削除（コース削除の前に実行する想定） -->
   <delete id="deleteByStudentId">
-    DELETE scas
-    FROM student_courses_application_status scas
-    INNER JOIN student_courses sc
-    ON sc.course_id = scas.course_id
-    WHERE sc.student_id = #{studentId, jdbcType=BINARY,
+    DELETE FROM student_courses_application_status
+    WHERE course_id IN (
+    SELECT course_id
+    FROM student_courses
+    WHERE student_id = #{studentId, jdbcType=BINARY,
       typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+    )
   </delete>
 
 </mapper>

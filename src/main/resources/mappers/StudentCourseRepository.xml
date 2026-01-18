@@ -47,26 +47,68 @@
   <insert id="insertIfNotExists" parameterType="StudentCourse">
     INSERT INTO student_courses (course_id, student_id, course_name, start_date, end_date,
     created_at)
-    SELECT
+    VALUES (
     #{courseId, jdbcType=BINARY, typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
     #{studentId, jdbcType=BINARY, typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
     #{courseName},
     #{startDate},
     #{endDate},
     NOW()
-    FROM DUAL
-    WHERE NOT EXISTS (
-    SELECT 1 FROM student_courses
-    WHERE student_id = #{studentId}
-    AND course_name = #{courseName}
     )
+    ON DUPLICATE KEY UPDATE
+    course_id = course_id
   </insert>
+
+  <!-- courseId があるコースを更新（studentIdも条件に入れて安全に） -->
+  <update id="updateCourse" parameterType="raisetech.student.management.data.StudentCourse">
+    UPDATE student_courses
+    SET
+    course_name = #{courseName},
+    start_date = #{startDate},
+    end_date = #{endDate}
+    WHERE course_id = #{courseId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+    AND student_id = #{studentId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+  </update>
+
+  <!-- courseId があるコースのPATCH差分を更新（nullは更新しない） -->
+  <update id="updateCourseSelective"
+    parameterType="raisetech.student.management.data.StudentCourse">
+    UPDATE student_courses
+    <set>
+      <if test="courseName != null">course_name = #{courseName},</if>
+      <if test="startDate != null">start_date = #{startDate},</if>
+      <if test="endDate != null">end_date = #{endDate},</if>
+    </set>
+    WHERE course_id = #{courseId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+    AND student_id = #{studentId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+  </update>
 
   <!-- 削除 -->
   <delete id="deleteCoursesByStudentId">
     DELETE FROM student_courses WHERE student_id = #{studentId, jdbcType=BINARY,
     typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </delete>
+
+  <!-- 差し替え時：リクエストに無い courseId を削除するために使う -->
+  <delete id="deleteCoursesByCourseIds" parameterType="map">
+    DELETE FROM student_courses
+    WHERE student_id = #{studentId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+    AND course_id IN
+    <foreach collection="courseIds" item="id" open="(" separator="," close=")">
+      #{id, jdbcType=BINARY,
+        typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+    </foreach>
+  </delete>
+
+  <!-- 全件取得 -->
+  <select id="findAllCourses" resultMap="StudentCourseResultMap">
+    SELECT * FROM student_courses
+  </select>
 
   <!-- 特定受講生のコース一覧を申込状況つきで取得（LEFT JOIN）  -->
   <select id="findCoursesByStudentId" resultMap="StudentCourseResultMap">
@@ -110,11 +152,6 @@
     </if>
 
     ORDER BY sc.created_at DESC
-  </select>
-
-  <!-- 全件取得 -->
-  <select id="findAllCourses" resultMap="StudentCourseResultMap">
-    SELECT * FROM student_courses
   </select>
 
 </mapper>

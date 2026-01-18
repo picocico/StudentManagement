@@ -70,7 +70,7 @@
     now(), #{deleted})
   </insert>
 
-  <!-- 更新 -->
+  <!-- PUT/全体更新 -->
   <update id="updateStudent" parameterType="raisetech.student.management.data.Student">
     UPDATE students SET
     full_name = #{fullName},
@@ -83,6 +83,27 @@
     remarks = #{remarks},
     is_deleted = #{deleted},
     deleted_at = #{deletedAt}
+    WHERE student_id = #{studentId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+  </update>
+
+  <!-- PATCH/差分更新 （nullは更新しない）-->
+  <update id="updateStudentSelective" parameterType="raisetech.student.management.data.Student">
+    UPDATE students
+    <set>
+      <if test="fullName != null">full_name = #{fullName},</if>
+      <if test="furigana != null">furigana = #{furigana},</if>
+      <if test="nickname != null">nickname = #{nickname},</if>
+      <if test="email != null">email = #{email},</if>
+      <if test="location != null">location = #{location},</if>
+      <if test="age != null">age = #{age},</if>
+      <if test="gender != null">gender = #{gender},</if>
+      <if test="remarks != null">remarks = #{remarks},</if>
+
+      <!-- deleted系をPATCHで触る設計なら -->
+      <if test="deleted != null">is_deleted = #{deleted},</if>
+      <if test="deletedAt != null">deleted_at = #{deletedAt},</if>
+    </set>
     WHERE student_id = #{studentId, jdbcType=BINARY,
     typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </update>
