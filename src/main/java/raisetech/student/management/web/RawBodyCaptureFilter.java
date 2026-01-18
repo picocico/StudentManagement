@@ -1,14 +1,16 @@
 package raisetech.student.management.web;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import org.springframework.core.Ordered;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -34,9 +36,9 @@ public class RawBodyCaptureFilter extends org.springframework.web.filter.OncePer
 
     // 状態を判定
     RawBodyState state =
-        (bytes.length == 0 || text.isEmpty()) ? RawBodyState.NONE
-            : "{}".equals(text) ? RawBodyState.EMPTY_OBJECT
-                : RawBodyState.NON_EMPTY;
+        (bytes.length == 0 || text.isEmpty())
+            ? RawBodyState.NONE
+            : "{}".equals(text) ? RawBodyState.EMPTY_OBJECT : RawBodyState.NON_EMPTY;
 
     // 属性に格納（コントローラで参照）
     request.setAttribute(ATTR_RAW_BODY_LEN, bytes.length);

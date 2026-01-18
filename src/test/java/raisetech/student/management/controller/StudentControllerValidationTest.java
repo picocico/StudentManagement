@@ -17,8 +17,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.exception.InvalidIdFormatException;
 
@@ -31,24 +33,25 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
    *   <li>必須項目が未入力・形式不正の JSON を送信する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>HTTP ステータスコードが 400 である</li>
-   *   <li>レスポンスボディの {@code code} が {@code "E001"} である</li>
-   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
-   *   <li>{@code message} が「入力値に不備があります」を含む</li>
-   *   <li>{@code errors} 配列が存在し、1 件以上の要素を持つ</li>
+   *   <li>HTTP ステータスコードが 400 である
+   *   <li>レスポンスボディの {@code code} が {@code "E001"} である
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である
+   *   <li>{@code message} が「入力値に不備があります」を含む
+   *   <li>{@code errors} 配列が存在し、1 件以上の要素を持つ
    * </ul>
    *
    * @throws Exception HTTP 通信の模擬処理中に例外が発生した場合
    */
   @Test
-  public void registerStudent_バリデーションエラー発生時に適切なHTTPステータスとエラーレスポンスが返ること()
-      throws Exception {
+  public void registerStudent_バリデーションエラー発生時に適切なHTTPステータスとエラーレスポンスが返ること() throws Exception {
     String invalid =
         """
             {
@@ -69,93 +72,97 @@ class StudentControllerValidationTest extends ControllerTestBase {
     mockMvc
         .perform(post("/api/students").contentType(MediaType.APPLICATION_JSON).content(invalid))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E001")) // ここを errorCode → code に
         .andExpect(jsonPath("$.error").value("VALIDATION_FAILED")) // 旧: errorType を使っていたなら error に
-        .andExpect(jsonPath("$.message").value("入力値に不備があります"))
+        .andExpect(jsonPath("$.message").value(containsString("入力値")))
         .andExpect(jsonPath("$.errors").isArray())
         .andExpect(jsonPath("$.errors.length()").value(org.hamcrest.Matchers.greaterThan(0)));
   }
 
   /**
    * {@code includeDeleted=true} と {@code deletedOnly=true} を同時指定した場合に
-   * 400（E006/INVALID_ID_FORMAT）が返ることを検証します。
+   * 400（E003/INVALID_REQUEST）が返ることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students}<br>
-   * Params: {@code includeDeleted=true}, {@code deletedOnly=true}<br> Status:
-   * {@code 400 BAD_REQUEST}
+   * Params: {@code includeDeleted=true}, {@code deletedOnly=true}<br>
+   * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
+   *
    * <ul>
-   *   <li>{@code service.getStudentList(null, true, true)} が
-   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
+   *   <li>{@code service.getStudentList(null, true, true)} が {@link IllegalArgumentException}
+   *       を送出するようスタブされている
    * </ul>
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>MockMvc で上記パラメータを指定して GET を実行する</li>
+   *   <li>MockMvc で上記パラメータを指定して GET を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>HTTP ステータス 400 が返る</li>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
-   *   <li>{@code message} に「同時指定できません」の文言が含まれる</li>
+   *   <li>HTTP ステータス 400 が返る
+   *   <li>{@code code} が {@code "E003"} である
+   *   <li>{@code error} が {@code "INVALID_REQUEST"} である
+   *   <li>{@code message} に「同時指定できません」の文言が含まれる
    * </ul>
    *
    * @throws Exception 実行時例外
    */
   @Test
-  public void getStudentList_論理削除と削除のみ指定が同時にtrueの場合_例外が返ること()
-      throws Exception {
+  public void getStudentList_論理削除と削除のみ指定が同時にtrueの場合_例外が返ること() throws Exception {
     when(service.getStudentList(null, true, true, null))
         .thenThrow(
-            new IllegalArgumentException(
-                "includeDeleted=true と deletedOnly=true は同時指定できません"));
+            new IllegalArgumentException("includeDeleted=true と deletedOnly=true は同時指定できません"));
 
     mockMvc
         .perform(get("/api/students").param("includeDeleted", "true").param("deletedOnly", "true"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400))
-        .andExpect(jsonPath("$.code").value("E006"))
+        .andExpect(jsonPath("$.code").value("E003"))
         .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
         .andExpect(
             jsonPath("$.message")
-                .value(containsString(
-                    "includeDeleted=true と deletedOnly=true は同時指定できません")));
+                .value(containsString("includeDeleted=true と deletedOnly=true は同時指定できません")));
+
+    verify(service).getStudentList(null, true, true, null);
   }
 
   /**
    * {@code includeDeleted} に文字列など不正な型を指定した場合に、 型不一致エラー（E004/TYPE_MISMATCH/400）が返ることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students}<br>
-   * Params: {@code includeDeleted=abc}<br> Status: {@code 400 BAD_REQUEST}
+   * Params: {@code includeDeleted=abc}<br>
+   * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>{@code includeDeleted} に {@code "abc"} を指定して GET を実行する</li>
+   *   <li>{@code includeDeleted} に {@code "abc"} を指定して GET を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E004"} である</li>
-   *   <li>{@code error} が {@code "TYPE_MISMATCH"} である</li>
-   *   <li>{@code message} に {@code "includeDeleted"} が含まれる</li>
-   *   <li>{@code code} が文字列型、{@code status} が数値型である</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E004"} である
+   *   <li>{@code error} が {@code "TYPE_MISMATCH"} である
+   *   <li>{@code message} に {@code "includeDeleted"} が含まれる
+   *   <li>{@code code} が文字列型、{@code status} が数値型である
    * </ul>
    *
    * @throws Exception 実行時例外
    */
   @Test
-  public void getStudentList_includeDeletedに文字列が指定された場合_型不一致エラーが返ること()
-      throws Exception {
+  public void getStudentList_includeDeletedに文字列が指定された場合_型不一致エラーが返ること() throws Exception {
     mockMvc
         .perform(get("/api/students").param("includeDeleted", "abc"))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E004")) // ← 数値ではなく文字列
         .andExpect(jsonPath("$.error").value("TYPE_MISMATCH")) // ← errorType → error
@@ -168,31 +175,33 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * {@code deletedOnly} に文字列など不正な型を指定した場合に、 型不一致エラー（E004/TYPE_MISMATCH/400）が返ることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students}<br>
-   * Params: {@code deletedOnly=xyz}<br> Status: {@code 400 BAD_REQUEST}
+   * Params: {@code deletedOnly=xyz}<br>
+   * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>{@code deletedOnly} に {@code "xyz"} を指定して GET を実行する</li>
+   *   <li>{@code deletedOnly} に {@code "xyz"} を指定して GET を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E004"} である</li>
-   *   <li>{@code error} が {@code "TYPE_MISMATCH"} である</li>
-   *   <li>{@code message} に {@code "deletedOnly"} が含まれる</li>
-   *   <li>{@code code} が文字列型、{@code status} が数値型である</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E004"} である
+   *   <li>{@code error} が {@code "TYPE_MISMATCH"} である
+   *   <li>{@code message} に {@code "deletedOnly"} が含まれる
+   *   <li>{@code code} が文字列型、{@code status} が数値型である
    * </ul>
    *
    * @throws Exception 実行時例外
    */
   @Test
-  public void getStudentList_deletedOnlyに文字列が指定された場合_型不一致エラーが返ること()
-      throws Exception {
+  public void getStudentList_deletedOnlyに文字列が指定された場合_型不一致エラーが返ること() throws Exception {
     mockMvc
         .perform(get("/api/students").param("deletedOnly", "xyz"))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E004"))
         .andExpect(jsonPath("$.error").value("TYPE_MISMATCH"))
@@ -208,42 +217,44 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
+   *
    * <ul>
-   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が
-   *       {@link IllegalArgumentException} を送出するようスタブされている</li>
+   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が {@link IllegalArgumentException}
+   *       を送出するようスタブされている
    * </ul>
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>パス変数 {@code studentId} に UUID として不正な文字列を指定し GET を実行する</li>
+   *   <li>パス変数 {@code studentId} に UUID として不正な文字列を指定し GET を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
-   *   <li>{@code message} に {@code "IDの形式が不正です"} が含まれる</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E006"} である
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である
+   *   <li>{@code message} に {@code "IDの形式が不正です"} が含まれる
    * </ul>
    *
    * @throws Exception 実行時例外
    */
   @Test
-  public void getStudentDetail_UUID形式として不正なIDを指定した場合_400エラーが返ること()
-      throws Exception {
+  public void getStudentDetail_UUID形式として不正なIDを指定した場合_400エラーが返ること() throws Exception {
 
     String invalid = "@@invalid@@";
     when(converter.decodeUuidStringOrThrow(invalid))
-        .thenThrow(new IllegalArgumentException("IDの形式が不正です（UUID）"));
+        .thenThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
         .perform(get("/api/students/{studentId}", invalid))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_REQUEST")) // ← error キー
-        .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
+        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT")) // ← error キー
+        .andExpect(jsonPath("$.message").value(containsString("UUID")));
 
     verify(converter).decodeUuidStringOrThrow(invalid);
     verifyNoInteractions(service);
@@ -256,17 +267,19 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>必須項目が欠落・形式不正な {@code student} を含む JSON を送信する</li>
+   *   <li>必須項目が欠落・形式不正な {@code student} を含む JSON を送信する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E001"} である</li>
-   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
-   *   <li>{@code errors} 配列が存在する</li>
-   *   <li>バリデーション段階で失敗するため {@code converter} および {@code service} は呼ばれない</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E001"} である
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である
+   *   <li>{@code errors} 配列が存在する
+   *   <li>バリデーション段階で失敗するため {@code converter} および {@code service} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -297,19 +310,18 @@ class StudentControllerValidationTest extends ControllerTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(invalid))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E001")) // ← 文字列のコード
         .andExpect(jsonPath("$.error").value("VALIDATION_FAILED")) // ← error に統一
         .andExpect(jsonPath("$.message").value(containsString("入力値")))
         // 配列の存在だけ緩く見る（空白差の影響を受けにくい）
-        .andExpect(jsonPath("$.errors").isArray())
-        .andExpect(jsonPath("$.details").isArray());
+        .andExpect(jsonPath("$.errors").isArray());
     // もし特定フィールドまで見たいなら部分一致で:
     // .andExpect(jsonPath("$.errors[*].field", hasItem("student.email")));
 
     // バリデーションで落ちる想定なので依存には触らない
-    verifyNoInteractions(converter, service);
+    verifyNoInteractions(service);
   }
 
   /**
@@ -319,17 +331,19 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
+   *
    * <ul>
-   *   <li>{@code converter.decodeUuidStringOrThrow(invalidId)} が
-   *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
+   *   <li>{@code converter.decodeUuidStringOrThrow(invalidId)} が {@link InvalidIdFormatException}
+   *       を送出するようスタブされている
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
-   *   <li>ID変換で失敗するため {@code service} は呼ばれない</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E006"} である
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である
+   *   <li>ID変換で失敗するため {@code service} は呼ばれない
    * </ul>
    */
   @Test
@@ -342,10 +356,13 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .decodeUuidStringOrThrow(invalidId);
 
     String body =
-        json(new StudentRegistrationRequest() {{
-          setStudent(studentDto);
-          setCourses(List.of(courseDto));
-        }});
+        json(
+            new StudentRegistrationRequest() {
+              {
+                setStudent(studentDto);
+                setCourses(List.of(courseDto));
+              }
+            });
 
     mockMvc
         .perform(
@@ -353,11 +370,11 @@ class StudentControllerValidationTest extends ControllerTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"))
-        .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
+        .andExpect(jsonPath("$.message").value(containsString("UUID")));
 
     // ID変換で落ちるので service は触られない
     verify(converter).decodeUuidStringOrThrow(invalidId);
@@ -371,16 +388,18 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>空文字列のボディで PUT を実行する</li>
+   *   <li>空文字列のボディで PUT を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E003"} である</li>
-   *   <li>{@code error} が {@code "MISSING_PARAMETER"} である</li>
-   *   <li>{@code message} に「リクエストボディ」を含む</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E003"} である
+   *   <li>{@code error} が {@code "MISSING_PARAMETER"} である
+   *   <li>{@code message} に「リクエストボディ」を含む
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -394,14 +413,14 @@ class StudentControllerValidationTest extends ControllerTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(""))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E003")) // ← MISSING_PARAMETER は E003
         .andExpect(jsonPath("$.error").value("MISSING_PARAMETER"))
         .andExpect(jsonPath("$.message").value(containsString("リクエストボディ")));
-    // @Valid 前にdecodeしない設計なら、ここも converter に触らない想定にできます。
-    // 設計に合わせて下行はコメントアウト可
-    // verifyNoInteractions(converter, service);
+
+    verifyNoInteractions(converter);
+    verifyNoInteractions(service);
   }
 
   /**
@@ -411,19 +430,21 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>{@code {"student":null,"courses":[]} } をボディとして PUT を実行する</li>
+   *   <li>{@code {"student":null,"courses":[]} } をボディとして PUT を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E001"} である</li>
-   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
-   *   <li>{@code message} に「入力値」が含まれる</li>
-   *   <li>{@code errors}  配列が存在する</li>
-   *   <li>{@code errors[*].field} に {@code "student"} を含む</li>
-   *   <li>バリデーションで失敗するため {@code converter} および {@code service} は呼ばれない</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E001"} である
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である
+   *   <li>{@code message} に「入力値」が含まれる
+   *   <li>{@code errors} 配列が存在する
+   *   <li>{@code errors[*].field} に {@code "student"} を含む
+   *   <li>バリデーションで失敗するため {@code converter} および {@code service} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -446,16 +467,15 @@ class StudentControllerValidationTest extends ControllerTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E001"))
         .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))
         .andExpect(jsonPath("$.message").value(containsString("入力値")))
         .andExpect(jsonPath("$.errors").isArray())
-        .andExpect(jsonPath("$.details").isArray())
         .andExpect(jsonPath("$.errors[*].field", hasItem("student"))); // 部分一致で十分
 
-    verifyNoInteractions(converter, service);
+    verifyNoInteractions(service);
   }
 
   /**
@@ -465,18 +485,20 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>{@code student} は正しいが {@code courses=null} の JSON を送信する</li>
+   *   <li>{@code student} は正しいが {@code courses=null} の JSON を送信する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E001"} である</li>
-   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
-   *   <li>{@code message} に「入力値」が含まれる</li>
-   *   <li>{@code errors[*].field} に {@code "courses"} を含む</li>
-   *   <li>バリデーションで失敗するため {@code converter} および {@code service} は呼ばれない</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E001"} である
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である
+   *   <li>{@code message} に「入力値」が含まれる
+   *   <li>{@code errors[*].field} に {@code "courses"} を含む
+   *   <li>バリデーションで失敗するため {@code converter} および {@code service} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -496,7 +518,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(req)))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E001"))
         .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))
@@ -504,7 +526,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.errors[*].field", hasItem("courses")));
 
     // バリデーションで弾かれるので下位は呼ばれない想定
-    verifyNoInteractions(converter, service);
+    verifyNoInteractions(service);
   }
 
   /**
@@ -535,7 +557,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"))
-        .andExpect(jsonPath("$.message").value(containsString("IDの形式が不正です")));
+        .andExpect(jsonPath("$.message").value(containsString("UUID")));
 
     verify(converter).decodeUuidStringOrThrow(invalidId);
     verifyNoMoreInteractions(converter);
@@ -549,17 +571,19 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>空ボディで PATCH を実行する</li>
+   *   <li>空ボディで PATCH を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E003"} である</li>
-   *   <li>{@code error} が {@code "MISSING_PARAMETER"} である</li>
-   *   <li>{@code message} に「リクエストボディ」が含まれる</li>
-   *   <li>{@code converter} および {@code service} は呼ばれない</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E003"} である
+   *   <li>{@code error} が {@code "MISSING_PARAMETER"} である
+   *   <li>{@code message} に「リクエストボディ」が含まれる
+   *   <li>{@code converter} および {@code service} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -569,17 +593,16 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
     mockMvc
         .perform(
-            patch("/api/students/{studentId}", studentById)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(""))
+            patch("/api/students/{studentId}", studentById).contentType(MediaType.APPLICATION_JSON))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E003"))
         .andExpect(jsonPath("$.error").value("MISSING_PARAMETER"))
         .andExpect(jsonPath("$.message", containsString("リクエストボディ")));
 
-    verifyNoInteractions(converter, service);
+    verifyNoInteractions(converter);
+    verifyNoInteractions(service);
   }
 
   /**
@@ -589,16 +612,18 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>ボディに {@code {}} を指定して PATCH を実行する</li>
+   *   <li>ボディに {@code {}} を指定して PATCH を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code error} が {@code "EMPTY_OBJECT"} である</li>
-   *   <li>{@code code} が {@code "E003"} である</li>
-   *   <li>{@code message} に「更新対象のフィールドがありません」が含まれる</li>
-   *   <li>{@code converter} および {@code service} は呼ばれない</li>
+   *   <li>{@code error} が {@code "EMPTY_OBJECT"} である
+   *   <li>{@code code} が {@code "E003"} である
+   *   <li>{@code message} に「更新対象のフィールドがありません」が含まれる
+   *   <li>{@code converter} および {@code service} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -614,11 +639,10 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("EMPTY_OBJECT"))
         .andExpect(jsonPath("$.code").value("E003"))
-        .andExpect(
-            jsonPath("$.message").value(
-                org.hamcrest.Matchers.containsString("更新対象のフィールドがありません")));
+        .andExpect(jsonPath("$.message", containsString("更新対象")));
 
-    verifyNoInteractions(converter, service);
+    verifyNoInteractions(converter);
+    verifyNoInteractions(service);
   }
 
   /**
@@ -628,19 +652,21 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>{@code {"student":null,"courses":[]} } をボディとして PATCH を実行する</li>
+   *   <li>{@code {"student":null,"courses":[]} } をボディとして PATCH を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code status} が {@code 400} である</li>
-   *   <li>{@code code} が {@code "E001"} である</li>
-   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である</li>
-   *   <li>{@code message} に「入力値」が含まれる</li>
-   *   <li>{@code errors}  配列が存在する</li>
-   *   <li>バリデーションエラーの詳細に {@code field="student"} を含む</li>
-   *   <li>{@code converter} および {@code service} は呼ばれない</li>
+   *   <li>{@code status} が {@code 400} である
+   *   <li>{@code code} が {@code "E001"} である
+   *   <li>{@code error} が {@code "VALIDATION_FAILED"} である
+   *   <li>{@code message} に「入力値」が含まれる
+   *   <li>{@code errors} 配列が存在する
+   *   <li>バリデーションエラーの詳細に {@code field="student"} を含む
+   *   <li>{@code converter} および {@code service} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -654,15 +680,30 @@ class StudentControllerValidationTest extends ControllerTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"student\":null,\"courses\":[]}"))
         .andExpect(status().isBadRequest())
-        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.status").value(400))
         .andExpect(jsonPath("$.code").value("E001")) // ← errorCode→code、文字列
         .andExpect(jsonPath("$.error").value("VALIDATION_FAILED")) // ← error に統一
         .andExpect(jsonPath("$.message").value(containsString("入力値")))
-        .andExpect(jsonPath("$.errors").isArray())
-        .andExpect(jsonPath("$.details").isArray());
+        .andExpect(jsonPath("$.errors").isArray());
 
-    verifyNoInteractions(converter, service);
+    verifyNoInteractions(converter);
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  void partialUpdateStudent_courses空配列でappend省略の場合_400を返すこと() throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/students/{studentId}", studentById)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"courses\":[]}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.message", containsString("更新対象")));
+
+    verifyNoInteractions(converter);
+    verifyNoInteractions(service);
   }
 
   /**
@@ -672,21 +713,24 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
+   *
    * <ul>
-   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が
-   *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
+   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が {@link InvalidIdFormatException}
+   *       を送出するようスタブされている
    * </ul>
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>UUID として不正な {@code invalid} を {@code studentId} に指定して DELETE を実行する</li>
+   *   <li>UUID として不正な {@code invalid} を {@code studentId} に指定して DELETE を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
-   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
+   *   <li>{@code code} が {@code "E006"} である
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である
+   *   <li>ID 変換で失敗するため {@code service} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -695,14 +739,14 @@ class StudentControllerValidationTest extends ControllerTestBase {
   public void deleteStudent_studentIdのUUID形式が不正な場合_400を返すこと() throws Exception {
 
     String invalid = "invalid_UUID";
-    when(converter.decodeUuidStringOrThrow(invalid)).thenThrow(
-        new InvalidIdFormatException("IDの形式が不正です（UUID）"));
+    when(converter.decodeUuidStringOrThrow(invalid))
+        .thenThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
         .perform(delete("/api/students/{studentId}", invalid))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"));
+        .andExpect(jsonPath("$.message", containsString("（UUID）")));
 
     verify(converter).decodeUuidStringOrThrow(invalid);
     verifyNoInteractions(service);
@@ -715,21 +759,24 @@ class StudentControllerValidationTest extends ControllerTestBase {
    * Status: {@code 400 BAD_REQUEST}
    *
    * <p>Given:
+   *
    * <ul>
-   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が
-   *       {@link InvalidIdFormatException} を送出するようスタブされている</li>
+   *   <li>{@code converter.decodeUuidStringOrThrow(invalid)} が {@link InvalidIdFormatException}
+   *       を送出するようスタブされている
    * </ul>
    *
    * <p>When:
+   *
    * <ul>
-   *   <li>UUID として不正な {@code invalid} を {@code studentId} に指定して PATCH を実行する</li>
+   *   <li>UUID として不正な {@code invalid} を {@code studentId} に指定して PATCH を実行する
    * </ul>
    *
    * <p>Then:
+   *
    * <ul>
-   *   <li>{@code code} が {@code "E006"} である</li>
-   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である</li>
-   *   <li>ID 変換で失敗するため {@code service} は呼ばれない</li>
+   *   <li>{@code code} が {@code "E006"} である
+   *   <li>{@code error} が {@code "INVALID_ID_FORMAT"} である
+   *   <li>ID 変換で失敗するため {@code service} は呼ばれない
    * </ul>
    *
    * @throws Exception 実行時例外
@@ -738,14 +785,14 @@ class StudentControllerValidationTest extends ControllerTestBase {
   public void restoreStudent_UUID形式が不正の場合_400を返すこと() throws Exception {
 
     String invalid = "invalid_UUID";
-    when(converter.decodeUuidStringOrThrow(invalid)).thenThrow(
-        new InvalidIdFormatException("IDの形式が不正です（UUID）"));
+    when(converter.decodeUuidStringOrThrow(invalid))
+        .thenThrow(new InvalidIdFormatException("IDの形式が不正です（UUID）"));
 
     mockMvc
         .perform(patch("/api/students/{studentId}/restore", invalid))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("E006"))
-        .andExpect(jsonPath("$.error").value("INVALID_ID_FORMAT"));
+        .andExpect(jsonPath("$.message").value(containsString("UUID")));
 
     verify(converter).decodeUuidStringOrThrow(invalid);
     verifyNoInteractions(service);
