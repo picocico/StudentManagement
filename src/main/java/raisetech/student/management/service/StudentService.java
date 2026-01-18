@@ -35,19 +35,6 @@ public interface StudentService {
   Student updateStudentWithCourses(Student student, List<StudentCourse> courses);
 
   /**
-   * 受講生IDに紐づく受講コース一覧を取得します。
-   *
-   * @param studentId 受講生ID（UUID）
-   * @return 受講コース一覧（0件の場合は空リスト）
-   * @throws IllegalArgumentException studentId が null の場合
-   */
-  List<StudentCourse> getCoursesByStudentId(UUID studentId);
-
-  // 既存メソッド群（例）
-  // Student partialUpdateStudentWithCourses(...);
-  // List<Student> searchStudents(...);
-
-  /**
    * 条件に基づいて受講生詳細情報を取得します。
    *
    * @param furigana ふりがなによる検索（部分一致、null または空文字の場合は無視）
@@ -89,13 +76,6 @@ public interface StudentService {
   List<StudentCourse> searchCoursesByStudentId(UUID studentId);
 
   /**
-   * 全てのコース情報を取得します。
-   *
-   * @return コースエンティティのリスト
-   */
-  List<StudentCourse> searchAllCourses();
-
-  /**
    * 受講生を論理削除します。
    *
    * @param studentId 受講生ID（UUID）
@@ -115,19 +95,4 @@ public interface StudentService {
    * @param studentId 削除対象の受講生ID（UUID）
    */
   void forceDeleteStudent(UUID studentId);
-
-  /**
-   * 指定した受講生の既存コースを全て削除し、与えられた一覧に置き換えます。
-   *
-   * <p>処理はトランザクション内で行われ、削除と挿入は原子性を保ちます。<br>
-   * 呼び出し側で {@code updateStudentInfoOnly(...)} 等の基本情報更新を別途行ってください。 また、レスポンスに返す際は最終状態を必ず DB
-   * から再取得することを推奨します。
-   *
-   * @param studentId  受講生ID（UUID）
-   * @param newCourses 置換後に保持するコース一覧（null/空の場合は「全削除のみ」）
-   * @throws ResourceNotFoundException 該当受講生が存在しない場合
-   * @implNote 各 {@code StudentCourse} の {@code studentId} は本メソッド内で安全のため再セットします。
-   * @since 1.0
-   */
-  void replaceCourses(UUID studentId, List<StudentCourse> newCourses);
 }

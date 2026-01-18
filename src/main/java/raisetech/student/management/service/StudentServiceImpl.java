@@ -262,19 +262,11 @@ public class StudentServiceImpl implements StudentService {
       insertCourseWithStatus(studentId, c);
     }
 
-  /**
-   * 受講生の基本情報のみを更新します。
-   *
-   * <p>このメソッドでは、氏名、メールアドレス、年齢などの基本属性のみが更新対象となり、 コース情報（student_coursesテーブル）は一切変更されません。
-   *
-   * <p>PATCHリクエストで「コースの追加」のみを行う場合に併用され、 既存のコース情報を保持したまま、受講生の属性情報だけを変更したいケースで使用します。
-   *
-   * @param student 更新対象の受講生エンティティ（student_idを含む必要があります）
-   */
-  @Override
-  @Transactional
-  public void updateStudentInfoOnly(Student student) {
-    Objects.requireNonNull(student, "student must not be null");
+    // 更新（courseId!=null）
+    for (StudentCourse c : toUpdate) {
+      updateCourseWithOptionalStatus(studentId, existingIds, c);
+    }
+  }
 
   private void insertCourseWithStatus(UUID studentId, StudentCourse c) {
     c.setStudentId(studentId);
@@ -394,16 +386,6 @@ public class StudentServiceImpl implements StudentService {
   }
 
   /**
-   * 全コース情報を取得します。
-   *
-   * @return コースリスト
-   */
-  @Override
-  public List<StudentCourse> searchAllCourses() {
-    return courseRepository.findAllCourses();
-  }
-
-  /**
    * 受講生を論理削除します。
    *
    * @param studentId 受講生ID（UUID）
@@ -415,8 +397,7 @@ public class StudentServiceImpl implements StudentService {
 
     // 対象の受講生が存在しない場合は例外をスロー
     if (student == null) {
-      throw new ResourceNotFoundException(
-          "Student not found for ID: " + studentId);
+      throw new ResourceNotFoundException("Student not found for ID: " + studentId);
     }
 
     // すでに論理削除済みでなければ、削除処理を行う
@@ -425,8 +406,7 @@ public class StudentServiceImpl implements StudentService {
       int updated = studentRepository.updateStudent(student);
       if (updated == 0) {
         // ここは通常起こりにくいが、整合性の保険として
-        throw new IllegalStateException("論理削除に失敗しました: " +
-            student.getStudentId());
+        throw new IllegalStateException("論理削除に失敗しました: " + student.getStudentId());
       }
       log.info("論理削除完了 - studentId: {}", student.getStudentId());
     }
@@ -493,78 +473,5 @@ public class StudentServiceImpl implements StudentService {
 
     // 4. 正常に1件削除された場合はログを出して終了
     log.info("物理削除完了 - studentId: {}", idForLog);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  @Transactional
-  public Student updateStudentWithCourses(Student student, List<StudentCourse> courses) {
-    Objects.requireNonNull(student, "student must not be null");
-    UUID studentId = student.getStudentId();
-    if (studentId == null) {
-      throw new IllegalArgumentException("studentId must not be null");
-    }
-
-    // 1) いきなり UPDATE して件数を見る
-    int updatedCount = studentRepository.updateStudent(student);
-    if (updatedCount == 0) {
-      String idForLog = studentId.toString();
-      throw new ResourceNotFoundException("受講生ID " + idForLog + " が見つかりません。");
-    }
-
-    // 2) コース全削除 → 一括Insert（メソッド名：deleteCoursesByStudentId / insertCourses）
-    courseRepository.deleteCoursesByStudentId(studentId);
-    if (courses != null && !courses.isEmpty()) {
-      for (StudentCourse sc : courses) {
-        sc.setStudentId(studentId); // 念のため上書き
-      }
-      courseRepository.insertCourses(courses);
-      for (StudentCourse c : courses) {
-        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
-      }
-    }
-
-    // 3) 最新の学生を再取得（null返し仕様に合わせる）
-    Student updated = studentRepository.findById(studentId);
-    if (updated == null) {
-      // 直前で更新しているので通常起きないが、整合性確保のため
-      throw new ResourceNotFoundException("student", "studentId");
-    }
-    return updated;
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public List<StudentCourse> getCoursesByStudentId(UUID studentId) {
-    if (studentId == null) {
-      throw new IllegalArgumentException("studentId must not be null");
-    }
-    // メソッド名：findCoursesByStudentId
-    return courseRepository.findCoursesByStudentId(studentId);
-  }
-
-  @Override
-  @Transactional
-  public void replaceCourses(UUID studentId, List<StudentCourse> newCourses) {
-    // 受講生の存在チェック（必要なら既存メソッド呼び出し）
-    findStudentById(studentId);
-
-    // 既存コースを全削除
-    courseRepository.deleteCoursesByStudentId(studentId);
-
-    // 新規があれば挿入
-    if (newCourses != null && !newCourses.isEmpty()) {
-      for (StudentCourse c : newCourses) {
-        c.setStudentId(studentId); // 念のためセット
-      }
-      courseRepository.insertCourses(newCourses);
-      for (StudentCourse c : newCourses) {
-        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
-      }
-    }
   }
 }

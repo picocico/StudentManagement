@@ -25,7 +25,6 @@ import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import raisetech.student.management.controller.converter.StudentConverter;
@@ -116,13 +115,6 @@ class StudentServiceImplTest {
     student.setFullName("テスト　花子");
     student.setEmail("test@example.com");
     student.setAge(30);
-
-    spyService = Mockito.spy(service);
-
-    // コースを1件追加してcoursesを初期化（必要に応じて各テスト内で利用）
-    StudentCourse course = new StudentCourse();
-    course.setStudentId(studentId);
-    course.setCourseId(UUID.randomUUID()); // 任意のダミーUUID
   }
 
   /**
@@ -150,16 +142,6 @@ class StudentServiceImplTest {
     verifyNoInteractions(statusRepository);
   }
 
-  /**
-   * 受講生情報の全体更新時に、既存のコースが削除され、新しいコースが登録されることを検証します。
-   *
-   * <p>期待する呼び出し順:
-   * <ol>
-   *   <li>{@code studentRepository.updateStudent(student)}</li>
-   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}</li>
-   *   <li>{@code courseRepository.insertCourses(courses)}</li>
-   * </ol>
-   */
   @Test
   void updateStudentWithCourses_studentがnullならNullPointerExceptionとなること() {
     assertThatThrownBy(() -> service.updateStudentWithCourses(null, List.of()))
@@ -167,13 +149,6 @@ class StudentServiceImplTest {
     verifyNoInteractions(studentRepository, courseRepository, statusRepository, converter);
   }
 
-  /**
-   * updateStudent 実行時に、リポジトリから「0件更新」が返された場合、 対象受講生が存在しないものとみなして ResourceNotFoundException
-   * を送出することを検証します。
-   *
-   * <p>リポジトリ層は「0件更新」で存在有無を表現し、サービス層で
-   * ドメイン例外（404系）にマッピングする責務を負います。
-   */
   @Test
   void updateStudentWithCourses_studentIdがnullならIllegalArgumentExceptionとなること() {
     Student s = new Student();
@@ -194,16 +169,6 @@ class StudentServiceImplTest {
     verifyNoInteractions(courseRepository, statusRepository);
   }
 
-  /**
-   * 部分更新（partialUpdateStudent）時に、受講生情報が更新され、 既存コース削除 → 新規コース登録が行われることを検証します。
-   *
-   * <p>期待する呼び出し順:
-   * <ol>
-   *   <li>{@code studentRepository.updateStudent(student)}</li>
-   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}</li>
-   *   <li>{@code courseRepository.insertCourses(courses)}</li>
-   * </ol>
-   */
   @Test
   void updateStudentWithCourses_coursesがnullなら全削除してinsertしないこと() {
     when(studentRepository.updateStudent(student)).thenReturn(1);
@@ -218,12 +183,6 @@ class StudentServiceImplTest {
     verifyNoInteractions(statusRepository);
   }
 
-  /**
-   * partialUpdateStudent 実行時に、studentId が null の場合、 処理を行わずに IllegalArgumentException
-   * を送出することを検証します。
-   *
-   * <p>サービス層で ID の null を早期に検出し、不正な呼び出しを防ぎます。
-   */
   @Test
   void updateStudentWithCourses_coursesありならstudentIdを再セットしてinsertしstatusも作ること() {
     when(studentRepository.updateStudent(student)).thenReturn(1);
@@ -251,12 +210,6 @@ class StudentServiceImplTest {
     verify(statusRepository, times(2)).insertProvisionalIfAbsent(any(UUID.class), any(UUID.class));
   }
 
-  /**
-   * appendCourses 実行時に、既に存在するコースには insert されないことを検証します。
-   *
-   * <p>サービスでは {@code courseRepository.insertIfNotExists(...)} を呼び出し、
-   * リポジトリ側で重複チェックを行う前提です。
-   */
   @Test
   void updateStudentWithCourses_再取得がnullならResourceNotFoundExceptionとなること() {
     when(studentRepository.updateStudent(student)).thenReturn(1);
@@ -555,39 +508,7 @@ class StudentServiceImplTest {
     verify(courseRepository).findCoursesByStudentId(studentId); // 呼び出されたかも検証
   }
 
-  /**
-   * searchAllCourses で、コース情報が全件取得できることを検証します。
-   *
-   * <p>{@link StudentCourseRepository#findAllCourses()} の結果をそのまま返していることを確認します。
-   */
-  @Test
-  void searchAllCourses_コース情報を全件取得すること() {
-
-    // 準備
-    StudentCourse course1 = new StudentCourse();
-    course1.setCourseId(UUID.fromString("123e4567-e89b-12d3-a456-426614174003"));
-    course1.setCourseName("Javaコース");
-
-    StudentCourse course2 = new StudentCourse();
-    course2.setCourseId(UUID.fromString("123e4567-e89b-12d3-a456-426614174003"));
-    course2.setCourseName("AWSコース");
-
-    List<StudentCourse> mockCourses = List.of(course1, course2);
-
-    // モック設定
-    when(courseRepository.findAllCourses()).thenReturn(mockCourses);
-
-    // 実行
-    List<StudentCourse> result = service.searchAllCourses();
-
-    // 検証
-    assertThat(result).isEqualTo(mockCourses);
-    verify(courseRepository).findAllCourses(); // 呼び出しがされたかどうかの確認
-  }
-
-  /**
-   * softDeleteStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。
-   */
+  /** softDeleteStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。 */
   @Test
   void softDeleteStudent_対象受講生が存在しなければ例外メッセージが投げられること() {
 
@@ -595,7 +516,7 @@ class StudentServiceImplTest {
     when(studentRepository.findById(studentId)).thenReturn(null);
 
     // 実行
-    assertThatThrownBy(() -> spyService.softDeleteStudent(studentId))
+    assertThatThrownBy(() -> service.softDeleteStudent(studentId))
         // 検証
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Student not found for ID: " + UUID_STRING);
