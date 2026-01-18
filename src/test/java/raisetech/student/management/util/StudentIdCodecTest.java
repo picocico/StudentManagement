@@ -5,15 +5,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.ByteBuffer;
 import java.util.UUID;
+
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
 import raisetech.student.management.exception.InvalidIdFormatException;
 
 /**
  * {@link StudentIdCodec} の単体テストクラス。
  *
- * <p>UUID 文字列表現と BINARY(16)（UUID 生バイト）の相互変換ロジックについて、
- * 正常系／異常系の振る舞いを網羅的に検証します。
+ * <p>UUID 文字列表現と BINARY(16)（UUID 生バイト）の相互変換ロジックについて、 正常系／異常系の振る舞いを網羅的に検証します。
  */
 public class StudentIdCodecTest {
 
@@ -34,8 +35,8 @@ public class StudentIdCodecTest {
   /**
    * UUID を 16 バイトの配列（BINARY(16)）に変換するテスト用ユーティリティです。
    *
-   * <p>本番コード側でも、UUID を {@code BINARY(16)} に変換するユーティリティ
-   * （例: {@code UUIDUtil#toBytes(UUID)} 等）が同じ変換を担うことを想定しています。
+   * <p>本番コード側でも、UUID を {@code BINARY(16)} に変換するユーティリティ （例: {@code UUIDUtil#toBytes(UUID)}
+   * 等）が同じ変換を担うことを想定しています。
    *
    * @param uuid 変換対象の UUID
    * @return 引数の UUID を表現する 16 バイト配列
@@ -65,15 +66,11 @@ public class StudentIdCodecTest {
   // encodeId のテスト
   // ------------------------------------------------------------
 
-  /**
-   * {@link StudentIdCodec#encodeId(byte[])} の振る舞いを検証するテストグループ。
-   */
+  /** {@link StudentIdCodec#encodeId(byte[])} の振る舞いを検証するテストグループ。 */
   @Nested
   class EncodeIdTest {
 
-    /**
-     * 正常系: 16 バイトの UUID バイト配列を渡した場合に、 対応する UUID 文字列表現が返されることを検証します。
-     */
+    /** 正常系: 16 バイトの UUID バイト配列を渡した場合に、 対応する UUID 文字列表現が返されることを検証します。 */
     @Test
     void encodeId_正常系_16バイトのUUIDバイト配列を正しくUUID化できること() {
       String result = codec.encodeId(FIXED_UUID_BYTES);
@@ -100,7 +97,7 @@ public class StudentIdCodecTest {
      */
     @Test
     void encodeId_異常系_16バイト以外の長さの場合はIllegalArgumentExceptionがスローされること() {
-      byte[] invalid = new byte[]{0x01, 0x02, 0x03, 0x04}; // 4バイト
+      byte[] invalid = new byte[] {0x01, 0x02, 0x03, 0x04}; // 4バイト
 
       assertThatThrownBy(() -> codec.encodeId(invalid))
           .isInstanceOf(IllegalArgumentException.class)
@@ -113,8 +110,8 @@ public class StudentIdCodecTest {
   // ------------------------------------------------------------
 
   /**
-   * {@link StudentIdCodec#decodeUuidBytesOrThrow(String)} の振る舞いを検証する テストグループ（UUID 文字列 →
-   * {@code byte[16]}）。
+   * {@link StudentIdCodec#decodeUuidBytesOrThrow(String)} の振る舞いを検証する テストグループ（UUID 文字列 → {@code
+   * byte[16]}）。
    */
   @Nested
   class DecodeTest {
@@ -122,8 +119,7 @@ public class StudentIdCodecTest {
     /**
      * 正常系: 正しい UUID 文字列表現を渡した場合に、 長さ 16 のバイト配列へ復元されることを検証します。
      *
-     * <p>さらに、復元したバイト配列を UUID に戻したときに元の文字列表現と一致することも確認し、
-     * 往復変換の整合性を保証します。
+     * <p>さらに、復元したバイト配列を UUID に戻したときに元の文字列表現と一致することも確認し、 往復変換の整合性を保証します。
      */
     @Test
     void decodeUuidBytesOrThrow_正常系_UUID文字列を正しく16バイト配列にデコードできること() {
@@ -200,9 +196,7 @@ public class StudentIdCodecTest {
   @Nested
   class DecodeUuidOrThrowTest {
 
-    /**
-     * 正常系: 正しい UUID 文字列表現を渡した場合に、 元の {@link UUID} オブジェクトとして復元できることを検証します。
-     */
+    /** 正常系: 正しい UUID 文字列表現を渡した場合に、 元の {@link UUID} オブジェクトとして復元できることを検証します。 */
     @Test
     void decodeUuidOrThrow_正常系_UUID文字列から元のUUIDに復元できること() {
       UUID result = codec.decodeUuidOrThrow(FIXED_UUID_STRING);
@@ -247,9 +241,7 @@ public class StudentIdCodecTest {
   @Nested
   class DecodeUuidBytesOrThrowTest {
 
-    /**
-     * 正常系: 固定 UUID 文字列から 16 バイト配列に復元した結果が、 あらかじめ用意した {@link #FIXED_UUID_BYTES} と完全一致することを検証します。
-     */
+    /** 正常系: 固定 UUID 文字列から 16 バイト配列に復元した結果が、 あらかじめ用意した {@link #FIXED_UUID_BYTES} と完全一致することを検証します。 */
     @Test
     void decodeUuidBytesOrThrow_正常系_UUID文字列からUUIDバイト配列に復元できること() {
       byte[] result = codec.decodeUuidBytesOrThrow(FIXED_UUID_STRING);
