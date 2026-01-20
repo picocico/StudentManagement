@@ -83,7 +83,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
 
   /**
    * {@code includeDeleted=true} と {@code deletedOnly=true} を同時指定した場合に
-   * 400（E003/INVALID_REQUEST）が返ることを検証します。
+   * 400（E006/INVALID_REQUEST）が返ることを検証します。
    *
    * <p>Endpoint: {@code GET /api/students}<br>
    * Params: {@code includeDeleted=true}, {@code deletedOnly=true}<br>
@@ -106,7 +106,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *
    * <ul>
    *   <li>HTTP ステータス 400 が返る
-   *   <li>{@code code} が {@code "E003"} である
+   *   <li>{@code code} が {@code "E006"} である
    *   <li>{@code error} が {@code "INVALID_REQUEST"} である
    *   <li>{@code message} に「同時指定できません」の文言が含まれる
    * </ul>
@@ -123,7 +123,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
         .perform(get("/api/students").param("includeDeleted", "true").param("deletedOnly", "true"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400))
-        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
         .andExpect(
             jsonPath("$.message")
@@ -606,7 +606,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
   }
 
   /**
-   * 部分更新で空 JSON オブジェクト（{@code {}}）を送った場合に、 400（E003/EMPTY_OBJECT）が返ることを検証します。
+   * 部分更新で空 JSON オブジェクト（{@code {}}）を送った場合に、 400（E006/EMPTY_OBJECT）が返ることを検証します。
    *
    * <p>Endpoint: {@code PATCH /api/students/{studentId}}<br>
    * Status: {@code 400 BAD_REQUEST}
@@ -621,7 +621,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
    *
    * <ul>
    *   <li>{@code error} が {@code "EMPTY_OBJECT"} である
-   *   <li>{@code code} が {@code "E003"} である
+   *   <li>{@code code} が {@code "E006"} である
    *   <li>{@code message} に「更新対象のフィールドがありません」が含まれる
    *   <li>{@code converter} および {@code service} は呼ばれない
    * </ul>
@@ -638,7 +638,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
                 .content("{}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("EMPTY_OBJECT"))
-        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.message", containsString("更新対象")));
 
     verifyNoInteractions(converter);
@@ -699,7 +699,7 @@ class StudentControllerValidationTest extends ControllerTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"courses\":[]}"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.message", containsString("更新対象")));
 
     verifyNoInteractions(converter);

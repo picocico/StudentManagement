@@ -48,7 +48,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
   /**
    * 各スモークテストの実行前に、共通のスタブを設定します。
    *
-   * <p>ベースクラスの reset の後、正常系のスタブを注入し、 404エラー（NotFound）が発生しないようにサービス層のスタブ（空のStudent）も設定します。
+   * <p>ベースクラスの reset の後、正常系のスタブを注入し、 404エラー（NotFound）が発生しないように サービス層のスタブ（空のStudent）も設定します。
    */
   @BeforeEach
   void setUpSmoke() {
@@ -113,7 +113,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
                 .content("{}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("EMPTY_OBJECT"))
-        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.errorCode").doesNotExist())
         .andExpect(jsonPath("$.errorType").doesNotExist());
   }
@@ -132,7 +132,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
                 .content("{}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("EMPTY_OBJECT"))
-        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.details").doesNotExist())
         .andExpect(jsonPath("$.errors").doesNotExist())
         .andExpect(jsonPath("$.errorCode").doesNotExist())
@@ -142,8 +142,8 @@ class ErrorContractSmokeTest extends ControllerTestBase {
   /**
    * エラーレスポンスのスキーマ（契約）が、定義された最終キーのみを含み、 レガシーなエイリアスキーを含まないことを厳密に検証します。
    *
-   * <p>必須キー（error, code, message）の存在と型、および レガシーキー（errorCode, errorType）や可変キー（details, errors）が
-   * このケースでは存在しないことを確認します。
+   * <p>必須キー（error, code, message）の存在と型、および レガシーキー（errorCode, errorType）や 可変キー（details,
+   * errors）がこのケースでは存在しないことを確認します。
    *
    * @throws Exception MockMvc実行時例外
    */
@@ -172,7 +172,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
   }
 
   /**
-   * [400] PATCHリクエストのボディが空（null）の場合。 E001 (MISSING_PARAMETER) が返され、そのスキーマが固定されていることを検証します。
+   * [400] PATCHリクエストのボディが空（null）の場合。 E003 (MISSING_PARAMETER) が返され、 そのスキーマが固定されていることを検証します。
    *
    * @throws Exception MockMvc実行時例外
    */
@@ -191,7 +191,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
   }
 
   /**
-   * [400] PATCHリクエストのボディが空のJSON（{}）の場合。 E003 (EMPTY_OBJECT) が返され、そのスキーマが固定されていることを検証します。
+   * [400] PATCHリクエストのボディが空のJSON（{}）の場合。 E006 (EMPTY_OBJECT) が返され、 そのスキーマが固定されていることを検証します。
    *
    * @throws Exception MockMvc実行時例外
    */
@@ -204,7 +204,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
                 .content("{}"))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.error").value("EMPTY_OBJECT"))
-        .andExpect(jsonPath("$.code").value("E003"))
+        .andExpect(jsonPath("$.code").value("E006"))
         .andExpect(jsonPath("$.message").isNotEmpty())
         .andExpect(jsonPath("$.errors").doesNotExist())
         .andExpect(jsonPath("$.details").doesNotExist())
@@ -213,7 +213,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
   }
 
   /**
-   * [400] リクエストボディが不正なJSON形式（例: "{"）の場合。 E002 (INVALID_JSON) が返され、そのスキーマが固定されていることを検証します。
+   * [400] リクエストボディが不正なJSON形式（例: "{"）の場合。 E002 (INVALID_JSON) が返され、 そのスキーマが固定されていることを検証します。
    *
    * @throws Exception MockMvc実行時例外
    */
@@ -235,7 +235,7 @@ class ErrorContractSmokeTest extends ControllerTestBase {
   }
 
   /**
-   * [404] 存在しないパス（エンドポイント）にアクセスした場合。 E404 (NOT_FOUND) が返され、そのスキーマが固定されていることを検証します。
+   * [404] 存在しないパス（エンドポイント）にアクセスした場合。 E404 (NOT_FOUND) が返され、 そのスキーマが固定されていることを検証します。
    *
    * @throws Exception MockMvc実行時例外
    */
