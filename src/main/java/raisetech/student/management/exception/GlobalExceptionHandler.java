@@ -138,7 +138,7 @@ public class GlobalExceptionHandler {
         (ex.getMessage() == null || ex.getMessage().isBlank())
             ? "更新対象のフィールドがありません"
             : ex.getMessage();
-    return build(HttpStatus.BAD_REQUEST, "EMPTY_OBJECT", "E003", msg, null);
+    return build(HttpStatus.BAD_REQUEST, "EMPTY_OBJECT", "E006", msg, null);
   }
 
   /// ========= 400: 型不一致（クエリ/パスパラメータ変換） =========
@@ -170,7 +170,7 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleBadInput(IllegalArgumentException ex) {
     String message =
         (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "リクエスト形式が不正です";
-    return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E003", message, null);
+    return build(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "E006", message, null);
   }
 
   /// ========= 403: 権限不足 =========
