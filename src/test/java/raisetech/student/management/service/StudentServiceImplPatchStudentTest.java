@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -16,7 +18,6 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +25,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -56,46 +56,59 @@ public class StudentServiceImplPatchStudentTest {
    *
    * <p>受講生情報の永続化や検索の振る舞いをスタブ/検証するために利用します。
    */
-  @Mock private StudentRepository studentRepository;
+  @Mock
+  private StudentRepository studentRepository;
 
   /**
    * 受講生コースリポジトリのモック。
    *
    * <p>コース情報の取得・登録・削除などをスタブ/検証するために利用します。
    */
-  @Mock private StudentCourseRepository courseRepository;
+  @Mock
+  private StudentCourseRepository courseRepository;
 
   /**
    * 受講生コースの申請状況のリポジトリのモック。
    *
    * <p>コースの申請状況の取得・登録・削除などをスタブ/検証するために利用します。
    */
-  @Mock private StudentCourseApplicationStatusRepository statusRepository;
+  @Mock
+  private StudentCourseApplicationStatusRepository statusRepository;
 
   /**
    * エンティティとDTO間の変換を行うコンバーターのモック。
    *
    * <p>サービス層からの呼び出しを検証しつつ、DTOリスト生成などをスタブします。
    */
-  @Mock private StudentConverter converter;
+  @Mock
+  private StudentConverter converter;
 
   /**
    * テスト対象のサービス実装。
    *
    * <p>{@link InjectMocks} により、上記モックがインジェクションされた状態の {@link StudentServiceImpl} が生成されます。
    */
-  @InjectMocks private StudentServiceImpl service;
+  @InjectMocks
+  private StudentServiceImpl service;
 
-  /** テスト共通で使用する受講生 ID（UUID）。 */
+  /**
+   * テスト共通で使用する受講生 ID（UUID）。
+   */
   private UUID studentId;
 
-  /** テスト共通で使用する受講生 ID（文字列）。 */
+  /**
+   * テスト共通で使用する受講生 ID（文字列）。
+   */
   private String studentIdString;
 
-  /** テスト共通で使用する既存受講生エンティティ。 */
+  /**
+   * テスト共通で使用する既存受講生エンティティ。
+   */
   private Student existingStudent;
 
-  /** テスト共通で使用する期待結果の受講生詳細DTO（戻り値）。 */
+  /**
+   * テスト共通で使用する期待結果の受講生詳細DTO（戻り値）。
+   */
   private StudentDetailDto expectedDetail;
 
   // patchStudent 内で findStudentById(studentId) が複数回呼ばれるため、
@@ -273,24 +286,35 @@ public class StudentServiceImplPatchStudentTest {
     entity.setCourseId(null); // ★新規扱い
     entity.setCourseName("Java");
     entity.setApplicationStatus(null); // 未指定
+
     when(converter.toCourseEntities(eq(studentId), anyList())).thenReturn(List.of(entity));
+
+    when(statusRepository.updateStatusByCourseId(anyString(), any(UUID.class)))
+        .thenReturn(0);
+
+    when(statusRepository.insertStatus(any(UUID.class), any(UUID.class), anyString()))
+        .thenReturn(1);
 
     // Act
     service.patchStudent(studentId, req, studentIdString);
 
-    // Assert
-    // insertCourses が 1件で呼ばれる（サービスは List.of(c) でinsertしてる）
+    // Assert: course は insertCourses で 1件追加される
     @SuppressWarnings("unchecked")
-    ArgumentCaptor<List<StudentCourse>> captor = ArgumentCaptor.forClass(List.class);
-    verify(courseRepository).insertCourses(captor.capture());
-    List<StudentCourse> inserted = captor.getValue();
+    ArgumentCaptor<List<StudentCourse>> coursesCaptor = ArgumentCaptor.forClass(List.class);
+    verify(courseRepository, times(1)).insertCourses(coursesCaptor.capture());
+
+    List<StudentCourse> inserted = coursesCaptor.getValue();
     assertThat(inserted).hasSize(1);
     assertThat(inserted.get(0).getStudentId()).isEqualTo(studentId);
-    assertThat(inserted.get(0).getCourseId()).isNotNull(); // サービス側で採番される
+    assertThat(inserted.get(0).getCourseId()).isNotNull();
 
-    // status は PROVISIONAL で upsert
-    verify(statusRepository)
-        .upsertStatus(any(UUID.class), eq(inserted.get(0).getCourseId()), eq("PROVISIONAL"));
+    UUID actualCourseId = inserted.get(0).getCourseId();
+
+    // Assert: status は PROVISIONAL で upsert (update -> insert)
+    verify(statusRepository, times(1)).updateStatusByCourseId(eq("PROVISIONAL"),
+        eq(actualCourseId));
+    verify(statusRepository, times(1))
+        .insertStatus(any(UUID.class), eq(actualCourseId), eq("PROVISIONAL"));
 
     // update系は呼ばれない
     verify(courseRepository, never()).updateCourseSelective(any());
@@ -332,12 +356,18 @@ public class StudentServiceImplPatchStudentTest {
 
     when(courseRepository.updateCourseSelective(any(StudentCourse.class))).thenReturn(1);
 
+    when(statusRepository.updateStatusByCourseId(anyString(), any(UUID.class)))
+        .thenReturn(1);
+
     // Act
     service.patchStudent(studentId, req, studentIdString);
 
     // Assert
     verify(courseRepository).updateCourseSelective(argThat(c -> courseId.equals(c.getCourseId())));
-    verify(statusRepository).upsertStatus(any(UUID.class), eq(courseId), eq("IN_PROGRESS"));
+    verify(statusRepository, times(1))
+        .updateStatusByCourseId(eq("IN_PROGRESS"), eq(courseId));
+    verify(statusRepository, never())
+        .insertStatus(any(UUID.class), any(UUID.class), anyString());
   }
 
   // ------------------------------------------------------------------
@@ -374,13 +404,18 @@ public class StudentServiceImplPatchStudentTest {
     entity.setApplicationStatus("IN_PROGRESS");
 
     when(converter.toCourseEntities(eq(studentId), anyList())).thenReturn(List.of(entity));
+    when(statusRepository.updateStatusByCourseId(anyString(), any(UUID.class)))
+        .thenReturn(1);
 
     // Act
     service.patchStudent(studentId, req, studentIdString);
 
     // Assert
     verify(courseRepository, never()).updateCourseSelective(any());
-    verify(statusRepository).upsertStatus(any(UUID.class), eq(courseId), eq("IN_PROGRESS"));
+    verify(statusRepository, times(1))
+        .updateStatusByCourseId(eq("IN_PROGRESS"), eq(courseId)); // ←期待statusに合わせる
+    verify(statusRepository, never())
+        .insertStatus(any(UUID.class), any(UUID.class), anyString());
   }
 
   // --------------------------------------------------------------
