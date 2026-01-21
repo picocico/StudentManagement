@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS student_courses (
     CONSTRAINT uq_student_course_name UNIQUE (student_id, course_name)
 );
 
-CREATE TABLE student_courses_application_status (
+CREATE TABLE IF NOT EXISTS student_courses_application_status (
   application_status_id BINARY(16) NOT NULL,
   course_id             BINARY(16) NOT NULL,
   status                VARCHAR(20) NOT NULL,
