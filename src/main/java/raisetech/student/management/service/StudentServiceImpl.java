@@ -3,12 +3,10 @@ package raisetech.student.management.service;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -88,8 +86,8 @@ public class StudentServiceImpl implements StudentService {
    * @param student 更新対象の受講生エンティティ（{@code studentId} 必須）
    * @param courses 更新後に紐づける受講コースの一覧（{@code null} / 空の場合は「全削除のみ」）
    * @return 更新後の受講生エンティティ（DBから再取得した最新状態）
-   * @throws NullPointerException {@code student} が {@code null} の場合
-   * @throws IllegalArgumentException {@code student.getStudentId()} が {@code null} の場合
+   * @throws NullPointerException      {@code student} が {@code null} の場合
+   * @throws IllegalArgumentException  {@code student.getStudentId()} が {@code null} の場合
    * @throws ResourceNotFoundException 指定IDの受講生が存在しない場合、または整合性確保のため再取得に失敗した場合
    */
   @Override
@@ -174,12 +172,12 @@ public class StudentServiceImpl implements StudentService {
    *
    * <p><b>トランザクション</b>：本処理は {@link Transactional} により同一トランザクションで実行されます。
    *
-   * @param studentId 更新対象の受講生ID（UUID）
-   * @param req 部分更新リクエスト（student / courses / appendCourses を含む）
+   * @param studentId       更新対象の受講生ID（UUID）
+   * @param req             部分更新リクエスト（student / courses / appendCourses を含む）
    * @param studentIdString レスポンスDTOに設定する受講生ID文字列（パスで受け取ったUUID文字列表現など）
    * @return 更新後の受講生詳細DTO（学生＋コース）
-   * @throws IllegalArgumentException {@code studentId} が {@code null} の場合（{@code findStudentById}
-   *     実装に依存）
+   * @throws IllegalArgumentException  {@code studentId} が {@code null} の場合（{@code findStudentById}
+   *                                   実装に依存）
    * @throws ResourceNotFoundException 受講生が存在しない場合、または指定した {@code courseId} が当該受講生に紐づかない場合
    */
   @Override
@@ -273,9 +271,7 @@ public class StudentServiceImpl implements StudentService {
     c.setCourseId(UUID.randomUUID());
 
     courseRepository.insertCourses(List.of(c));
-
-    String status = (c.getApplicationStatus() != null) ? c.getApplicationStatus() : "PROVISIONAL";
-    statusRepository.upsertStatus(UUID.randomUUID(), c.getCourseId(), status);
+    upsertStatusChecked(c.getCourseId(), c.getApplicationStatus());
   }
 
   private void updateCourseWithOptionalStatus(
@@ -284,7 +280,8 @@ public class StudentServiceImpl implements StudentService {
 
     // 所有チェック（他人courseId更新の事故防止）
     if (!existingIds.contains(c.getCourseId())) {
-      throw new ResourceNotFoundException("courseId " + c.getCourseId() + " はこの受講生に紐づきません");
+      throw new ResourceNotFoundException(
+          "courseId " + c.getCourseId() + " はこの受講生に紐づきません");
     }
 
     boolean hasCourseFields =
@@ -294,7 +291,7 @@ public class StudentServiceImpl implements StudentService {
     // A) ステータスだけ更新（コース情報は触らない）
     if (!hasCourseFields) {
       if (hasStatus) {
-        statusRepository.upsertStatus(UUID.randomUUID(), c.getCourseId(), c.getApplicationStatus());
+        upsertStatusChecked(c.getCourseId(), c.getApplicationStatus());
       }
       return;
     }
@@ -307,7 +304,7 @@ public class StudentServiceImpl implements StudentService {
 
     // status もあれば更新
     if (hasStatus) {
-      statusRepository.upsertStatus(UUID.randomUUID(), c.getCourseId(), c.getApplicationStatus());
+      upsertStatusChecked(c.getCourseId(), c.getApplicationStatus());
     }
   }
 
@@ -317,12 +314,42 @@ public class StudentServiceImpl implements StudentService {
     return converter.toDetailDto(latest, latestCourses, studentIdString);
   }
 
+  private void upsertStatusChecked(UUID courseId, String status) {
+    if (courseId == null) {
+      throw new IllegalStateException("courseIdは必須項目です");
+    }
+
+    String s = (status != null && !status.isBlank()) ? status : "PROVISIONAL";
+
+    // 1) まず更新を試す（既存があれば1件更新されるはず）
+    int updated = statusRepository.updateStatusByCourseId(s, courseId);
+
+    // 2) 更新できなかった（=0件）なら、新規作成
+    if (updated == 0) {
+      UUID newId = UUID.randomUUID();
+      int inserted = statusRepository.insertStatus(newId, courseId, s);
+
+      if (inserted != 1) {
+        throw new IllegalStateException(
+            "ステータスの更新・登録に失敗しました: inserted=" + inserted + ", courseId="
+                + courseId);
+      }
+      return;
+    }
+
+    // 3) 更新が1件以外なら異常（通常ここは1のはず）
+    if (updated != 1) {
+      throw new IllegalStateException(
+          "ステータスの更新・登録に失敗しました: updated=" + updated + ", courseId=" + courseId);
+    }
+  }
+
   /**
    * 検索条件に基づいて受講生詳細情報リストを取得します。
    *
-   * @param furigana ふりがな検索（省略可能）
+   * @param furigana       ふりがな検索（省略可能）
    * @param includeDeleted 論理削除済みも含めるか
-   * @param deletedOnly 論理削除済みのみ取得するか
+   * @param deletedOnly    論理削除済みのみ取得するか
    * @return 受講生詳細DTOリスト
    */
   @Override
@@ -333,7 +360,8 @@ public class StudentServiceImpl implements StudentService {
       ApplicationStatus applicationStatus) {
 
     if (includeDeleted && deletedOnly) {
-      throw new IllegalArgumentException("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
+      throw new IllegalArgumentException(
+          "includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
     }
 
     String statusCode = (applicationStatus == null) ? null : applicationStatus.name();

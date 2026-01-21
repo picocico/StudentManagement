@@ -6,6 +6,27 @@
 <mapper
   namespace="raisetech.student.management.repository.StudentCourseApplicationStatusRepository">
 
+  <update id="updateStatusByCourseId">
+    UPDATE student_courses_application_status
+    SET status = #{status},
+    updated_at = CURRENT_TIMESTAMP
+    WHERE course_id = #{courseId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+  </update>
+
+  <insert id="insertStatus">
+    INSERT INTO student_courses_application_status
+    (application_status_id, course_id, status, created_at, updated_at)
+    VALUES
+    (#{applicationStatusId, jdbcType=BINARY,
+      typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
+    #{courseId, jdbcType=BINARY,
+     typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler},
+    #{status},
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP)
+  </insert>
+
   <!-- 申込状況が未登録の場合のみ作成（デフォルト：PROVISIONAL）。既に存在する場合は何も更新しない（updated_atも据え置き） -->
   <insert id="insertProvisionalIfAbsent">
     INSERT INTO student_courses_application_status (
@@ -53,8 +74,7 @@
   <delete id="deleteByStudentId">
     DELETE FROM student_courses_application_status
     WHERE course_id IN (
-    SELECT course_id
-    FROM student_courses
+    SELECT course_id FROM student_courses
     WHERE student_id = #{studentId, jdbcType=BINARY,
       typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
     )

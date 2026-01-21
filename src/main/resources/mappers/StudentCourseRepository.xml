@@ -154,5 +154,11 @@
     ORDER BY sc.created_at DESC
   </select>
 
+  <select id="countCoursesByStudentId" resultType="int">
+    SELECT COUNT(*) FROM student_courses
+    WHERE student_id = #{studentId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+  </select>
+
 </mapper>
 
