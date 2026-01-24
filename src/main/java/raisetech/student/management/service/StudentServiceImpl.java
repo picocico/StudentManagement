@@ -202,6 +202,15 @@ public class StudentServiceImpl implements StudentService {
   // private helpers
   // --------------------
 
+  /**
+   * student フィールドが指定されている場合のみ、受講生本体を部分更新します。
+   *
+   * <p>既存エンティティにリクエスト内容をマージし、null による上書きを避けつつ
+   * {@code updateStudentSelective} で更新します。</p>
+   *
+   * @param studentId 更新対象の受講生ID
+   * @param req       PATCH リクエスト
+   */
   private void patchStudentEntityIfPresent(UUID studentId, StudentRegistrationRequest req) {
     if (req.getStudent() == null) {
       return;
@@ -214,6 +223,15 @@ public class StudentServiceImpl implements StudentService {
     studentRepository.updateStudentSelective(existing);
   }
 
+  /**
+   * courses フィールドが指定されている場合のみ、受講コースを部分更新します。
+   *
+   * <p>{@code courses == null} の場合は「未指定」として何もしません。
+   * {@code appendCourses} により追加/更新のみ（append=true）または差し替え（append=false）を切り替えます。</p>
+   *
+   * @param studentId 更新対象の受講生ID
+   * @param req       PATCH リクエスト
+   */
   private void patchCoursesIfPresent(UUID studentId, StudentRegistrationRequest req) {
     if (req.getCourses() == null) {
       return; // フィールド未指定 → 触らない
@@ -266,6 +284,14 @@ public class StudentServiceImpl implements StudentService {
     }
   }
 
+  /**
+   * 新規コースを登録し、申込状況（application status）も登録/更新します。
+   *
+   * <p>{@code courseId} は本メソッドで採番し、status が未指定の場合は既定値を適用します。</p>
+   *
+   * @param studentId 受講生ID
+   * @param c         登録対象コース（courseId は null 想定）
+   */
   private void insertCourseWithStatus(UUID studentId, StudentCourse c) {
     c.setStudentId(studentId);
     c.setCourseId(UUID.randomUUID());
@@ -274,6 +300,17 @@ public class StudentServiceImpl implements StudentService {
     upsertStatusChecked(c.getCourseId(), c.getApplicationStatus());
   }
 
+  /**
+   * 既存コースを部分更新し、必要に応じて申込状況（application status）も更新します。
+   *
+   * <p>対象 {@code courseId} が当該受講生に紐づくことを検証し、コース情報の更新が不要な場合は
+   * status のみ更新します。</p>
+   *
+   * @param studentId   受講生ID
+   * @param existingIds 当該受講生に紐づく既存 courseId 一覧（所有チェック用）
+   * @param c           更新対象コース（courseId は必須）
+   * @throws ResourceNotFoundException courseId が当該受講生に紐づかない場合、または更新対象が存在しない場合
+   */
   private void updateCourseWithOptionalStatus(
       UUID studentId, List<UUID> existingIds, StudentCourse c) {
     c.setStudentId(studentId);
@@ -308,12 +345,28 @@ public class StudentServiceImpl implements StudentService {
     }
   }
 
+  /**
+   * 更新後の最新状態（学生＋コース）を再取得し、詳細DTOへ変換して返します。
+   *
+   * @param studentId       受講生ID
+   * @param studentIdString レスポンスDTOに設定する受講生ID文字列
+   * @return 最新の受講生詳細DTO
+   */
   private StudentDetailDto loadLatestDetail(UUID studentId, String studentIdString) {
     Student latest = findStudentById(studentId);
     List<StudentCourse> latestCourses = searchCoursesByStudentId(studentId);
     return converter.toDetailDto(latest, latestCourses, studentIdString);
   }
 
+  /**
+   * courseId をキーに申込状況（application status）を更新し、存在しない場合は新規作成します。
+   *
+   * <p>status が未指定/空の場合は既定値（PROVISIONAL）を適用します。</p>
+   *
+   * @param courseId コースID（必須）
+   * @param status   申込状況（未指定可）
+   * @throws IllegalStateException 更新/登録件数が想定外の場合、または courseId が null の場合
+   */
   private void upsertStatusChecked(UUID courseId, String status) {
     if (courseId == null) {
       throw new IllegalStateException("courseIdは必須項目です");

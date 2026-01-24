@@ -129,8 +129,8 @@ public class StudentServiceImplPatchStudentTest {
 
     // loadLatestDetail の変換を固定
     lenient().when(courseRepository.findCoursesByStudentId(studentId)).thenReturn(List.of());
-    lenient()
-        .when(converter.toDetailDto(eq(existingStudent), anyList(), eq(studentIdString)))
+    lenient().
+        when(converter.toDetailDto(any(Student.class), anyList(), eq(studentIdString)))
         .thenReturn(expectedDetail);
   }
 
@@ -193,11 +193,37 @@ public class StudentServiceImplPatchStudentTest {
     verifyNoInteractions(statusRepository);
 
     // student が null なので studentRepository.updateStudentSelective も呼ばれない
+    verify(studentRepository, times(2)).findById(studentId);
     verify(studentRepository, never()).updateStudentSelective(any());
   }
 
+  // --------------------------------------------------------------
+  // 3) courses=null → 「フィールド未指定」扱いでコースは触らない（no touch）
+  // --------------------------------------------------------------
+  @Test
+  void patchStudent_coursesがnullであれば_既存のcoursesの状態を変更しないこと() {
+
+    StudentRegistrationRequest req = new StudentRegistrationRequest();
+    req.setStudent(null);
+    req.setAppendCourses(false); // ここがfalseでも、courses=nullなら触らないのが期待
+    req.setCourses(null);
+
+    StudentDetailDto result = service.patchStudent(studentId, req, studentIdString);
+    assertThat(result).isSameAs(expectedDetail);
+
+    verify(courseRepository, never()).deleteCoursesByStudentId(any());
+    verify(courseRepository, never()).deleteCoursesByCourseIds(any(), anyList());
+    verify(courseRepository, never()).insertCourses(anyList());
+    verify(courseRepository, never()).updateCourseSelective(any());
+
+    verifyNoInteractions(statusRepository);
+    // student=null なので student 更新もしない
+    verify(studentRepository, never()).updateStudentSelective(any());
+
+  }
+
   // ------------------------------------------
-  // 3) courses=[] & append=false → 全削除
+  // 4) courses=[] & append=false → 全削除
   // ------------------------------------------
   @Test
   void patchStudent_courses空配列_append_falseなら全削除されること() {
@@ -218,7 +244,7 @@ public class StudentServiceImplPatchStudentTest {
   }
 
   // -----------------------------------------------------------
-  // 4) append=false 差し替え　→　requestに無い courseId を削除
+  // 5) append=false 差し替え　→　requestに無い courseId を削除
   // -----------------------------------------------------------
   @Test
   void patchStudent_appendFalse差し替えで_existingからrequestにないcourseIdが削除されること() {
@@ -264,7 +290,7 @@ public class StudentServiceImplPatchStudentTest {
   }
 
   // --------------------------------------------------------------------
-  // 5) courseId==null（新規追加）→ insert + status upsert(PROVISIONAL)
+  // 6) courseId==null（新規追加）→ insert + status upsert(PROVISIONAL)
   // --------------------------------------------------------------------
   @Test
   void patchStudent_courseId未指定は新規追加され_PROVISIONALがupsertされること() {
@@ -321,7 +347,7 @@ public class StudentServiceImplPatchStudentTest {
   }
 
   // ---------------------------------------------------------------
-  // 6) course + status → updateCourseSelective + upsertStatusを呼ぶ
+  // 7) course + status → updateCourseSelective + upsertStatusを呼ぶ
   // ---------------------------------------------------------------
   @Test
   void patchStudent_course情報とstatusが両方ある場合はupdateCourseSelectiveとupsertStatusが両方呼ばれること() {
@@ -371,7 +397,7 @@ public class StudentServiceImplPatchStudentTest {
   }
 
   // ------------------------------------------------------------------
-  // 7) statusだけ更新（コース項目なし）→ updateCourseSelectiveは呼ばれない
+  // 8) statusだけ更新（コース項目なし）→ updateCourseSelectiveは呼ばれない
   // ------------------------------------------------------------------
   @Test
   void patchStudent_statusだけ更新ならupdateCourseSelectiveせずupsertStatusだけすること() {
@@ -419,7 +445,7 @@ public class StudentServiceImplPatchStudentTest {
   }
 
   // --------------------------------------------------------------
-  // 8) courseId!=null だが所有してない → ResourceNotFoundException
+  // 9) courseId!=null だが所有してない → ResourceNotFoundException
   // --------------------------------------------------------------
   @Test
   void patchStudent_courseIdが他人のものなら404_例外となること() {
@@ -455,7 +481,7 @@ public class StudentServiceImplPatchStudentTest {
   }
 
   // --------------------------------------------------------------
-  // 9) courseId!=null かつ所有しているが、更新件数=0 → ResourceNotFoundException
+  // 10) courseId!=null かつ所有しているが、更新件数=0 → ResourceNotFoundException
   // --------------------------------------------------------------
   @Test
   void patchStudent_course更新でupdate0件ならResourceNotFoundExceptionとなること() {

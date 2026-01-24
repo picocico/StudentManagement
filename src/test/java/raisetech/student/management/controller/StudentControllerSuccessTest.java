@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -21,18 +23,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-
+import java.util.stream.Stream;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.http.MediaType;
-
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentCourseDto;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
+import raisetech.student.management.web.RawBodyCaptureFilter;
+import raisetech.student.management.web.RawBodyCaptureFilter.RawBodyState;
 
 class StudentControllerSuccessTest extends ControllerTestBase {
 
@@ -68,7 +75,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception MockMvc 実行時の例外
    */
   @Test
-  public void getStudentDetail_受講生ID検索した場合_一致する受講生詳細が返ること() throws Exception {
+  public void getStudentDetail_受講生ID検索した場合_一致する受講生詳細が返ること()
+      throws Exception {
 
     when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     when(service.findStudentById(studentId)).thenReturn(student);
@@ -133,7 +141,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception 実行時例外
    */
   @Test
-  public void getStudentDetail_受講コースが存在しない場合_空のコースリストが返ること() throws Exception {
+  public void getStudentDetail_受講コースが存在しない場合_空のコースリストが返ること()
+      throws Exception {
 
     // given
     String idStr = studentById; // 既にテストクラスで用意している UUID 文字列
@@ -153,7 +162,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     // 3) Converter が返す DTO を明示的にスタブする
     StudentDto studentDto =
         new StudentDto(
-            idStr, "山田 太郎", "やまだ たろう", "タロウ", "taro@example.com", "Osaka", 25, "Male", "備考", false);
+            idStr, "山田 太郎", "やまだ たろう", "タロウ", "taro@example.com", "Osaka", 25, "Male",
+            "備考", false);
 
     StudentDetailDto detailDto = new StudentDetailDto(studentDto, List.of());
 
@@ -185,7 +195,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *   <li>{@code includeDeleted=false}
    *   <li>{@code deletedOnly=false}
    * </ul>
-   *
+   * <p>
    * Status: {@code 200 OK}
    *
    * <p>Given:
@@ -212,7 +222,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception MockMvc 実行時の例外
    */
   @Test
-  public void getStudentList_ふりがな検索した場合_一致する受講生リストが返ること() throws Exception {
+  public void getStudentList_ふりがな検索した場合_一致する受講生リストが返ること()
+      throws Exception {
 
     // when: service.getStudentList のモック化
     when(service.getStudentList(furigana, false, false, null)).thenReturn(List.of(detailDto));
@@ -243,7 +254,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *   <li>{@code includeDeleted=true}
    *   <li>{@code deletedOnly} は指定なし（false）
    * </ul>
-   *
+   * <p>
    * Status: {@code 200 OK}
    *
    * <p>Given:
@@ -271,7 +282,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception MockMvc 実行時の例外
    */
   @Test
-  public void getStudentList_論理削除を含めた検索をした場合_一致する受講生リストが返ること() throws Exception {
+  public void getStudentList_論理削除を含めた検索をした場合_一致する受講生リストが返ること()
+      throws Exception {
 
     when(service.getStudentList(null, true, false, null))
         .thenReturn(List.of(detailDto1, detailDto2));
@@ -303,7 +315,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    *   <li>{@code deletedOnly=true}
    *   <li>{@code includeDeleted} は指定なし（false）
    * </ul>
-   *
+   * <p>
    * Status: {@code 200 OK}
    *
    * <p>Given:
@@ -330,7 +342,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception MockMvc 実行時の例外
    */
   @Test
-  public void getStudentList_論理削除のみ検索した場合_削除済の受講生リストのみが返ること() throws Exception {
+  public void getStudentList_論理削除のみ検索した場合_削除済の受講生リストのみが返ること()
+      throws Exception {
 
     when(service.getStudentList(null, false, true, null)).thenReturn(List.of(detailDto2));
 
@@ -381,7 +394,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception MockMvc 実行時の例外
    */
   @Test
-  public void registerStudent_新規受講生登録時_ステータス201と登録済Dtoレスポンスが返ること() throws Exception {
+  public void registerStudent_新規受講生登録時_ステータス201と登録済Dtoレスポンスが返ること()
+      throws Exception {
 
     String body =
         """
@@ -511,31 +525,15 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception MockMvc 実行時の例外
    */
   @Test
-  public void updateStudent_受講生情報を更新した時_ステータス200と更新済Dtoレスポンスが返ること() throws Exception {
+  public void updateStudent_受講生情報を更新した時_ステータス200と更新済Dtoレスポンスが返ること()
+      throws Exception {
 
     // given
     String idStr = studentById; // "123e4567-e89b-..."
     UUID idUuid = studentId; // @BeforeEach で UUID.fromString している想定
 
     // リクエストDTO
-    StudentRegistrationRequest req = new StudentRegistrationRequest();
-    StudentDto reqStudent =
-        new StudentDto(
-            idStr,
-            "テスト　花子",
-            "てすと　はなこ",
-            "ハナちゃん",
-            "test@example.com",
-            "大阪",
-            30,
-            "Female",
-            "コース追加予定",
-            false);
-
-    StudentCourseDto bodyCourseDto = new StudentCourseDto(null, "Javaコース", null, null, null, null);
-
-    req.setStudent(reqStudent);
-    req.setCourses(List.of(bodyCourseDto));
+    StudentRegistrationRequest req = getStudentRegistrationRequest(idStr);
 
     // Entity 側
     Student entityBefore = new Student();
@@ -576,6 +574,41 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     verifyNoMoreInteractions(service);
     // converter は ObjectMapper/validation の流れで増えることがあるなら NoMore は外すのが無難
+  }
+
+  /**
+   * テスト用の {@link StudentRegistrationRequest} を生成して返します。
+   *
+   * <p>本メソッドは、PATCH/PUT/POST 等のリクエスト生成を簡略化するためのヘルパーです。
+   * 受講生情報（{@link StudentDto}）と、コース情報（{@link StudentCourseDto}）を1件含む
+   * {@link StudentRegistrationRequest} を組み立てます。</p>
+   *
+   * <p>コース側の {@code courseId} は {@code null} を設定し、「新規コースとして追加される」ケースを想定します。</p>
+   *
+   * @param idStr 受講生ID（文字列）。{@link StudentDto} のIDとして設定します。
+   * @return テスト用に組み立てた {@link StudentRegistrationRequest}（nullではありません）
+   */
+  private static @NonNull StudentRegistrationRequest getStudentRegistrationRequest(String idStr) {
+    StudentRegistrationRequest req = new StudentRegistrationRequest();
+    StudentDto reqStudent =
+        new StudentDto(
+            idStr,
+            "テスト　花子",
+            "てすと　はなこ",
+            "ハナちゃん",
+            "test@example.com",
+            "大阪",
+            30,
+            "Female",
+            "コース追加予定",
+            false);
+
+    StudentCourseDto bodyCourseDto = new StudentCourseDto(null, "Javaコース", null, null, null,
+        null);
+
+    req.setStudent(reqStudent);
+    req.setCourses(List.of(bodyCourseDto));
+    return req;
   }
 
   /**
@@ -620,7 +653,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
 
     when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     when(service.patchStudent(
-            eq(studentId), any(StudentRegistrationRequest.class), eq(studentById)))
+        eq(studentId), any(StudentRegistrationRequest.class), eq(studentById)))
         .thenReturn(out);
 
     // when & then
@@ -667,7 +700,8 @@ class StudentControllerSuccessTest extends ControllerTestBase {
    * @throws Exception MockMvc 実行時の例外
    */
   @Test
-  public void partialUpdateStudent_coursesが空でも基本情報があるなら200を返すこと() throws Exception {
+  public void partialUpdateStudent_coursesが空でも基本情報があるなら200を返すこと()
+      throws Exception {
     // 入力（courses: 空配列）
     String body =
         """
@@ -686,7 +720,7 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     // --- Mock 準備 ---
     when(converter.decodeUuidStringOrThrow(studentById)).thenReturn(studentId);
     when(service.patchStudent(
-            eq(studentId), any(StudentRegistrationRequest.class), eq(studentById)))
+        eq(studentId), any(StudentRegistrationRequest.class), eq(studentById)))
         .thenReturn(resp);
 
     // --- 実行 & 検証 ---
@@ -710,6 +744,23 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     assertThat(passed.getAppendCourses()).isTrue();
   }
 
+  /**
+   * 【Controller: PATCH /api/students/{studentId}】 courses が空配列（[]）かつ
+   * appendCourses=false（差し替えモード）の場合でも、 Controller がリクエストを正しく DTO へ変換し、サービス呼び出しまで到達して 200 OK
+   * を返すことを検証します。
+   *
+   * <p>このテストは「Controller の入力→DTO変換→Service 呼び出し」の結線確認が主目的です。
+   * 空配列＋append=false のときの実際の削除動作（全削除など）は Service 層のテストで担保します。</p>
+   *
+   * <p>検証内容：</p>
+   * <ul>
+   *   <li>HTTP 200 を返す</li>
+   *   <li>studentId のデコードが呼ばれる</li>
+   *   <li>service.patchStudent が呼ばれ、courses が空配列・appendCourses=false で渡される</li>
+   * </ul>
+   *
+   * @throws Exception MockMvc 実行時の例外
+   */
   @Test
   void partialUpdateStudent_courses空配列でappendがfalse場合_200を返すこと() throws Exception {
 
@@ -738,6 +789,113 @@ class StudentControllerSuccessTest extends ControllerTestBase {
     StudentRegistrationRequest passed = captor.getValue();
     assertThat(passed.getCourses()).isEmpty();
     assertThat(passed.getAppendCourses()).isFalse();
+  }
+
+  /**
+   * 【Controller: PATCH /api/students/{studentId}（パラメタライズ）】 courses フィールドが (1) キー無し（absent）(2) 明示
+   * null (3) 空配列（[]）のいずれの場合でも、 リクエストが Controller に到達した後の挙動（HTTPステータス）と DTO 変換結果が想定どおりであることを検証します。
+   *
+   * <p>本 Controller では、Map → {@link StudentRegistrationRequest} へ変換した後に
+   * {@code req.isPatchEmpty()} を評価し、「更新対象が無い」と判断した場合は {@code 400(E003)} を返します。
+   * そのため、入力パターンによっては変換自体は成功しても 200 にならないケースがあります。</p>
+   *
+   * <p>注意：{@link RawBodyState} は「リクエストボディ全体」の状態（NONE / EMPTY_OBJECT / NON_EMPTY）を表すもので、
+   * courses 単体の absent/null/empty の区別には使用しません。本テストでは Filter 判定を通過させるために
+   * {@code RawBodyState.NON_EMPTY} を明示設定します。</p>
+   *
+   * <h3>検証内容</h3>
+   * <ul>
+   *   <li>更新項目がある場合（例：student の実在フィールドを含む）→ {@code 200} となり、Service が呼ばれる</li>
+   *   <li>更新項目が無い場合（例：courses:null / courses:[] 単体）→ {@code 400} となり、Service は呼ばれない</li>
+   *   <li>{@code 200} の場合のみ、DTO変換結果として courses が {@code null} か空配列かをアサートする</li>
+   * </ul>
+   *
+   * @param json           リクエストボディ（JSON文字列）
+   * @param expectedStatus 期待するHTTPステータス（200 or 400）
+   * @param exp            courses の期待状態（absent / null / empty）
+   * @throws Exception MockMvc 実行時の例外
+   */
+  @ParameterizedTest
+  @MethodSource("coursesBodyPatterns")
+  void partialUpdateStudent_coursesがabsent_null_emptyである場合_ステータスとDTO変換が想定どおりになること
+  (String json, int expectedStatus, CoursesExpectation exp) throws Exception {
+
+    UUID studentId = UUID.randomUUID();
+
+    when(converter.decodeUuidStringOrThrow(anyString())).thenReturn(studentId);
+
+    if (expectedStatus == 200) {
+      when(service.patchStudent(eq(studentId), any(StudentRegistrationRequest.class), anyString()))
+          .thenReturn(new StudentDetailDto());
+    }
+    var action = mockMvc.perform(
+        patch("/api/students/{studentId}", "dummyIdStr")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json)
+            .requestAttr(RawBodyCaptureFilter.ATTR_RAW_BODY_STATE, RawBodyState.NON_EMPTY));
+
+    action.andExpect(status().is(expectedStatus));
+
+    if (expectedStatus == 200) {
+      ArgumentCaptor<StudentRegistrationRequest> reqCaptor = ArgumentCaptor.forClass(
+          StudentRegistrationRequest.class);
+      verify(service).patchStudent(eq(studentId), reqCaptor.capture(), anyString());
+
+      StudentRegistrationRequest req = reqCaptor.getValue();
+      switch (exp) {
+        case ABSENT, NULL -> assertThat(req.getCourses()).isNull();
+        case EMPTY_ARRAY -> {
+          assertThat(req.getCourses()).isEmpty();
+        }
+      }
+    } else {
+      verify(service, never()).patchStudent(any(), any(), anyString());
+    }
+  }
+
+  /**
+   * {@link #partialUpdateStudent_coursesがabsent_null_emptyである場合_ステータスとDTO変換が想定どおりになること(String, int,
+   * CoursesExpectation)} に渡すパラメータ（JSON・期待HTTPステータス・期待状態）を提供します。
+   *
+   * <p>本 Controller の仕様として {@code req.isPatchEmpty()} が true の場合は {@code 400(E003)} を返すため、
+   * courses:null や courses:[] を単体で送ったケースは 400 を期待値とします。</p>
+   *
+   * <p>パターン：</p>
+   * <ul>
+   *   <li>courses キー無し（absent）＋ student の更新項目あり → 200</li>
+   *   <li>courses: null のみ（更新対象なし） → 400</li>
+   *   <li>courses: [] のみ（更新対象なし ※appendCourses無し） → 400</li>
+   * </ul>
+   *
+   * @return JSONボディ・期待HTTPステータス・期待状態の組
+   */
+  static Stream<Arguments> coursesBodyPatterns() {
+    return Stream.of(
+        // studentは実在フィールドで「更新あり」扱い → 200
+        Arguments.of("{\"student\":{\"fullName\":\"A\"}}", 200, CoursesExpectation.ABSENT),
+        // courses:null 単体は「更新なし(E003)」 → 400
+        Arguments.of("{\"courses\":null}", 400, CoursesExpectation.NULL),
+        // courses:[] 単体も「更新なし(E003)」 → 400（※appendCourses無し）
+        Arguments.of("{\"courses\":[]}", 400, CoursesExpectation.EMPTY_ARRAY)
+    );
+  }
+
+  /**
+   * courses フィールドの入力パターンを表す期待値の列挙です。
+   *
+   * <ul>
+   *   <li>{@link #ABSENT} : JSON に courses キーが存在しない</li>
+   *   <li>{@link #NULL} : JSON に courses キーが存在し、値が null</li>
+   *   <li>{@link #EMPTY_ARRAY} : JSON に courses キーが存在し、値が空配列（[]）</li>
+   * </ul>
+   *
+   * <p>本 Controller の DTO 変換結果としては、ABSENT と NULL はいずれも
+   * {@code req.getCourses() == null} となる前提で検証します。</p>
+   */
+  enum CoursesExpectation {
+    ABSENT,
+    NULL,
+    EMPTY_ARRAY
   }
 
   /**
