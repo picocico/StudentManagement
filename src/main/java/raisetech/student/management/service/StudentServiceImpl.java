@@ -111,10 +111,16 @@ public class StudentServiceImpl implements StudentService {
     if (courses != null && !courses.isEmpty()) {
       for (StudentCourse sc : courses) {
         sc.setStudentId(studentId); // 念のため上書き
+        // courseId が null のケースに備える（insert が必須なら特に重要）
+        if (sc.getCourseId() == null) {
+          sc.setCourseId(UUID.randomUUID());
+        }
       }
+
       courseRepository.insertCourses(courses);
+      // status は統一メソッド経由で作る（null → PROVISIONAL）
       for (StudentCourse c : courses) {
-        statusRepository.insertProvisionalIfAbsent(UUID.randomUUID(), c.getCourseId());
+        statusRepository.upsertStatus(UUID.randomUUID(), c.getCourseId(), "PROVISIONAL");
       }
     }
 
@@ -359,13 +365,15 @@ public class StudentServiceImpl implements StudentService {
   }
 
   /**
-   * courseId をキーに申込状況（application status）を更新し、存在しない場合は新規作成します。
+   * courseId をキーに申込状況（application status）をUPSERT（存在すれば更新、なければ新規作成）します。
    *
    * <p>status が未指定/空の場合は既定値（PROVISIONAL）を適用します。</p>
    *
+   * <p>DB 側の UPSERT（ON DUPLICATE KEY UPDATE）を利用します。</p>
+   *
    * @param courseId コースID（必須）
    * @param status   申込状況（未指定可）
-   * @throws IllegalStateException 更新/登録件数が想定外の場合、または courseId が null の場合
+   * @throws IllegalStateException courseId が null の場合
    */
   private void upsertStatusChecked(UUID courseId, String status) {
     if (courseId == null) {
@@ -373,28 +381,8 @@ public class StudentServiceImpl implements StudentService {
     }
 
     String s = (status != null && !status.isBlank()) ? status : "PROVISIONAL";
-
-    // 1) まず更新を試す（既存があれば1件更新されるはず）
-    int updated = statusRepository.updateStatusByCourseId(s, courseId);
-
-    // 2) 更新できなかった（=0件）なら、新規作成
-    if (updated == 0) {
-      UUID newId = UUID.randomUUID();
-      int inserted = statusRepository.insertStatus(newId, courseId, s);
-
-      if (inserted != 1) {
-        throw new IllegalStateException(
-            "ステータスの更新・登録に失敗しました: inserted=" + inserted + ", courseId="
-                + courseId);
-      }
-      return;
-    }
-
-    // 3) 更新が1件以外なら異常（通常ここは1のはず）
-    if (updated != 1) {
-      throw new IllegalStateException(
-          "ステータスの更新・登録に失敗しました: updated=" + updated + ", courseId=" + courseId);
-    }
+    // 更新は試さずDB upsert 1回
+    statusRepository.upsertStatus(UUID.randomUUID(), courseId, s);
   }
 
   /**
