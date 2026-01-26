@@ -315,12 +315,6 @@ public class StudentServiceImplPatchStudentTest {
 
     when(converter.toCourseEntities(eq(studentId), anyList())).thenReturn(List.of(entity));
 
-    when(statusRepository.updateStatusByCourseId(anyString(), any(UUID.class)))
-        .thenReturn(0);
-
-    when(statusRepository.insertStatus(any(UUID.class), any(UUID.class), anyString()))
-        .thenReturn(1);
-
     // Act
     service.patchStudent(studentId, req, studentIdString);
 
@@ -337,13 +331,12 @@ public class StudentServiceImplPatchStudentTest {
     UUID actualCourseId = inserted.get(0).getCourseId();
 
     // Assert: status は PROVISIONAL で upsert (update -> insert)
-    verify(statusRepository, times(1)).updateStatusByCourseId(eq("PROVISIONAL"),
-        eq(actualCourseId));
-    verify(statusRepository, times(1))
-        .insertStatus(any(UUID.class), eq(actualCourseId), eq("PROVISIONAL"));
+    verify(statusRepository, times(1)).upsertStatus(any(UUID.class), eq(actualCourseId),
+        eq("PROVISIONAL"));
 
-    // update系は呼ばれない
-    verify(courseRepository, never()).updateCourseSelective(any());
+    // updateStatusByCourseId/insertStatusは呼ばれない
+    verify(statusRepository, never()).updateStatusByCourseId(anyString(), any(UUID.class));
+    verify(statusRepository, never()).insertStatus(any(UUID.class), any(UUID.class), anyString());
   }
 
   // ---------------------------------------------------------------
@@ -382,16 +375,16 @@ public class StudentServiceImplPatchStudentTest {
 
     when(courseRepository.updateCourseSelective(any(StudentCourse.class))).thenReturn(1);
 
-    when(statusRepository.updateStatusByCourseId(anyString(), any(UUID.class)))
-        .thenReturn(1);
-
     // Act
     service.patchStudent(studentId, req, studentIdString);
 
     // Assert
-    verify(courseRepository).updateCourseSelective(argThat(c -> courseId.equals(c.getCourseId())));
+    verify(courseRepository).updateCourseSelective(argThat
+        (c -> courseId.equals(c.getCourseId())));
     verify(statusRepository, times(1))
-        .updateStatusByCourseId(eq("IN_PROGRESS"), eq(courseId));
+        .upsertStatus(any(UUID.class), eq(courseId), eq("IN_PROGRESS"));
+    verify(statusRepository, never())
+        .updateStatusByCourseId(anyString(), any(UUID.class));
     verify(statusRepository, never())
         .insertStatus(any(UUID.class), any(UUID.class), anyString());
   }
@@ -430,8 +423,6 @@ public class StudentServiceImplPatchStudentTest {
     entity.setApplicationStatus("IN_PROGRESS");
 
     when(converter.toCourseEntities(eq(studentId), anyList())).thenReturn(List.of(entity));
-    when(statusRepository.updateStatusByCourseId(anyString(), any(UUID.class)))
-        .thenReturn(1);
 
     // Act
     service.patchStudent(studentId, req, studentIdString);
@@ -439,7 +430,9 @@ public class StudentServiceImplPatchStudentTest {
     // Assert
     verify(courseRepository, never()).updateCourseSelective(any());
     verify(statusRepository, times(1))
-        .updateStatusByCourseId(eq("IN_PROGRESS"), eq(courseId)); // ←期待statusに合わせる
+        .upsertStatus(any(UUID.class), eq(courseId), eq("IN_PROGRESS")); // ←期待statusに合わせる
+    verify(statusRepository, never())
+        .updateStatusByCourseId(anyString(), any(UUID.class));
     verify(statusRepository, never())
         .insertStatus(any(UUID.class), any(UUID.class), anyString());
   }

@@ -16,7 +16,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.UUID;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +25,6 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
@@ -56,46 +54,58 @@ class StudentServiceImplTest {
    *
    * <p>受講生情報の永続化や検索の振る舞いをスタブ/検証するために利用します。
    */
-  @Mock private StudentRepository studentRepository;
+  @Mock
+  private StudentRepository studentRepository;
 
   /**
    * 受講生コースリポジトリのモック。
    *
    * <p>コース情報の取得・登録・削除などをスタブ/検証するために利用します。
    */
-  @Mock private StudentCourseRepository courseRepository;
+  @Mock
+  private StudentCourseRepository courseRepository;
 
   /**
    * 受講生コースの申請状況のリポジトリのモック。
    *
    * <p>コースの申請状況の取得・登録・削除などをスタブ/検証するために利用します。
    */
-  @Mock private StudentCourseApplicationStatusRepository statusRepository;
+  @Mock
+  private StudentCourseApplicationStatusRepository statusRepository;
 
   /**
    * エンティティとDTO間の変換を行うコンバーターのモック。
    *
    * <p>サービス層からの呼び出しを検証しつつ、DTOリスト生成などをスタブします。
    */
-  @Mock private StudentConverter converter;
+  @Mock
+  private StudentConverter converter;
 
   /**
    * テスト対象のサービス実装。
    *
    * <p>{@link InjectMocks} により、上記モックがインジェクションされた状態の {@link StudentServiceImpl} が生成されます。
    */
-  @InjectMocks private StudentServiceImpl service;
+  @InjectMocks
+  private StudentServiceImpl service;
 
-  /** テストで利用する固定 UUID。 */
+  /**
+   * テストで利用する固定 UUID。
+   */
   private static final String UUID_STRING = "123e4567-e89b-12d3-a456-426614174000";
 
-  /** テスト共通で使用する受講生 ID（UUID）。 */
+  /**
+   * テスト共通で使用する受講生 ID（UUID）。
+   */
   private UUID studentId;
 
-  /** テスト共通で使用する受講生エンティティ。 */
+  /**
+   * テスト共通で使用する受講生エンティティ。
+   */
   private Student student;
 
-  @Captor ArgumentCaptor<List<UUID>> studentIdsCaptor;
+  @Captor
+  ArgumentCaptor<List<UUID>> studentIdsCaptor;
 
   /**
    * 各テスト実行前に共通の準備を行います。
@@ -207,7 +217,11 @@ class StudentServiceImplTest {
     assertThat(inserted).hasSize(2);
     assertThat(inserted).allSatisfy(sc -> assertThat(sc.getStudentId()).isEqualTo(studentId));
 
-    verify(statusRepository, times(2)).insertProvisionalIfAbsent(any(UUID.class), any(UUID.class));
+    verify(statusRepository, times(2)).upsertStatus(any(UUID.class), any(UUID.class),
+        eq("PROVISIONAL"));
+
+    verify(statusRepository, never())
+        .insertProvisionalIfAbsent(any(UUID.class), any(UUID.class));
   }
 
   @Test
@@ -245,7 +259,7 @@ class StudentServiceImplTest {
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
     when(studentRepository.searchStudents(
-            furigana, includeDeleted, deletedOnly, applicationStatus.name()))
+        furigana, includeDeleted, deletedOnly, applicationStatus.name()))
         .thenReturn(mockStudents);
 
     // ★ searchAllCourses() ではなく、studentIds でまとめてコース取得する想定
@@ -276,7 +290,9 @@ class StudentServiceImplTest {
     inOrder.verify(converter).toDetailDtoList(eq(mockStudents), eq(mockCourses));
   }
 
-  /** getStudentList において、論理削除を含めて検索する場合 （includeDeleted=true, deletedOnly=false）の振る舞いを検証します。 */
+  /**
+   * getStudentList において、論理削除を含めて検索する場合 （includeDeleted=true, deletedOnly=false）の振る舞いを検証します。
+   */
   @Test
   void getStudentList_論理削除含めた検索_で関連メソッドが順に呼ばれ結果が返ること() {
 
@@ -295,7 +311,7 @@ class StudentServiceImplTest {
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
     when(studentRepository.searchStudents(
-            furigana, includeDeleted, deletedOnly, applicationStatus.name()))
+        furigana, includeDeleted, deletedOnly, applicationStatus.name()))
         .thenReturn(mockStudents);
 
     when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
@@ -344,7 +360,7 @@ class StudentServiceImplTest {
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
     when(studentRepository.searchStudents(
-            furigana, includeDeleted, deletedOnly, applicationStatus.name()))
+        furigana, includeDeleted, deletedOnly, applicationStatus.name()))
         .thenReturn(mockStudents);
 
     when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
@@ -373,8 +389,8 @@ class StudentServiceImplTest {
   }
 
   /**
-   * getStudentList において、includeDeleted と deletedOnly を同時に true にした場合、 不正な組み合わせとして {@link
-   * IllegalArgumentException} がスローされることを検証します。
+   * getStudentList において、includeDeleted と deletedOnly を同時に true にした場合、 不正な組み合わせとして
+   * {@link IllegalArgumentException} がスローされることを検証します。
    */
   @Test
   void getStudentList_論理削除と削除のみ検索が同時指定された場合_例外がスローされる() {
@@ -387,19 +403,20 @@ class StudentServiceImplTest {
 
     // 実行
     assertThatThrownBy(
-            () -> service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus))
+        () -> service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus))
         // 検証
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
   }
 
   /**
-   * 申込状況（applicationStatus）を指定した場合に、 {@link
-   * raisetech.student.management.repository.StudentRepository#searchStudents(String, boolean,
-   * boolean, String)} へ指定したステータスが引数として渡されることを検証します。
+   * 申込状況（applicationStatus）を指定した場合に、
+   * {@link raisetech.student.management.repository.StudentRepository#searchStudents(String,
+   * boolean, boolean, String)} へ指定したステータスが引数として渡されることを検証します。
    *
-   * <p>本テストは「検索条件として status が適切に下層（Repository）へ伝播する」ことに焦点を当てます。 取得した学生一覧に対してコース一覧を取得し、DTOへ変換する一連の流れ
-   * （searchAllCourses → converter.toDetailDtoList）も呼ばれることを合わせて確認します。
+   * <p>本テストは「検索条件として status が適切に下層（Repository）へ伝播する」ことに焦点を当てます。
+   * 取得した学生一覧に対してコース一覧を取得し、DTOへ変換する一連の流れ （searchAllCourses →
+   * converter.toDetailDtoList）も呼ばれることを合わせて確認します。
    *
    * <p>※検索条件を status のみに絞るため、furigana は null を使用します。
    */
@@ -420,7 +437,7 @@ class StudentServiceImplTest {
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
     when(studentRepository.searchStudents(
-            furigana, includeDeleted, deletedOnly, applicationStatus.name()))
+        furigana, includeDeleted, deletedOnly, applicationStatus.name()))
         .thenReturn(mockStudents);
 
     when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
@@ -448,7 +465,9 @@ class StudentServiceImplTest {
     inOrder.verify(converter).toDetailDtoList(eq(mockStudents), eq(mockCourses));
   }
 
-  /** findStudentById で有効な ID を指定した場合に、対応する受講生情報が取得できることを検証します。 */
+  /**
+   * findStudentById で有効な ID を指定した場合に、対応する受講生情報が取得できることを検証します。
+   */
   @Test
   void findStudentById_該当する受講生IDで検索した場合_受講生情報が取得できること() {
 
@@ -463,7 +482,9 @@ class StudentServiceImplTest {
     verify(studentRepository).findById(studentId);
   }
 
-  /** findStudentById で存在しない ID を指定した場合、 {@link ResourceNotFoundException} がスローされることを検証します。 */
+  /**
+   * findStudentById で存在しない ID を指定した場合、 {@link ResourceNotFoundException} がスローされることを検証します。
+   */
   @Test
   void findStudentById_存在しないIDを指定_ResourceNotFoundExceptionがスローされること() {
 
@@ -508,7 +529,9 @@ class StudentServiceImplTest {
     verify(courseRepository).findCoursesByStudentId(studentId); // 呼び出されたかも検証
   }
 
-  /** softDeleteStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。 */
+  /**
+   * softDeleteStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。
+   */
   @Test
   void softDeleteStudent_対象受講生が存在しなければ例外メッセージが投げられること() {
 
@@ -551,7 +574,9 @@ class StudentServiceImplTest {
     verify(studentRepository).updateStudent(student);
   }
 
-  /** restoreStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。 */
+  /**
+   * restoreStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。
+   */
   @Test
   void restoreStudent_該当の受講生がいなければ例外メッセージが投げられること() {
 
@@ -566,7 +591,9 @@ class StudentServiceImplTest {
         .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
   }
 
-  /** restoreStudent で、論理削除されている受講生が存在する場合に 復元処理と更新処理が実行されることを検証します。 */
+  /**
+   * restoreStudent で、論理削除されている受講生が存在する場合に 復元処理と更新処理が実行されることを検証します。
+   */
   @Test
   void restoreStudent_論理削除されている受講生が存在すれば受講生情報を復元すること() {
     Student student = mock(Student.class);
@@ -581,7 +608,9 @@ class StudentServiceImplTest {
     verify(studentRepository).updateStudent(student);
   }
 
-  /** restoreStudent で、論理削除されていない受講生に対しては 更新処理が行われないことを検証します。 */
+  /**
+   * restoreStudent で、論理削除されていない受講生に対しては 更新処理が行われないことを検証します。
+   */
   @Test
   void restoreStudent_論理削除されていない場合は更新処理が行われないこと() {
     Student student = mock(Student.class);
