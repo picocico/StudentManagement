@@ -24,7 +24,12 @@ final class TestRequests {
             false);
     var course =
         new StudentCourseDto(
-            null, "Javaコース", LocalDate.parse("2024-03-01"), LocalDate.parse("2024-09-30"));
+            null,
+            "Javaコース",
+            LocalDate.parse("2024-03-01"),
+            LocalDate.parse("2024-09-30"),
+            null,
+            null);
     var req = new StudentRegistrationRequest(); // ← デフォルトコンストラクタ
     req.setStudent(dto);
     req.setCourses(List.of(course));

@@ -12,9 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 /**
  * 受講生の登録・更新リクエストに使用されるデータ転送オブジェクト（DTO）。
@@ -22,8 +20,6 @@ import lombok.Setter;
  * <p>受講生の基本情報と受講コース情報をまとめて送信するための構造であり、 バリデーションアノテーションによりネストされたオブジェクトも検証されます。
  */
 @Schema(description = "受講生登録リクエスト（基本情報＋コース情報）")
-@Getter
-@Setter
 @Data
 @NoArgsConstructor // ← 引数なしのデフォルトコンストラクタも自動生成
 public class StudentRegistrationRequest {
@@ -65,7 +61,7 @@ public class StudentRegistrationRequest {
    *
    * <p>true の場合、新しいコースを既存のコースに追加する。 false の場合、既存のコースを上書きして新しいコースに置き換える。
    */
-  @Schema(description = "true にすると既存のコースを保持し、courses に指定されたコースを追加する", example = "false")
+  @Schema(description = "courses を差し込み追加するか（true=追加/更新のみ, false=差し替え）", defaultValue = "true")
   @JsonProperty("appendCourses")
   // ★ Boolean にして @Getter/@Setter を付与
   private Boolean appendCourses; // ← trueならコースを追加、falseなら置き換え
@@ -87,9 +83,14 @@ public class StudentRegistrationRequest {
 
     // 2) courses の中身（1件でもあれば“変更あり”）
     final var cs = this.getCourses();
-    final boolean hasCourseChanges = (cs != null && !cs.isEmpty());
+    final boolean append = isAppendCourses(); // null->true ルールを利用
+    final boolean hasCourseChanges = cs != null && (!cs.isEmpty() || !append);
+    // cs != null かつ
+    // - 1件でもあれば変更あり
+    // - 空でも append=false（差し替え）なら「全削除」の意味があるので変更あり
 
-    // 3) 判定（appendCourses は空判定には使わない）
+    // 3) 判定（appendCourses 単体では変更扱いにしない）
+    //    ※ただし courses=[] の場合は appendCourses=false を「全削除の意図」として変更扱いにする
     return !(hasStudentChanges || hasCourseChanges);
   }
 
@@ -99,18 +100,14 @@ public class StudentRegistrationRequest {
       @JsonProperty("student") StudentDto student,
       @JsonProperty("courses") List<StudentCourseDto> courses,
       @JsonProperty("deleted") boolean deleted,
-      @JsonProperty("appendCourses") boolean appendCourses) {
+      @JsonProperty("appendCourses") Boolean appendCourses) {
     this.student = student;
     this.courses = courses;
     this.deleted = deleted;
-    this.appendCourses = appendCourses;
+    this.appendCourses = (appendCourses == null) ? Boolean.TRUE : appendCourses;
   }
 
-  /*
-   このメソッドは不要 （@Dataがあるため、手動Getterは不要）
-   public boolean isAppendCourses() {
-   return appendCourses;
-   }
-  */
-
+  public boolean isAppendCourses() {
+    return appendCourses == null || appendCourses;
+  }
 }

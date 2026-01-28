@@ -4,14 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.UUID;
+
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
  * {@link UUIDUtil} のユニットテスト。
  *
- * <p>UUID と byte[16] の相互変換ロジックについて、
- * 正常系／異常系をシンプルに検証します。
+ * <p>UUID と byte[16] の相互変換ロジックについて、 正常系／異常系をシンプルに検証します。
  */
 public class UUIDUtilTest {
 
@@ -27,9 +27,7 @@ public class UUIDUtilTest {
       byte[] bytes = UUIDUtil.toBytes(FIXED_UUID);
 
       // 16バイトであること
-      assertThat(bytes)
-          .isNotNull()
-          .hasSize(16);
+      assertThat(bytes).isNotNull().hasSize(16);
 
       // 往復させると同じ UUID に戻ること
       UUID restored = UUIDUtil.fromBytes(bytes);
@@ -82,4 +80,3 @@ public class UUIDUtilTest {
     }
   }
 }
-

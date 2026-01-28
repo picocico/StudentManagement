@@ -9,12 +9,12 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.ByteBuffer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +28,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import raisetech.student.management.config.TestMockConfig;
 import raisetech.student.management.controller.admin.AdminStudentController;
 import raisetech.student.management.controller.converter.StudentConverter;
@@ -36,12 +39,17 @@ import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentCourseDto;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentDto;
+import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.exception.GlobalExceptionHandler;
 import raisetech.student.management.service.StudentService;
 
 @AutoConfigureMockMvc(addFilters = false)
-@WebMvcTest(controllers = {StudentController.class, DebugStudentController.class,
-    AdminStudentController.class})
+@WebMvcTest(
+    controllers = {
+      StudentController.class,
+      DebugStudentController.class,
+      AdminStudentController.class
+    })
 @Import({GlobalExceptionHandler.class, TestMockConfig.class})
 @ImportAutoConfiguration(exclude = {GsonAutoConfiguration.class})
 @ActiveProfiles("test")
@@ -52,27 +60,23 @@ abstract class ControllerTestBase {
    *
    * <p>{@code @WebMvcTest} などでSpring MVCの振る舞いを検証する際に使用される。
    */
-  @Autowired
-  protected MockMvc mockMvc;
+  @Autowired protected MockMvc mockMvc;
 
-  @Autowired
-  protected ObjectMapper objectMapper;
+  @Autowired protected ObjectMapper objectMapper;
 
   /**
    * モック化された {@link StudentService}。
    *
    * <p>コントローラの依存性として注入され、サービス層のロジックをテスト対象から切り離します
    */
-  @Autowired
-  protected StudentService service;
+  @Autowired protected StudentService service;
 
   /**
    * テスト対象の {@link StudentController} に注入されるモックの {@link StudentConverter}。
    *
    * <p>実際のエンティティ・DTO変換処理は行わず、必要に応じてスタブ化された動作により、 コントローラーの単体テストを実現します。
    */
-  @Autowired
-  protected StudentConverter converter;
+  @Autowired protected StudentConverter converter;
 
   protected static final boolean DEBUG =
       Boolean.parseBoolean(System.getProperty("debugTests", "false"))
@@ -83,8 +87,7 @@ abstract class ControllerTestBase {
   protected static org.springframework.test.web.servlet.ResultHandler maybePrint() {
     // デフォルトは無出力
     if (!Boolean.parseBoolean(System.getProperty("DEBUG_MOCKMVC", "false"))) {
-      return result -> {
-      }; // no-op
+      return result -> {}; // no-op
     }
     // デバッグ時のみ本文表示やprint()を使う
     return org.springframework.test.web.servlet.result.MockMvcResultHandlers.print();
@@ -105,10 +108,8 @@ abstract class ControllerTestBase {
   protected String gender;
   protected String remarks;
 
-  protected static final UUID COURSE_ID_1 =
-      UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
-  protected static final UUID COURSE_ID_2 =
-      UUID.fromString("123e4567-e89b-12d3-a456-426614174002");
+  protected static final UUID COURSE_ID_1 = UUID.fromString("123e4567-e89b-12d3-a456-426614174001");
+  protected static final UUID COURSE_ID_2 = UUID.fromString("123e4567-e89b-12d3-a456-426614174002");
 
   protected String courseName;
   protected String secondCourseName;
@@ -151,24 +152,22 @@ abstract class ControllerTestBase {
    * <p>Given:
    *
    * <ul>
-   *   <li>固定の UUID／16 バイト ID（{@link #UUID_STRING} とその派生値）の生成</li>
-   *   <li>受講生・コースのダミーエンティティおよび DTO の用意</li>
+   *   <li>固定の UUID／16 バイト ID（{@link #UUID_STRING} とその派生値）の生成
+   *   <li>受講生・コースのダミーエンティティおよび DTO の用意
    *   <li>モックの完全リセットと、ID 変換・DTO 変換の共通スタブ再設定
-   *     <ul>
-   *       <li>{@link StudentConverter#decodeUuidStringOrThrow(String)} による
-   *       　　　UUID文字列表現から 16 バイト ID へのデコード</li>
-   *       <li>{@link StudentConverter#encodeUuidString(UUID)} による
-   *       　　　16 バイト ID から UUID文字列表現への変換</li>
-   *       <li>{@link #stubConverterHappyPath()} および {@link #stubServiceHappyPath()} による
-   *       「ハッピーパス」スタブの設定</li>
-   *     </ul>
-   *   </li>
+   *       <ul>
+   *         <li>{@link StudentConverter#decodeUuidStringOrThrow(String)} による 　　　UUID文字列表現から 16 バイト
+   *             ID へのデコード
+   *         <li>{@link StudentConverter#encodeUuidString(UUID)} による 　　　16 バイト ID から UUID文字列表現への変換
+   *         <li>{@link #stubConverterHappyPath()} および {@link #stubServiceHappyPath()} による
+   *             「ハッピーパス」スタブの設定
+   *       </ul>
    * </ul>
    *
    * <p>Then:
    *
    * <ul>
-   *   <li>以降の各テストが同一前提（固定 ID・同一ダミーデータ・同一モック挙動）で安定して実行できる状態になる</li> // ←★少し説明を具体化
+   *   <li>以降の各テストが同一前提（固定 ID・同一ダミーデータ・同一モック挙動）で安定して実行できる状態になる // ←★少し説明を具体化
    * </ul>
    */
   @BeforeEach
@@ -267,13 +266,8 @@ abstract class ControllerTestBase {
 
     // 2) ここで「共通の基本スタブ」を再設定（各テストで上書きしてOK）（UUID/IDを “VALID_UUID” に統一）
     // 例：成功系／500系で使う固定ID
-    // UUID文字列 → byte[16]（Controller が内部で使うID）
-    when(converter.decodeUuidStringOrThrow(studentById))
-        .thenReturn(studentId);
-
-    // byte[16] → UUID文字列（レスポンスに載せるとき）
-    when(converter.encodeUuidString(studentId))
-        .thenReturn(studentById);
+    when(converter.decodeUuidStringOrThrow(anyString())).thenReturn(studentId);
+    when(converter.encodeUuidString(any(UUID.class))).thenReturn(studentById);
 
     // 共通ハッピーパス・スタブ（必要なら各テストで上書きOK）
     stubConverterHappyPath();
@@ -309,23 +303,21 @@ abstract class ControllerTestBase {
    * <p>現在のエラーレスポンス仕様は次のとおりです。
    *
    * <ul>
-   *   <li>{@code status}: HTTP ステータスコード（数値）</li>
-   *   <li>{@code error}: エラー種別（例: {@code "TYPE_MISMATCH"}, {@code "NOT_FOUND"}）</li>
-   *   <li>{@code code}: アプリケーションエラーコード（例: {@code "E001"}, {@code "E404"}）</li>
-   *   <li>{@code message}: 人間向けメッセージ文字列</li>
+   *   <li>{@code status}: HTTP ステータスコード（数値）
+   *   <li>{@code error}: エラー種別（例: {@code "TYPE_MISMATCH"}, {@code "NOT_FOUND"}）
+   *   <li>{@code code}: アプリケーションエラーコード（例: {@code "E001"}, {@code "E404"}）
+   *   <li>{@code message}: 人間向けメッセージ文字列
    * </ul>
    *
-   * <p>このメソッドでは上記のフィールドに加えて、旧フォーマットで使用していた
-   * {@code errorType} および {@code errorCode} フィールドがレスポンスに
+   * <p>このメソッドでは上記のフィールドに加えて、旧フォーマットで使用していた {@code errorType} および {@code errorCode} フィールドがレスポンスに
    * 含まれていないことも合わせて検証します。 // ←★ココを変更: 「差異吸収」→「旧キーが無いことも検証」
    *
-   * @param result                         MockMvc の実行結果
-   * @param expectedHttp                   期待する HTTP ステータスコード
-   * @param expectedType                   期待するエラー種別（例: {@code "TYPE_MISMATCH"}）
-   * @param expectedCodeSubstring          {@code code} に含まれているべき部分文字列 （例: {@code "E404"}） //
-   *                                       ←★ココ少し具体化
-   * @param expectedMessageSubstringOrNull {@code message} に含まれているべき部分文字列。 メッセージ検証が不要な場合は
-   *                                       {@code null} を指定する // ←★説明を現挙動に合わせて補足
+   * @param result MockMvc の実行結果
+   * @param expectedHttp 期待する HTTP ステータスコード
+   * @param expectedType 期待するエラー種別（例: {@code "TYPE_MISMATCH"}）
+   * @param expectedCodeSubstring {@code code} に含まれているべき部分文字列 （例: {@code "E404"}） // ←★ココ少し具体化
+   * @param expectedMessageSubstringOrNull {@code message} に含まれているべき部分文字列。 メッセージ検証が不要な場合は {@code
+   *     null} を指定する // ←★説明を現挙動に合わせて補足
    * @throws Exception レスポンスの読み取りや JSON パースに失敗した場合
    */
   protected void assertErrorCompat(
@@ -368,27 +360,33 @@ abstract class ControllerTestBase {
   /**
    * Converter の「共通ハッピーパス」スタブを設定します。
    *
-   * <p>Controller の単体テストで、変換レイヤーの振る舞いを安定化させるための
-   * 最低限のダミー挙動（成功シナリオ）を一括で登録します。 個々のテストで上書き（再スタブ）して構いません。
+   * <p>Controller の単体テストで、変換レイヤーの振る舞いを安定化させるための 最低限のダミー挙動（成功シナリオ）を一括で登録します。
+   * 個々のテストで上書き（再スタブ）して構いません。
    *
    * <h4>設定内容</h4>
    *
    * <ul>
-   *   <li>{@code toEntity(...)}: 任意入力（null 可）→ 空の {@link Student} を返却</li>
-   *   <li>{@code mergeStudent(...)}: void メソッド → 何もしない（素通し）</li>
-   *   <li>{@code toEntityList(...)}: 任意入力 → 空リストを返却</li>
-   *   <li>{@code toDetailDto(...)}: 最小限の {@link StudentDetailDto}（または mock）を返却</li>
+   *   <li>{@code toEntity(...)}: 任意入力（null 可）→ 空の {@link Student} を返却
+   *   <li>{@code mergeStudent(...)}: void メソッド → 何もしない（素通し）
+   *   <li>{@code toEntityList(...)}: 任意入力 → 空リストを返却
+   *   <li>{@code toDetailDto(...)}: 最小限の {@link StudentDetailDto}（または mock）を返却
    * </ul>
    *
    * <h4>意図</h4>
-   * <p>変換の正当性そのものはこのテストでは検証対象外とし、
-   * Controller の分岐やエラーハンドリングだけに焦点を当てます。
+   *
+   * <p>変換の正当性そのものはこのテストでは検証対象外とし、 Controller の分岐やエラーハンドリングだけに焦点を当てます。
    */
   // 共通（ハッピーパス）スタブを流し込む
   protected void stubConverterHappyPath() {
 
     // toEntity(null 可)。必要最低限の空オブジェクトでOK
-    when(converter.toEntity(any())).thenAnswer(inv -> new Student());
+    when(converter.toEntity(any()))
+        .thenAnswer(
+            inv -> {
+              Student st = new Student();
+              st.setStudentId(studentId); // ★常に固定IDを入れる
+              return st;
+            });
 
     // mergeStudent は void：素通し
     doAnswer(inv -> null).when(converter).mergeStudent(any(Student.class), any(Student.class));
@@ -401,12 +399,10 @@ abstract class ControllerTestBase {
     StudentDetailDto dummyDetail = org.mockito.Mockito.mock(StudentDetailDto.class);
 
     // 2引数版
-    when(converter.toDetailDto(any(Student.class), anyList()))
-        .thenReturn(dummyDetail);
+    when(converter.toDetailDto(any(Student.class), anyList())).thenReturn(dummyDetail);
 
     // 3引数版（UUID文字列付き）
-    when(converter.toDetailDto(any(Student.class), anyList(), anyString()))
-        .thenReturn(dummyDetail);
+    when(converter.toDetailDto(any(Student.class), anyList(), anyString())).thenReturn(dummyDetail);
   }
 
   /**
@@ -423,27 +419,44 @@ abstract class ControllerTestBase {
    * </ul>
    *
    * <h4>意図</h4>
-   * <p>
-   * 永続化やビジネスロジックの副作用を排し、Controller レベルの 入出力・例外ハンドリングに集中してテストできるようにします。
+   *
+   * <p>永続化やビジネスロジックの副作用を排し、Controller レベルの 入出力・例外ハンドリングに集中してテストできるようにします。
    */
   protected void stubServiceHappyPath() {
-    when(service.findStudentById(any())).thenReturn(new Student());
+    // --- GET/detail 等で使う ---
+    when(service.findStudentById(any(UUID.class)))
+        .thenAnswer(
+            inv -> {
+              Student st = new Student();
+              st.setStudentId(studentId);
+              return st;
+            });
+
     when(service.searchCoursesByStudentId(any())).thenReturn(List.of());
 
-    // void メソッドは doNothing
-    doNothing().when(service).updateStudentInfoOnly(any(Student.class));
-    doNothing().when(service).appendCourses(any(), anyList());
-    doNothing().when(service).replaceCourses(any(), anyList());
+    // --- PATCH 入口 ---
+    StudentDetailDto dummy = Mockito.mock(StudentDetailDto.class);
+    when(service.patchStudent(any(UUID.class), any(StudentRegistrationRequest.class), anyString()))
+        .thenReturn(dummy);
+
+    // --- PUT 入口 ---
+    when(service.updateStudentWithCourses(any(Student.class), anyList()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    // 引数で渡されたStudentをそのまま返す（自然）
+
+    // --- POST / DELETE / RESTORE（void）---
+    doNothing().when(service).registerStudent(any(Student.class), anyList());
+    doNothing().when(service).softDeleteStudent(any(UUID.class));
+    doNothing().when(service).restoreStudent(any(UUID.class));
   }
 
   /**
    * 「想定外の実行時例外（500/E999 相当）」を能動的に発火させるための補助。
    *
-   * <p>早い段階（例：{@code converter.decodeUuidStringToBytesOrThrow(...)}）で
-   * {@link RuntimeException} を投げるようにスタブし、 後続のサービス呼び出しへ到達しない経路を作ります。
+   * <p>早い段階（例：{@code converter.decodeUuidStringToBytesOrThrow(...)}）で {@link RuntimeException}
+   * を投げるようにスタブし、 後続のサービス呼び出しへ到達しない経路を作ります。
    */
   protected void makeConverterThrowEarly() {
-    when(converter.decodeUuidStringOrThrow(anyString())).thenThrow(
-        new RuntimeException("boom"));
+    when(converter.decodeUuidStringOrThrow(anyString())).thenThrow(new RuntimeException("boom"));
   }
 }

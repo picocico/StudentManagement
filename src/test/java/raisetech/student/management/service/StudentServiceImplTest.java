@@ -4,13 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -18,29 +19,31 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.exception.ResourceNotFoundException;
+import raisetech.student.management.repository.StudentCourseApplicationStatusRepository;
 import raisetech.student.management.repository.StudentCourseRepository;
 import raisetech.student.management.repository.StudentRepository;
 
 /**
  * {@link StudentServiceImpl} の単体テストクラス。
  *
- * <p>DB では UUID を BINARY(16) で保持しつつ、
- * サービス層では UUID 型として受講生情報およびコース情報を扱う前提で、 その振る舞いを検証します。
+ * <p>DB では UUID を BINARY(16) で保持しつつ、 サービス層では UUID 型として受講生情報およびコース情報を扱う前提で、 その振る舞いを検証します。
  *
  * <ul>
- *   <li>リポジトリ層への委譲が正しく行われているか</li>
- *   <li>コースの更新・追加ロジックが意図通りに呼び出されるか</li>
- *   <li>論理削除・復元・物理削除における例外処理/メッセージが期待通りか</li>
+ *   <li>リポジトリ層への委譲が正しく行われているか
+ *   <li>コースの更新・追加ロジックが意図通りに呼び出されるか
+ *   <li>論理削除・復元・物理削除における例外処理/メッセージが期待通りか
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +66,14 @@ class StudentServiceImplTest {
   private StudentCourseRepository courseRepository;
 
   /**
+   * 受講生コースの申請状況のリポジトリのモック。
+   *
+   * <p>コースの申請状況の取得・登録・削除などをスタブ/検証するために利用します。
+   */
+  @Mock
+  private StudentCourseApplicationStatusRepository statusRepository;
+
+  /**
    * エンティティとDTO間の変換を行うコンバーターのモック。
    *
    * <p>サービス層からの呼び出しを検証しつつ、DTOリスト生成などをスタブします。
@@ -73,8 +84,7 @@ class StudentServiceImplTest {
   /**
    * テスト対象のサービス実装。
    *
-   * <p>{@link InjectMocks} により、上記モックがインジェクションされた状態の
-   * {@link StudentServiceImpl} が生成されます。
+   * <p>{@link InjectMocks} により、上記モックがインジェクションされた状態の {@link StudentServiceImpl} が生成されます。
    */
   @InjectMocks
   private StudentServiceImpl service;
@@ -94,20 +104,16 @@ class StudentServiceImplTest {
    */
   private Student student;
 
-  /**
-   * searchAllCourses など、一部メソッドを差し替えて振る舞いを検証するためのスパイ。
-   */
-  private StudentServiceImpl spyService;
-
+  @Captor
+  ArgumentCaptor<List<UUID>> studentIdsCaptor;
 
   /**
    * 各テスト実行前に共通の準備を行います。
    *
    * <ul>
-   *   <li>{@link #UUID_STRING} から {@link #studentId} を生成</li>
-   *   <li>{@link #student} の基本情報を初期化</li>
-   *   <li>{@link #spyService} を作成</li>
-   *   <li>必要に応じたダミーの {@link StudentCourse} を生成</li>
+   *   <li>{@link #UUID_STRING} から {@link #studentId} を生成
+   *   <li>{@link #student} の基本情報を初期化
+   *   <li>必要に応じたダミーの {@link StudentCourse} を生成
    * </ul>
    */
   @BeforeEach
@@ -119,26 +125,20 @@ class StudentServiceImplTest {
     student.setFullName("テスト　花子");
     student.setEmail("test@example.com");
     student.setAge(30);
-
-    spyService = Mockito.spy(service);
-
-    // コースを1件追加してcoursesを初期化（必要に応じて各テスト内で利用）
-    StudentCourse course = new StudentCourse();
-    course.setStudentId(studentId);
-    course.setCourseId(UUID.randomUUID()); // 任意のダミーUUID
   }
 
   /**
    * 受講生登録時に、コースリストが空であればコース登録が行われないことを検証します。
    *
    * <p>期待する挙動:
+   *
    * <ul>
-   *   <li>{@code insertStudent(student)} は 1 回呼ばれる</li>
-   *   <li>{@code insertCourses(...)} は 1 度も呼ばれない</li>
+   *   <li>{@code insertStudent(student)} は 1 回呼ばれる
+   *   <li>{@code insertCourses(...)} は 1 度も呼ばれない
    * </ul>
    */
   @Test
-  void 受講生登録時_コースが空ならコースは登録されないこと() {
+  void registerStudent_受講生登録時_コースが空ならコースは登録されないこと() {
     // コースが空のケースにする
     List<StudentCourse> emptyCourses = List.of();
     // 実行
@@ -149,178 +149,91 @@ class StudentServiceImplTest {
     verify(studentRepository, times(1)).insertStudent(student);
     // insertCourses() は一度も呼ばれなかったかどうか？
     verify(courseRepository, never()).insertCourses(anyList());
+    verifyNoInteractions(statusRepository);
   }
 
-  /**
-   * 受講生情報の全体更新時に、既存のコースが削除され、新しいコースが登録されることを検証します。
-   *
-   * <p>期待する呼び出し順:
-   * <ol>
-   *   <li>{@code studentRepository.updateStudent(student)}</li>
-   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}</li>
-   *   <li>{@code courseRepository.insertCourses(courses)}</li>
-   * </ol>
-   */
   @Test
-  void updateStudent_受講生情報更新時_既存コースが削除され_新規コースが登録されること() {
-
-    // updateStudent用のオブジェクトを準備
-    StudentCourse course = new StudentCourse();
-    course.setStudentId(student.getStudentId());
-    course.setCourseId(UUID.randomUUID()); // 仮のCourse ID
-
-    List<StudentCourse> courses = List.of(course);
-
-    // 更新件数 1 を返すようにスタブ
-    when(studentRepository.updateStudent(student)).thenReturn(1);
-
-    // 実行
-    service.updateStudent(student, courses);
-
-    // 検証 メソッドの呼び出しが順序通り行えているか？
-    InOrder inOrder = inOrder(studentRepository, courseRepository);
-    // studentRepository.updateStudent(student)メソッドが呼び出されているかどうか？
-    inOrder.verify(studentRepository).updateStudent(student);
-    // studentId に紐づく受講コースを 一括削除する処理が実行されたかどうか？
-    inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
-    // 新たにcoursesをDBに登録する処理が呼び出されたかどうか？
-    inOrder.verify(courseRepository).insertCourses(courses);
+  void updateStudentWithCourses_studentがnullならNullPointerExceptionとなること() {
+    assertThatThrownBy(() -> service.updateStudentWithCourses(null, List.of()))
+        .isInstanceOf(NullPointerException.class);
+    verifyNoInteractions(studentRepository, courseRepository, statusRepository, converter);
   }
 
-  /**
-   * updateStudent 実行時に、リポジトリから「0件更新」が返された場合、 対象受講生が存在しないものとみなして ResourceNotFoundException
-   * を送出することを検証します。
-   *
-   * <p>リポジトリ層は「0件更新」で存在有無を表現し、サービス層で
-   * ドメイン例外（404系）にマッピングする責務を負います。
-   */
   @Test
-  void updateStudent_存在しないIDならResourceNotFoundExceptionが送出されること() {
+  void updateStudentWithCourses_studentIdがnullならIllegalArgumentExceptionとなること() {
     Student s = new Student();
-    s.setStudentId(studentId);
-
-    when(studentRepository.updateStudent(student)).thenReturn(0);
-
-    assertThatThrownBy(() -> service.updateStudent(student, List.of()))
-        .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
-  }
-
-  /**
-   * 部分更新（partialUpdateStudent）時に、受講生情報が更新され、 既存コース削除 → 新規コース登録が行われることを検証します。
-   *
-   * <p>期待する呼び出し順:
-   * <ol>
-   *   <li>{@code studentRepository.updateStudent(student)}</li>
-   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}</li>
-   *   <li>{@code courseRepository.insertCourses(courses)}</li>
-   * </ol>
-   */
-  @Test
-  void partialUpdateStudent_部分更新時_受講生情報が更新され_既存コース削除後_新規コースが登録されること() {
-
-    // partialUpdateStudent用のオブジェクトを準備
-    Student student = new Student();
-    student.setStudentId(studentId);
-    student.setFullName("検証 太郎");
-
-    StudentCourse course = new StudentCourse();
-    course.setCourseId(UUID.randomUUID());
-    List<StudentCourse> courses = List.of(course);
-
-    // ★件数 1 を返すようにスタブ
-    when(studentRepository.updateStudent(student)).thenReturn(1);
-
-    // 実行
-    service.partialUpdateStudent(student, courses);
-
-    // 検証
-    InOrder inOrder = inOrder(studentRepository, courseRepository);
-    // studentRepository.updateStudent(student)メソッドが呼び出されているかどうか？
-    inOrder.verify(studentRepository).updateStudent(student);
-    // studentId に紐づく受講コースを 一括削除する処理が実行されたかどうか？
-    inOrder.verify(courseRepository).deleteCoursesByStudentId(student.getStudentId());
-    inOrder.verify(courseRepository).insertCourses(courses);
-  }
-
-  /**
-   * partialUpdateStudent 実行時に、studentId が null の場合、 処理を行わずに IllegalArgumentException
-   * を送出することを検証します。
-   *
-   * <p>サービス層で ID の null を早期に検出し、不正な呼び出しを防ぎます。
-   */
-  @Test
-  void partialUpdateStudent_studentIdがnullならIllegalArgumentException() {
-    Student s = new Student();
-
-    assertThatThrownBy(() -> service.partialUpdateStudent(s, List.of()))
+    assertThatThrownBy(() -> service.updateStudentWithCourses(s, List.of()))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("UUIDの形式が不正です");
+        .hasMessageContaining("studentId must not be null");
   }
 
-  /**
-   * appendCourses 実行時に、既に存在するコースには insert されないことを検証します。
-   *
-   * <p>サービスでは {@code courseRepository.insertIfNotExists(...)} を呼び出し、
-   * リポジトリ側で重複チェックを行う前提です。
-   */
   @Test
-  void appendCourses_既に存在するコースにはinsertされないこと() {
+  void updateStudentWithCourses_update0件なら404の例外エラーとなること() {
+    when(studentRepository.updateStudent(any(Student.class))).thenReturn(0);
 
-    // appendCourses用のオブジェクトを準備
-    StudentCourse course = new StudentCourse();
-    course.setStudentId(student.getStudentId());
-    course.setCourseId(UUID.randomUUID());
-
-    List<StudentCourse> newCourses = List.of(course);
-
-    // 実行
-    service.appendCourses(student.getStudentId(), newCourses);
-
-    // insertIfNotExists が正しく呼ばれているか?
-    verify(courseRepository).insertIfNotExists(course);
-  }
-
-  /**
-   * updateStudentInfoOnly が呼び出された際に、リポジトリへ委譲されることを検証します。
-   *
-   * <p>期待する挙動: {@code studentRepository.updateStudent(student)} が 1回呼ばれる。
-   */
-  @Test
-  void updateStudentInfoOnlyが呼び出されると_リポジトリに委譲されること() {
-
-    // 準備
-    Student student = new Student();
-    student.setStudentId(studentId);
-    student.setFullName("検証　テスト");
-
-    // ★件数 1 を返す
-    when(studentRepository.updateStudent(student)).thenReturn(1);
-
-    // 実行
-    service.updateStudentInfoOnly(student);
-
-    // 検証：studentRepository.updateStudent(...) が呼ばれていること
-    verify(studentRepository).updateStudent(student);
-  }
-
-  /**
-   * updateStudentInfoOnly 実行時に、リポジトリからの更新件数が 0 件の場合、 対象受講生が存在しないものとみなして ResourceNotFoundException
-   * を送出することを検証します。
-   *
-   * <p>「情報だけ更新する」ケースでも、存在しない ID に対しては
-   * 一貫して 404 相当のドメイン例外を返すポリシーを確認します。
-   */
-  @Test
-  void updateStudentInfoOnly_存在しないIDならResourceNotFoundExceptionが送出されること() {
-    Student s = new Student();
-    s.setStudentId(studentId);
-
-    when(studentRepository.updateStudent(s)).thenReturn(0);
-
-    assertThatThrownBy(() -> service.updateStudentInfoOnly(s))
+    assertThatThrownBy(() -> service.updateStudentWithCourses(student, List.of()))
         .isInstanceOf(ResourceNotFoundException.class)
-        .hasMessageContaining("受講生ID " + UUID_STRING + " が見つかりません。");
+        .hasMessageContaining("受講生ID " + studentId + " が見つかりません。");
+
+    verify(studentRepository).updateStudent(student);
+    verifyNoInteractions(courseRepository, statusRepository);
+  }
+
+  @Test
+  void updateStudentWithCourses_coursesがnullなら全削除してinsertしないこと() {
+    when(studentRepository.updateStudent(student)).thenReturn(1);
+    when(studentRepository.findById(studentId)).thenReturn(student);
+
+    service.updateStudentWithCourses(student, null);
+
+    InOrder inOrder = inOrder(studentRepository, courseRepository);
+    inOrder.verify(studentRepository).updateStudent(student);
+    inOrder.verify(courseRepository).deleteCoursesByStudentId(studentId);
+    verify(courseRepository, never()).insertCourses(anyList());
+    verifyNoInteractions(statusRepository);
+  }
+
+  @Test
+  void updateStudentWithCourses_coursesありならstudentIdを再セットしてinsertしstatusも作ること() {
+    when(studentRepository.updateStudent(student)).thenReturn(1);
+    when(studentRepository.findById(studentId)).thenReturn(student);
+
+    StudentCourse c1 = new StudentCourse();
+    c1.setCourseId(UUID.randomUUID());
+    StudentCourse c2 = new StudentCourse();
+    c2.setCourseId(UUID.randomUUID());
+    List<StudentCourse> courses = List.of(c1, c2);
+
+    service.updateStudentWithCourses(student, courses);
+
+    verify(courseRepository).deleteCoursesByStudentId(studentId);
+
+    // insert引数の中身を検証
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<StudentCourse>> captor = ArgumentCaptor.forClass(List.class);
+
+    verify(courseRepository).insertCourses(captor.capture());
+    List<StudentCourse> inserted = captor.getValue();
+    assertThat(inserted).hasSize(2);
+    assertThat(inserted).allSatisfy(sc -> assertThat(sc.getStudentId()).isEqualTo(studentId));
+
+    verify(statusRepository, times(2)).upsertStatus(any(UUID.class), any(UUID.class),
+        eq("PROVISIONAL"));
+
+    verify(statusRepository, never())
+        .insertProvisionalIfAbsent(any(UUID.class), any(UUID.class));
+  }
+
+  @Test
+  void updateStudentWithCourses_再取得がnullならResourceNotFoundExceptionとなること() {
+    when(studentRepository.updateStudent(student)).thenReturn(1);
+    when(studentRepository.findById(studentId)).thenReturn(null);
+
+    assertThatThrownBy(() -> service.updateStudentWithCourses(student, List.of()))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    verify(studentRepository).updateStudent(student);
+    verify(courseRepository).deleteCoursesByStudentId(studentId);
   }
 
   /**
@@ -335,31 +248,46 @@ class StudentServiceImplTest {
     String furigana = "やまだ　たかし";
     boolean includeDeleted = false;
     boolean deletedOnly = false;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
 
-    List<Student> mockStudents = List.of(new Student());
+    UUID studentId = UUID.randomUUID();
+    Student s = new Student();
+    s.setStudentId(studentId);
+    List<Student> mockStudents = List.of(s);
+
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly))
+    when(studentRepository.searchStudents(
+        furigana, includeDeleted, deletedOnly, applicationStatus.name()))
         .thenReturn(mockStudents);
 
-    // searchAllCourses() の戻り値を差し替え
-    doReturn(mockCourses).when(spyService).searchAllCourses();
+    // ★ searchAllCourses() ではなく、studentIds でまとめてコース取得する想定
+    when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
+        .thenReturn(mockCourses);
 
     when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
 
     // 実行
     List<StudentDetailDto> result =
-        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
 
     // 呼び出し検証（順序付き）
-    InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
-    inOrder.verify(spyService).searchAllCourses();
-    inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
+    InOrder inOrder = inOrder(studentRepository, courseRepository, converter);
+    inOrder
+        .verify(studentRepository)
+        .searchStudents(furigana, includeDeleted, deletedOnly, applicationStatus.name());
+
+    inOrder
+        .verify(courseRepository)
+        .findCoursesByStudentIds(studentIdsCaptor.capture(), eq(applicationStatus.name()));
+    // ★ studentIds がちゃんと作られているか検証
+    assertThat(studentIdsCaptor.getValue()).containsExactly(studentId);
+
+    inOrder.verify(converter).toDetailDtoList(eq(mockStudents), eq(mockCourses));
   }
 
   /**
@@ -372,31 +300,43 @@ class StudentServiceImplTest {
     String furigana = "さとう　じろう";
     boolean includeDeleted = true;
     boolean deletedOnly = false;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
 
-    List<Student> mockStudents = List.of(new Student());
+    UUID studentId = UUID.randomUUID();
+    Student s = new Student();
+    s.setStudentId(studentId);
+    List<Student> mockStudents = List.of(s);
+
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly))
+    when(studentRepository.searchStudents(
+        furigana, includeDeleted, deletedOnly, applicationStatus.name()))
         .thenReturn(mockStudents);
 
-    // searchAllCourses() の戻り値を差し替え
-    doReturn(mockCourses).when(spyService).searchAllCourses();
+    when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
+        .thenReturn(mockCourses);
 
     when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
 
     // 実行
     List<StudentDetailDto> result =
-        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
 
     // 呼び出し検証（順序付き）
-    InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
-    inOrder.verify(spyService).searchAllCourses();
-    inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
+    InOrder inOrder = inOrder(studentRepository, courseRepository, converter);
+    inOrder
+        .verify(studentRepository)
+        .searchStudents(furigana, includeDeleted, deletedOnly, "IN_PROGRESS");
+    inOrder
+        .verify(courseRepository)
+        .findCoursesByStudentIds(studentIdsCaptor.capture(), eq(applicationStatus.name()));
+    assertThat(studentIdsCaptor.getValue()).containsExactly(studentId);
+
+    inOrder.verify(converter).toDetailDtoList(eq(mockStudents), eq(mockCourses));
   }
 
   /**
@@ -409,31 +349,43 @@ class StudentServiceImplTest {
     String furigana = "たかぎ　あかね";
     boolean includeDeleted = false;
     boolean deletedOnly = true;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
 
-    List<Student> mockStudents = List.of(new Student());
+    UUID studentId = UUID.randomUUID();
+    Student s = new Student();
+    s.setStudentId(studentId);
+    List<Student> mockStudents = List.of(s);
+
     List<StudentCourse> mockCourses = List.of(new StudentCourse());
     List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
 
-    when(studentRepository.searchStudents(furigana, includeDeleted, deletedOnly))
+    when(studentRepository.searchStudents(
+        furigana, includeDeleted, deletedOnly, applicationStatus.name()))
         .thenReturn(mockStudents);
 
-    // searchAllCourses() の戻り値を差し替え
-    doReturn(mockCourses).when(spyService).searchAllCourses();
+    when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
+        .thenReturn(mockCourses);
 
     when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
 
     // 実行
     List<StudentDetailDto> result =
-        spyService.getStudentList(furigana, includeDeleted, deletedOnly);
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
 
     // 主張
     assertThat(result).isEqualTo(expectedDtoList);
 
     // 呼び出し検証（順序付き）
-    InOrder inOrder = inOrder(studentRepository, spyService, converter);
-    inOrder.verify(studentRepository).searchStudents(furigana, includeDeleted, deletedOnly);
-    inOrder.verify(spyService).searchAllCourses();
-    inOrder.verify(converter).toDetailDtoList(mockStudents, mockCourses);
+    InOrder inOrder = inOrder(studentRepository, courseRepository, converter);
+    inOrder
+        .verify(studentRepository)
+        .searchStudents(furigana, includeDeleted, deletedOnly, applicationStatus.name());
+    inOrder
+        .verify(courseRepository)
+        .findCoursesByStudentIds(studentIdsCaptor.capture(), eq(applicationStatus.name()));
+    assertThat(studentIdsCaptor.getValue()).containsExactly(studentId);
+
+    inOrder.verify(converter).toDetailDtoList(eq(mockStudents), eq(mockCourses));
   }
 
   /**
@@ -447,12 +399,70 @@ class StudentServiceImplTest {
     String furigana = "たかはし　あや";
     boolean includeDeleted = true;
     boolean deletedOnly = true;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
 
     // 実行
-    assertThatThrownBy(() -> spyService.getStudentList(furigana, includeDeleted, deletedOnly))
+    assertThatThrownBy(
+        () -> service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus))
         // 検証
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("includeDeletedとdeletedOnlyの両方をtrueにすることはできません");
+  }
+
+  /**
+   * 申込状況（applicationStatus）を指定した場合に、
+   * {@link raisetech.student.management.repository.StudentRepository#searchStudents(String,
+   * boolean, boolean, String)} へ指定したステータスが引数として渡されることを検証します。
+   *
+   * <p>本テストは「検索条件として status が適切に下層（Repository）へ伝播する」ことに焦点を当てます。
+   * 取得した学生一覧に対してコース一覧を取得し、DTOへ変換する一連の流れ （searchAllCourses →
+   * converter.toDetailDtoList）も呼ばれることを合わせて確認します。
+   *
+   * <p>※検索条件を status のみに絞るため、furigana は null を使用します。
+   */
+  @Test
+  void getStudentList_status指定_でsearchStudentsにstatusが渡されること() {
+    // 準備
+    String furigana = null; // statusだけ見たいなら null でもOK
+    boolean includeDeleted = false;
+    boolean deletedOnly = false;
+    ApplicationStatus applicationStatus = ApplicationStatus.IN_PROGRESS;
+
+    UUID studentId = UUID.randomUUID();
+    Student s = new Student();
+    s.setStudentId(studentId);
+    List<Student> mockStudents = List.of(s);
+
+    List<StudentCourse> mockCourses = List.of(new StudentCourse());
+    List<StudentDetailDto> expectedDtoList = List.of(new StudentDetailDto());
+
+    when(studentRepository.searchStudents(
+        furigana, includeDeleted, deletedOnly, applicationStatus.name()))
+        .thenReturn(mockStudents);
+
+    when(courseRepository.findCoursesByStudentIds(anyList(), eq(applicationStatus.name())))
+        .thenReturn(mockCourses);
+
+    when(converter.toDetailDtoList(mockStudents, mockCourses)).thenReturn(expectedDtoList);
+
+    // 実行
+    List<StudentDetailDto> result =
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
+
+    // 主張
+    assertThat(result).isEqualTo(expectedDtoList);
+
+    InOrder inOrder = inOrder(studentRepository, courseRepository, converter);
+    // 呼び出し検証
+    inOrder
+        .verify(studentRepository)
+        .searchStudents(furigana, includeDeleted, deletedOnly, applicationStatus.name());
+    inOrder
+        .verify(courseRepository)
+        .findCoursesByStudentIds(studentIdsCaptor.capture(), eq(applicationStatus.name()));
+
+    assertThat(studentIdsCaptor.getValue()).containsExactly(studentId);
+    inOrder.verify(converter).toDetailDtoList(eq(mockStudents), eq(mockCourses));
   }
 
   /**
@@ -500,13 +510,11 @@ class StudentServiceImplTest {
     // 準備
     StudentCourse course1 = new StudentCourse();
     course1.setStudentId(studentId);
-    course1.setCourseId(
-        UUID.fromString("123e4567-e89b-12d3-a456-426614174001")); // 仮のCourse ID 1
+    course1.setCourseId(UUID.fromString("123e4567-e89b-12d3-a456-426614174001")); // 仮のCourse ID 1
 
     StudentCourse course2 = new StudentCourse();
     course2.setStudentId(studentId);
-    course2.setCourseId(
-        UUID.fromString("123e4567-e89b-12d3-a456-426614174002")); // 仮のCourse ID 2
+    course2.setCourseId(UUID.fromString("123e4567-e89b-12d3-a456-426614174002")); // 仮のCourse ID 2
 
     List<StudentCourse> expectedCourses = List.of(course1, course2);
 
@@ -522,36 +530,6 @@ class StudentServiceImplTest {
   }
 
   /**
-   * searchAllCourses で、コース情報が全件取得できることを検証します。
-   *
-   * <p>{@link StudentCourseRepository#findAllCourses()} の結果をそのまま返していることを確認します。
-   */
-  @Test
-  void searchAllCourses_コース情報を全件取得すること() {
-
-    // 準備
-    StudentCourse course1 = new StudentCourse();
-    course1.setCourseId(UUID.fromString("123e4567-e89b-12d3-a456-426614174003"));
-    course1.setCourseName("Javaコース");
-
-    StudentCourse course2 = new StudentCourse();
-    course2.setCourseId(UUID.fromString("123e4567-e89b-12d3-a456-426614174003"));
-    course2.setCourseName("AWSコース");
-
-    List<StudentCourse> mockCourses = List.of(course1, course2);
-
-    // モック設定
-    when(courseRepository.findAllCourses()).thenReturn(mockCourses);
-
-    // 実行
-    List<StudentCourse> result = service.searchAllCourses();
-
-    // 検証
-    assertThat(result).isEqualTo(mockCourses);
-    verify(courseRepository).findAllCourses(); // 呼び出しがされたかどうかの確認
-  }
-
-  /**
    * softDeleteStudent で、対象受講生が存在しない場合に {@link ResourceNotFoundException} がスローされることを検証します。
    */
   @Test
@@ -561,7 +539,7 @@ class StudentServiceImplTest {
     when(studentRepository.findById(studentId)).thenReturn(null);
 
     // 実行
-    assertThatThrownBy(() -> spyService.softDeleteStudent(studentId))
+    assertThatThrownBy(() -> service.softDeleteStudent(studentId))
         // 検証
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Student not found for ID: " + UUID_STRING);
@@ -571,9 +549,10 @@ class StudentServiceImplTest {
    * softDeleteStudent で、まだ論理削除されていない受講生に対して削除処理が実行されることを検証します。
    *
    * <p>期待する挙動:
+   *
    * <ul>
-   *   <li>{@code student.softDelete()} が呼ばれる</li>
-   *   <li>{@code studentRepository.updateStudent(student)} が呼ばれる</li>
+   *   <li>{@code student.softDelete()} が呼ばれる
+   *   <li>{@code studentRepository.updateStudent(student)} が呼ばれる
    * </ul>
    */
   @Test
@@ -648,8 +627,8 @@ class StudentServiceImplTest {
    * forceDeleteStudent 実行時に、物理削除の件数が 0 件だった場合、 対象受講生が存在しないものとみなして ResourceNotFoundException
    * を送出することを検証します。
    *
-   * <p>このとき先に実行した deleteCoursesByStudentId の削除も
-   * {@code @Transactional} によりロールバックされる前提であり、 部分的な削除状態が残らないことを保証します（実装側の意図の確認）。
+   * <p>このとき先に実行した deleteCoursesByStudentId の削除も {@code @Transactional} によりロールバックされる前提であり、
+   * 部分的な削除状態が残らないことを保証します（実装側の意図の確認）。
    */
   @Test
   void forceDeleteStudent_該当の受講生が存在しない時は例外がスローされること() {
@@ -669,9 +648,10 @@ class StudentServiceImplTest {
    * forceDeleteStudent で、受講生が存在する場合に 紐づくコースおよび受講生レコードが順序通り削除されることを検証します。
    *
    * <p>期待する呼び出し順:
+   *
    * <ol>
-   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}</li>
-   *   <li>{@code studentRepository.forceDeleteStudent(studentId)}</li>
+   *   <li>{@code courseRepository.deleteCoursesByStudentId(studentId)}
+   *   <li>{@code studentRepository.forceDeleteStudent(studentId)}
    * </ol>
    */
   @Test

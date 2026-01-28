@@ -6,12 +6,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
 import raisetech.student.management.dto.StudentCourseDto;
@@ -23,28 +25,24 @@ import raisetech.student.management.exception.InvalidIdFormatException;
  * {@link StudentConverter} の単体テストクラス。
  *
  * <p>主な検証対象は次の通りです。
- * <ul>
- *   <li>ID 変換（UUID 由来の byte[16] と UUID 文字列の相互変換）</li>
- *   <li>Student / StudentCourse と各種 DTO 間の項目移送</li>
- *   <li>集約変換（Student ＋ StudentCourse → StudentDetailDto）</li>
- *   <li>部分更新マージ処理（{@link StudentConverter#mergeStudent(Student, Student)}）</li>
- * </ul>
  *
+ * <ul>
+ *   <li>ID 変換（UUID 由来の byte[16] と UUID 文字列の相互変換）
+ *   <li>Student / StudentCourse と各種 DTO 間の項目移送
+ *   <li>集約変換（Student ＋ StudentCourse → StudentDetailDto）
+ *   <li>部分更新マージ処理（{@link StudentConverter#mergeStudent(Student, Student)}）
+ * </ul>
  */
 @ExtendWith(MockitoExtension.class)
 class StudentConverterTest {
 
-  /**
-   * テスト対象となるコンバータ。
-   */
-  @InjectMocks
-  private StudentConverter converter;
+  /** テスト対象となるコンバータ。 */
+  @InjectMocks private StudentConverter converter;
 
   // テスト用の固定UUID文字列
   private static final String UUID_STRING = "123e4567-e89b-12d3-a456-426614174000";
   private static final String UUID_STRING_B = "123e4567-e89b-12d3-a456-426614174001";
   private UUID uuid;
-
 
   @BeforeEach
   void setUp() {
@@ -55,17 +53,14 @@ class StudentConverterTest {
   // ID変換メソッドのテスト
   // ------------------------------------------------------------
 
-  /**
-   * ID 変換系メソッド（UUID ⇔ byte[]、文字列 ID デコード）のテストグループ。
-   */
+  /** ID 変換系メソッド（UUID ⇔ byte[]、文字列 ID デコード）のテストグループ。 */
   @Nested
   class IdConversionTest {
 
     /**
      * {@link StudentConverter#encodeUuidString(UUID)} が UUID を標準的な文字列表現に変換できることを検証します。
      *
-     * <p>内部の実装詳細（どのユーティリティを使うか）には依存せず、
-     * 「与えた UUID から期待通りの文字列が返るか」にフォーカスしたテストです。
+     * <p>内部の実装詳細（どのユーティリティを使うか）には依存せず、 「与えた UUID から期待通りの文字列が返るか」にフォーカスしたテストです。
      */
     @Test
     void encodeUuidString_正常系_UUIDを文字列に変換できること() {
@@ -84,8 +79,8 @@ class StudentConverterTest {
     }
 
     /**
-     * {@link StudentConverter# decodeUuidOrThrow(String)} にnullや空文字が渡された場合、
-     * {@link InvalidIdFormatException}（「" "」）がスローされることを検証します。
+     * {@link StudentConverter# decodeUuidOrThrow(String)} にnullや空文字が渡された場合、 {@link
+     * InvalidIdFormatException}（「" "」）がスローされることを検証します。
      */
     @Test
     void decodeUuidStringOrThrow_異常系_nullや空文字ならInvalidIdFormatException() {
@@ -104,35 +99,43 @@ class StudentConverterTest {
     }
   }
 
-// ------------------------------------------------------------
-//　DTO ⇔ エンティティ 変換メソッドのテスト
-// ------------------------------------------------------------
+  // ------------------------------------------------------------
+  // 　DTO ⇔ エンティティ 変換メソッドのテスト
+  // ------------------------------------------------------------
 
   /**
    * DTO とエンティティ間の変換ロジックを検証するテストグループ。
    *
    * <p>主に以下を対象とします。
+   *
    * <ul>
-   *   <li>{@link StudentDto} ⇔ {@link Student}</li>
-   *   <li>{@link StudentCourseDto} ⇔ {@link StudentCourse}</li>
-   *   <li>リスト変換・新規 ID 採番の挙動</li>
-   *   <li>集約 DTO／部分更新マージ処理</li>
+   *   <li>{@link StudentDto} ⇔ {@link Student}
+   *   <li>{@link StudentCourseDto} ⇔ {@link StudentCourse}
+   *   <li>リスト変換・新規 ID 採番の挙動
+   *   <li>集約 DTO／部分更新マージ処理
    * </ul>
    */
   @Nested
   class DtoEntityConversionTest {
 
     /**
-     * {@link StudentConverter#toEntity(StudentDto)} が、 ID 付きの {@link StudentDto} を正しく
-     * {@link Student} へ変換していることを検証します。
+     * {@link StudentConverter#toEntity(StudentDto)} が、 ID 付きの {@link StudentDto} を正しく {@link
+     * Student} へ変換していることを検証します。
      */
     @Test
     void toEntity_StudentDto_IDあり_全フィールドが正しくマッピングされIDがデコードされること() {
-      StudentDto inputDto = new StudentDto(
-          UUID_STRING,
-          "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-          "Tokyo", 25, "Male", "備考", false
-      );
+      StudentDto inputDto =
+          new StudentDto(
+              UUID_STRING,
+              "山田 太郎",
+              "ヤマダ タロウ",
+              "Taro",
+              "taro@example.com",
+              "Tokyo",
+              25,
+              "Male",
+              "備考",
+              false);
 
       // 変換実行
       Student result = converter.toEntity(inputDto);
@@ -159,11 +162,18 @@ class StudentConverterTest {
     @Test
     void toEntity_StudentDto_IDなし_新規にランダムIDが生成されること() {
       // IDがnullまたは空文字のDTOを準備
-      StudentDto inputDto = new StudentDto(
-          null, // IDなし
-          "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-          "Tokyo", 25, "Male", "備考", false
-      );
+      StudentDto inputDto =
+          new StudentDto(
+              null, // IDなし
+              "山田 太郎",
+              "ヤマダ タロウ",
+              "Taro",
+              "taro@example.com",
+              "Tokyo",
+              25,
+              "Male",
+              "備考",
+              false);
 
       // 変換実行
       Student result = converter.toEntity(inputDto);
@@ -176,18 +186,27 @@ class StudentConverterTest {
     }
 
     /**
-     * {@link StudentConverter#toDto(Student)} が {@link Student} の全フィールドを
-     * {@link StudentDto}へ正しくコピーしていることを検証します。
+     * {@link StudentConverter#toDto(Student)} が {@link Student} の全フィールドを {@link
+     * StudentDto}へ正しくコピーしていることを検証します。
      */
     @Test
     void toDto_Student_正常系_全フィールドが正しくマッピングされIDがエンコードされること() {
       UUID id = UUID.fromString(UUID_STRING);
       // IDありのDTOを準備
-      Student input = new Student(
-          id,
-          "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-          "Tokyo", 25, "Male", "備考", null, null, false
-      );
+      Student input =
+          new Student(
+              id,
+              "山田 太郎",
+              "ヤマダ タロウ",
+              "Taro",
+              "taro@example.com",
+              "Tokyo",
+              25,
+              "Male",
+              "備考",
+              null,
+              null,
+              false);
 
       StudentDto dto = converter.toDto(input);
 
@@ -218,12 +237,10 @@ class StudentConverterTest {
 
       // --- Given (入力データの準備) ---
       // Course IDが null の入力 DTO を準備
-      StudentCourseDto inputDto = new StudentCourseDto(
-          null, // ★ CourseId を null に設定
-          "Javaコース",
-          start,
-          end
-      );
+      StudentCourseDto inputDto =
+          new StudentCourseDto(
+              null, // ★ CourseId を null に設定
+              "Javaコース", start, end, null, null);
 
       // --- When (変換実行) ---
       // パスから渡ってきた想定の studentId（UUID文字列）
@@ -232,7 +249,7 @@ class StudentConverterTest {
 
       StudentCourse result = converter.toEntity(inputDto, studentIdString);
 
-      assertThat(result.getCourseId()).isNotNull();           // ランダム採番されている
+      assertThat(result.getCourseId()).isNotNull(); // ランダム採番されている
       assertThat(result.getStudentId()).isEqualTo(studentId); // 正しく紐づいている
       assertThat(result.getCourseName()).isEqualTo("Javaコース");
       assertThat(result.getStartDate()).isEqualTo(start);
@@ -247,18 +264,10 @@ class StudentConverterTest {
     void toEntityList_StudentCourseDto_CourseIDあり_既存IDが正しく使用されること() {
       LocalDate start = LocalDate.of(2025, 4, 1);
 
-      StudentCourseDto dto1 = new StudentCourseDto(
-          UUID_STRING,
-          "Javaコース",
-          start,
-          start.plusMonths(6)
-      );
-      StudentCourseDto dto2 = new StudentCourseDto(
-          UUID_STRING_B,
-          "SQLコース",
-          start,
-          start.plusMonths(3)
-      );
+      StudentCourseDto dto1 =
+          new StudentCourseDto(UUID_STRING, "Javaコース", start, start.plusMonths(6), null, null);
+      StudentCourseDto dto2 =
+          new StudentCourseDto(UUID_STRING_B, "SQLコース", start, start.plusMonths(3), null, null);
 
       UUID studentId = UUID.randomUUID();
 
@@ -266,14 +275,13 @@ class StudentConverterTest {
 
       assertThat(result).hasSize(2);
 
-      StudentCourse courseJava = result.stream()
-          .filter(c -> c.getCourseName().equals("Javaコース"))
-          .findFirst()
-          .orElseThrow();
-      StudentCourse courseSql = result.stream()
-          .filter(c -> c.getCourseName().equals("SQLコース"))
-          .findFirst()
-          .orElseThrow();
+      StudentCourse courseJava =
+          result.stream()
+              .filter(c -> c.getCourseName().equals("Javaコース"))
+              .findFirst()
+              .orElseThrow();
+      StudentCourse courseSql =
+          result.stream().filter(c -> c.getCourseName().equals("SQLコース")).findFirst().orElseThrow();
 
       assertThat(courseJava.getCourseId()).isEqualTo(UUID.fromString(UUID_STRING));
       assertThat(courseSql.getCourseId()).isEqualTo(UUID.fromString(UUID_STRING_B));
@@ -291,24 +299,26 @@ class StudentConverterTest {
       LocalDate start = LocalDate.of(2025, 4, 1);
 
       // 2つのコースDTO（どちらも CourseId が指定されている）
-      StudentCourseDto dto1 = new StudentCourseDto(
-          UUID_STRING,          // ★ 既存の CourseId（UUID）
-          "Javaコース",
-          start,
-          start.plusMonths(6)
-      );
-      StudentCourseDto dto2 = new StudentCourseDto(
-          UUID_STRING_B,        // ★ 別の CourseId（UUID）
-          "SQLコース",
-          start,
-          start.plusMonths(3)
-      );
+      StudentCourseDto dto1 =
+          new StudentCourseDto(
+              UUID_STRING, // ★ 既存の CourseId（UUID）
+              "Javaコース",
+              start,
+              start.plusMonths(6),
+              null,
+              null);
+      StudentCourseDto dto2 =
+          new StudentCourseDto(
+              UUID_STRING_B, // ★ 別の CourseId（UUID）
+              "SQLコース",
+              start,
+              start.plusMonths(3),
+              null,
+              null);
       return List.of(dto1, dto2);
     }
 
-    /**
-     * コース ID が未指定の DTO を渡した場合、新規 ID採番が行われることを検証します。
-     */
+    /** コース ID が未指定の DTO を渡した場合、新規 ID採番が行われることを検証します。 */
     @Test
     void toEntityList_StudentCourseDto_CourseIDなし_StudentCourseが新規IDで生成されること() {
       // --- Given ---
@@ -318,12 +328,10 @@ class StudentConverterTest {
       LocalDate end = LocalDate.of(2025, 9, 30);
 
       // CourseId が null の DTO を1件だけ用意
-      StudentCourseDto dto = new StudentCourseDto(
-          null,                 // ★ CourseId なし
-          "Javaコース",
-          start,
-          end
-      );
+      StudentCourseDto dto =
+          new StudentCourseDto(
+              null, // ★ CourseId なし
+              "Javaコース", start, end, null, null);
       List<StudentCourseDto> dtoList = List.of(dto);
 
       // --- When ---
@@ -344,12 +352,10 @@ class StudentConverterTest {
     }
 
     // ------------------------------------------------------------
-//  リスト/集約変換メソッドのテスト
-// ------------------------------------------------------------
+    //  リスト/集約変換メソッドのテスト
+    // ------------------------------------------------------------
 
-    /**
-     * 受講生・コース一覧からの集約生成および 部分更新マージ処理を検証するテストグループ。
-     */
+    /** 受講生・コース一覧からの集約生成および 部分更新マージ処理を検証するテストグループ。 */
     @Nested
     class AggregationConversionTest {
 
@@ -368,65 +374,78 @@ class StudentConverterTest {
         UUID studentIdA = uuid; // setUp で UUID_STRING から生成済み
         UUID studentIdB = UUID.fromString(UUID_STRING_B);
 
-        Student studentA = new Student(
-            studentIdA,
-            "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-            "Tokyo", 25, "Male", "備考", null, null, null
-        );
+        Student studentA =
+            new Student(
+                studentIdA,
+                "山田 太郎",
+                "ヤマダ タロウ",
+                "Taro",
+                "taro@example.com",
+                "Tokyo",
+                25,
+                "Male",
+                "備考",
+                null,
+                null,
+                null);
 
         // 2. 学生B (ID: FIXED_UUID_BYTES_B / UUID: FIXED_UUID_STRING_B)
-        Student studentB = new Student(
-            studentIdB, "田中 花子", "タナカ ハナコ", "Hana",
-            "hana@example.com", "Osaka", 30, "Female", "備考", null, null, null
-        );
+        Student studentB =
+            new Student(
+                studentIdB,
+                "田中 花子",
+                "タナカ ハナコ",
+                "Hana",
+                "hana@example.com",
+                "Osaka",
+                30,
+                "Female",
+                "備考",
+                null,
+                null,
+                null);
 
         // 3. コースA (学生Aに紐づくコース)
-        StudentCourse courseA1 = new StudentCourse(
-            // コースID自体の値は本テストの関心外なので、ゼロ埋め16バイトで十分
-            UUID.randomUUID(), studentIdA, "Javaコース",
-            S, S.plusMonths(6), null
-        );
+        StudentCourse courseA1 = course(studentIdA, "Javaコース", S, S.plusMonths(6));
+        // コースID自体の値は本テストの関心外なので、ゼロ埋め16バイトで十分
 
         // 4. コースB (学生Bに紐づくコース)
-        StudentCourse courseB1 = new StudentCourse(
-            UUID.randomUUID(), studentIdB, "Pythonコース",
-            S, S.plusMonths(3), null
-        );
-        StudentCourse courseB2 = new StudentCourse(
-            UUID.randomUUID(), studentIdB, "SQLコース",
-            S, S.plusMonths(1), null
-        );
+        StudentCourse courseB1 = course(studentIdB, "Pythonコース", S, S.plusMonths(3));
+
+        StudentCourse courseB2 = course(studentIdB, "SQLコース", S, S.plusMonths(1));
 
         // 入力リストの作成
         List<Student> students = List.of(studentA, studentB);
         List<StudentCourse> courses = List.of(courseA1, courseB1, courseB2);
 
         // --- When (変換実行) ---
-        List<StudentDetailDto> result =
-            converter.toDetailDtoList(students, courses);
+        List<StudentDetailDto> result = converter.toDetailDtoList(students, courses);
 
         // --- Then (検証) ---
         // 1. DTOリストのサイズが学生の数と一致すること
         assertThat(result).hasSize(2);
 
         // 2. 学生AのDTOを確認 (リストの最初の要素と仮定)
-        StudentDetailDto dtoA = result.stream()
-            .filter(d -> d.getStudent().getFullName().equals("山田 太郎"))
-            .findFirst().orElseThrow();
+        StudentDetailDto dtoA =
+            result.stream()
+                .filter(d -> d.getStudent().getFullName().equals("山田 太郎"))
+                .findFirst()
+                .orElseThrow();
         assertThat(dtoA.getStudent().getStudentId()).isEqualTo(UUID_STRING);
         assertThat(dtoA.getCourses()).hasSize(1); // Javaコースのみ
 
         // 3. 学生BのDTOを確認 (リストの2番目の要素と仮定)
-        StudentDetailDto dtoB = result.stream()
-            .filter(d -> d.getStudent().getFullName().equals("田中 花子"))
-            .findFirst().orElseThrow();
+        StudentDetailDto dtoB =
+            result.stream()
+                .filter(d -> d.getStudent().getFullName().equals("田中 花子"))
+                .findFirst()
+                .orElseThrow();
         assertThat(dtoB.getStudent().getStudentId()).isEqualTo(UUID_STRING_B);
         assertThat(dtoB.getCourses()).hasSize(2); // PythonとSQLの2コース
 
         // 4. コース名が正しく含まれていることを確認（学生B）
-        List<String> NamesB = dtoB.getCourses().stream()
-            .map(StudentCourseDto::getCourseName)
-            .toList();
+        List<String> NamesB =
+            dtoB.getCourses().stream().map(StudentCourseDto::getCourseName).toList();
         assertThat(NamesB).containsExactlyInAnyOrder("Pythonコース", "SQLコース");
       }
 
@@ -443,46 +462,64 @@ class StudentConverterTest {
         UUID studentIdA = uuid; // setUp で UUID_STRING から生成済み
         UUID studentIdB = UUID.fromString(UUID_STRING_B);
 
-        Student studentA = new Student(
-            studentIdA,
-            "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-            "Tokyo", 25, "Male", "備考", null, null, null
-        );
+        Student studentA =
+            new Student(
+                studentIdA,
+                "山田 太郎",
+                "ヤマダ タロウ",
+                "Taro",
+                "taro@example.com",
+                "Tokyo",
+                25,
+                "Male",
+                "備考",
+                null,
+                null,
+                null);
         // 2. 学生B (ID: FIXED_UUID_BYTES_B / UUID: FIXED_UUID_STRING_B)
-        Student studentB = new Student(
-            studentIdB, "田中 花子", "タナカ ハナコ", "Hana",
-            "hana@example.com", "Osaka", 30, "Female", "備考", null, null, null
-        );
+        Student studentB =
+            new Student(
+                studentIdB,
+                "田中 花子",
+                "タナカ ハナコ",
+                "Hana",
+                "hana@example.com",
+                "Osaka",
+                30,
+                "Female",
+                "備考",
+                null,
+                null,
+                null);
         // 3. コースA (学生Aに紐づくコース)
-        StudentCourse courseA1 = new StudentCourse(
-            UUID.randomUUID(),             // courseId 適当でOK
-            studentIdA, "Javaコース",
-            S, S.plusMonths(6), null
-        );
+        StudentCourse courseA1 = course(studentIdA, "Javaコース", S, S.plusMonths(6));
 
         // 入力リストの作成
         List<Student> students = List.of(studentA, studentB);
         List<StudentCourse> courses = List.of(courseA1); // コースA1のみ
 
         // --- When (変換実行) ---
-        List<StudentDetailDto> result =
-            converter.toDetailDtoList(students, courses);
+        List<StudentDetailDto> result = converter.toDetailDtoList(students, courses);
 
         // --- Then (検証) ---
         // 1. DTOリストのサイズが学生の数と一致すること
         assertThat(result).hasSize(2);
 
         // 2. 学生AのDTOを確認 (リストの最初の要素と仮定)
-        StudentDetailDto dtoA = result.stream()
-            .filter(d -> d.getStudent().getFullName().equals("山田 太郎"))
-            .findFirst().orElseThrow();
+        StudentDetailDto dtoA =
+            result.stream()
+                .filter(d -> d.getStudent().getFullName().equals("山田 太郎"))
+                .findFirst()
+                .orElseThrow();
         assertThat(dtoA.getStudent().getStudentId()).isEqualTo(UUID_STRING);
         assertThat(dtoA.getCourses()).hasSize(1); // Javaコースのみ
 
         // 3. 学生BのDTOを確認 (リストの2番目の要素と仮定)
-        StudentDetailDto dtoB = result.stream()
-            .filter(d -> d.getStudent().getFullName().equals("田中 花子"))
-            .findFirst().orElseThrow();
+        StudentDetailDto dtoB =
+            result.stream()
+                .filter(d -> d.getStudent().getFullName().equals("田中 花子"))
+                .findFirst()
+                .orElseThrow();
         assertThat(dtoB.getStudent().getStudentId()).isEqualTo(UUID_STRING_B);
         assertThat(dtoB.getCourses()).isEmpty();
       }
@@ -495,25 +532,37 @@ class StudentConverterTest {
       void mergeStudent_部分更新_Nullでないフィールドのみが既存データに上書きされること() {
         // mergeStudent(Student existing, Student update) のテスト
         // 既存のデータ（DBから取得した想定）
-        Student existing = new Student(
-            uuid,
-            "山田 太郎", "ヤマダ タロウ", "Taro", "taro@example.com",
-            "Tokyo", 25, "Male", "元の備考", null, null, null
-        );
+        Student existing =
+            new Student(
+                uuid,
+                "山田 太郎",
+                "ヤマダ タロウ",
+                "Taro",
+                "taro@example.com",
+                "Tokyo",
+                25,
+                "Male",
+                "元の備考",
+                null,
+                null,
+                null);
 
         // 部分更新用のデータ（リクエストボディの想定）
-        Student update = new Student(
-            null, // IDはマージ対象外
-            "田中 花子", // 氏名は更新
-            null, // フリガナはnullなのでスキップ
-            "Hana", // ニックネームは更新
-            null, // Emailはnullなのでスキップ
-            "Osaka", // Locationは更新
-            30, // Ageは更新
-            null, // Genderはnullなのでスキップ
-            "緊急連絡事項", // 備考は更新
-            null, null, null // その他のフィールドもnull
-        );
+        Student update =
+            new Student(
+                null, // IDはマージ対象外
+                "田中 花子", // 氏名は更新
+                null, // フリガナはnullなのでスキップ
+                "Hana", // ニックネームは更新
+                null, // Emailはnullなのでスキップ
+                "Osaka", // Locationは更新
+                30, // Ageは更新
+                null, // Genderはnullなのでスキップ
+                "緊急連絡事項", // 備考は更新
+                null,
+                null,
+                null // その他のフィールドもnull
+                );
 
         // 実行
         converter.mergeStudent(existing, update);
@@ -532,5 +581,20 @@ class StudentConverterTest {
         assertThat(existing.getGender()).isEqualTo("Male"); // スキップ
       }
     }
+  }
+
+  // ------------------------------------------------------------
+  //  テスト用ヘルパーメソッド
+  // ------------------------------------------------------------
+  private StudentCourse course(UUID studentId, String name, LocalDate start, LocalDate end) {
+    StudentCourse c = new StudentCourse();
+    c.setCourseId(UUID.randomUUID());
+    c.setStudentId(studentId);
+    c.setCourseName(name);
+    c.setStartDate(start);
+    c.setEndDate(end);
+    c.setApplicationStatus(null);
+    c.setCreatedAt(null);
+    return c;
   }
 }

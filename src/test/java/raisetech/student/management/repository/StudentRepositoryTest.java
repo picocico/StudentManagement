@@ -7,21 +7,29 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.boot.test.autoconfigure.MybatisTest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 
 @MybatisTest
-public class StudentRepositoryTest {
+@ActiveProfiles("test")
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class StudentRepositoryTest {
 
-  @Autowired
-  private StudentRepository sut;
+  @Autowired private StudentRepository sut;
 
-  @Autowired
-  private StudentCourseRepository courseRepository;
+  @Autowired private StudentCourseRepository courseRepository;
+
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   // コア：すべてのフィールドを引数で受け取る（private）
   private UUID insertStudent(
@@ -32,8 +40,7 @@ public class StudentRepositoryTest {
       String location,
       int age,
       String gender,
-      String remarks
-  ) {
+      String remarks) {
     UUID id = UUID.randomUUID();
 
     Student s = new Student();
@@ -55,102 +62,136 @@ public class StudentRepositoryTest {
   // 一般用：何も考えずに「まともな1件」が欲しいとき
   private UUID insertTestStudentAndReturnId() {
     String email = "test-" + System.nanoTime() + "@example.com";
-    return insertStudent(
-        "テスト 太郎",
-        "てすと たろう",
-        "テスト",
-        email,
-        "東京",
-        30,
-        "male",
-        "テスト用"
-    );
+    return insertStudent("テスト 太郎", "てすと たろう", "テスト", email, "東京", 30, "male", "テスト用");
   }
 
   // email を指定したいときだけこれを使う
   private UUID insertTestStudentAndReturnId(String email) {
-    return insertStudent(
-        "テスト 一郎",
-        "てすと いちろう",
-        "いっくん",
-        email,
-        "Nagoya",
-        20,
-        "Male",
-        "テスト用レコード"
-    );
+    return insertStudent("テスト 一郎", "てすと いちろう", "いっくん", email, "Nagoya", 20, "Male", "テスト用レコード");
   }
 
   @Test
   void searchStudents_受講生の全件検索が行えること() {
-    List<Student> actual = sut.searchStudents(
-        null,   // furigana 検索条件なし
-        true,   // includeDeleted: 論理削除済みも含める
-        false   // deletedOnly: 削除済みのみではない
-    );
-    // 検証
-    assertThat(actual).hasSize(16);
+    List<Student> actual =
+        sut.searchStudents(
+            null, // furigana 検索条件なし
+            true, // includeDeleted: 論理削除済みも含める
+            false, // deletedOnly: 削除済みのみではない
+            null);
+    // DB裏取り（students総数）
+    Integer expectedBoxed =
+        jdbcTemplate.queryForObject("SELECT COUNT(*) FROM students", Integer.class);
+
+    int expected = Objects.requireNonNull(expectedBoxed, "count must not be null");
+
+    assertThat(actual).hasSize(expected);
+
+    // studentIdが重複していないこと（念のため）
+    assertThat(actual).extracting(Student::getStudentId).doesNotHaveDuplicates();
   }
 
   @Test
   void searchStudents_論理削除を除いた受講生一覧が取得できること() {
-    List<Student> actual = sut.searchStudents(
-        null,
-        false, // includeDeleted: 削除済みは含めない
-        false  // deletedOnly: 削除済みのみではない
-    );
+    List<Student> actual =
+        sut.searchStudents(
+            null, false, // includeDeleted: 削除済みは含めない
+            false, // deletedOnly: 削除済みのみではない
+            null);
 
-    assertThat(actual).hasSize(14); // 16件中、2件が is_deleted = 1 の想定
+    Integer expectedBoxed =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM students WHERE is_deleted = false", Integer.class);
+
+    int expected = Objects.requireNonNull(expectedBoxed, "count must not be null");
+
+    assertThat(actual).hasSize(expected);
+    assertThat(actual).allSatisfy(s -> assertThat(s.getDeleted()).isFalse());
   }
 
   @Test
   void searchStudents_論理削除された受講生のみ取得できること() {
-    List<Student> actual = sut.searchStudents(
-        null,
-        true,  // ※ 全件＋下の deletedOnly 条件で削除のみになるはず
-        true   // deletedOnly: 削除済みのみ
-    );
+    List<Student> actual =
+        sut.searchStudents(
+            null, true, // ※ 全件＋下の deletedOnly 条件で削除のみになるはず
+            true, // deletedOnly: 削除済みのみ
+            null);
 
-    assertThat(actual).hasSize(2);
+    Integer expectedBoxed =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM students WHERE is_deleted = true", Integer.class);
+
+    int expected = Objects.requireNonNull(expectedBoxed, "count must not be null");
+
+    assertThat(actual).hasSize(expected);
+    assertThat(actual).allSatisfy(s -> assertThat(s.getDeleted()).isTrue());
+  }
+
+  // data.sqlの期待値に依存
+  @Test
+  void searchStudents_ふりがなで部分一致検索が行えること() {
+    List<Student> actual =
+        sut.searchStudents(
+            "やまだ", // data.sql 上のふりがなに合わせて
+            true, // 削除も含める
+            false, null);
+
+    assertThat(actual).singleElement().extracting(Student::getFullName).isEqualTo("Yamada Taro");
   }
 
   @Test
-  void searchStudents_ふりがなで部分一致検索が行えること() {
-    List<Student> actual = sut.searchStudents(
-        "やまだ", // data.sql 上のふりがなに合わせて
-        true,     // 削除も含める
-        false
-    );
+  void searchStudents_status指定で対象学生だけ返ること() {
 
-    assertThat(actual)
-        .singleElement()
-        .extracting(Student::getFullName)
-        .isEqualTo("Yamada Taro");
+    String applicationStatus = ApplicationStatus.IN_PROGRESS.getCode(); // "IN_PROGRESS"
+
+    List<Student> actual = sut.searchStudents(null, false, false, applicationStatus);
+    assertThat(actual).isNotEmpty();
+
+    // 返ってきた学生が「少なくとも1つ」IN_PROGRESSコースを持つことをDBで検証
+    for (Student s : actual) {
+      Integer cnt =
+          jdbcTemplate.queryForObject(
+              """
+              SELECT COUNT(*)
+              FROM student_courses sc
+              INNER JOIN student_courses_application_status scas
+                ON scas.course_id = sc.course_id
+              WHERE sc.student_id = ?
+                AND scas.status = ?
+              """,
+              Integer.class,
+              bytes(s.getStudentId()), // ★BINARY(16)に合わせる
+              applicationStatus);
+
+      assertThat(cnt)
+          .as("studentId=%s should have %s course", s.getStudentId(), applicationStatus)
+          .isNotNull()
+          .isGreaterThan(0);
+    }
   }
 
   @Test
   void insertStudent_受講生の登録が行えること() {
     // arrange: INSERT前の件数を取得
-    List<Student> before = sut.searchStudents(null, true, false);
+    List<Student> before = sut.searchStudents(null, true, false, null);
     int beforeSize = before.size();
 
     // act: 1件INSERT
     UUID id = insertTestStudentAndReturnId();
 
     // assert: 件数が +1 されていること
-    List<Student> after = sut.searchStudents(null, true, false);
+    List<Student> after = sut.searchStudents(null, true, false, null);
     assertThat(after.size()).isEqualTo(beforeSize + 1);
 
     // さきほどのIDを持つレコードが存在すること
-    Student saved = after.stream()
-        .filter(s -> Objects.equals(s.getStudentId(), id))
-        .findFirst()
-        .orElseThrow(() -> new AssertionError("登録した受講生が見つかりません"));
+    Student saved =
+        after.stream()
+            .filter(s -> Objects.equals(s.getStudentId(), id))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("登録した受講生が見つかりません"));
 
     // ついでに中身も確認しておく
     assertThat(saved.getDeleted()).isFalse();
   }
-
 
   @Test
   void findById_既存IDで取得できること() {
@@ -161,7 +202,6 @@ public class StudentRepositoryTest {
     assertThat(found).isNotNull();
     assertThat(found.getStudentId()).isEqualTo(id);
   }
-
 
   @Test
   void findById_存在しないIDの場合はnullが返ること() {
@@ -220,10 +260,11 @@ public class StudentRepositoryTest {
     student.setStudentId(unusedId);
     student.setFullName("ダミー");
     student.setFurigana("だみー");
-    student.setEmail("dummy@example.com");
+    student.setEmail("dummy-" + System.nanoTime() + "@example.com"); // ★必須&ユニーク
     student.setGender("Male");
     student.setLocation("どこか");
     student.setAge(30);
+    student.setRemarks("dummy");
 
     int updated = sut.updateStudent(student);
 
@@ -285,6 +326,7 @@ public class StudentRepositoryTest {
     assertThat(deleted).isEqualTo(0);
   }
 
+  // CASCADEなら期待が変わる
   @Test
   void forceDeleteStudent_受講コースが残っている場合は外部キー制約違反で例外になること() {
     UUID id = insertTestStudentAndReturnId();
@@ -302,5 +344,13 @@ public class StudentRepositoryTest {
     // Act & Assert: 子が残った状態で親だけ消そうとすると FK エラー
     assertThatThrownBy(() -> sut.forceDeleteStudent(id))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  /** UUID → BINARY(16) の byte[] に変換（H2/MySQLモード・JdbcTemplate検証用） */
+  private static byte[] bytes(UUID u) {
+    var bb = java.nio.ByteBuffer.allocate(16);
+    bb.putLong(u.getMostSignificantBits());
+    bb.putLong(u.getLeastSignificantBits());
+    return bb.array();
   }
 }

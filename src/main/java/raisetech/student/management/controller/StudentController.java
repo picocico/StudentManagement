@@ -1,21 +1,10 @@
 package raisetech.student.management.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.swagger.v3.oas.annotations.Hidden;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -32,9 +21,24 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.swagger.v3.oas.annotations.Hidden;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import raisetech.student.management.controller.converter.StudentConverter;
 import raisetech.student.management.data.Student;
 import raisetech.student.management.data.StudentCourse;
+import raisetech.student.management.domain.ApplicationStatus;
 import raisetech.student.management.dto.StudentDetailDto;
 import raisetech.student.management.dto.StudentRegistrationRequest;
 import raisetech.student.management.exception.EmptyObjectException;
@@ -49,11 +53,10 @@ import raisetech.student.management.web.RawBodyCaptureFilter.RawBodyState;
 /**
  * 受講生に関する REST API を提供するコントローラークラス。
  *
- * <p>このクラスは、受講生の登録・取得・更新・論理削除・復元、および
- * ふりがなによる検索などの操作をエンドポイントとして提供します。
+ * <p>このクラスは、受講生の登録・取得・更新・論理削除・復元、および ふりがなによる検索などの操作をエンドポイントとして提供します。
  *
- * <p>受講生 ID は、DB では UUID/BINARY(16)（{@code byte[16]}）として保持し、
- * API では標準的な UUID 文字列表現 （例: {@code 123e4567-e89b-12d3-a456-426614174000}）で受け渡します。
+ * <p>受講生 ID は、DB では UUID/BINARY(16)（{@code byte[16]}）として保持し、 API では標準的な UUID 文字列表現 （例: {@code
+ * 123e4567-e89b-12d3-a456-426614174000}）で受け渡します。
  */
 @Slf4j
 @RestController
@@ -63,14 +66,10 @@ import raisetech.student.management.web.RawBodyCaptureFilter.RawBodyState;
 @Tag(name = "受講生API", description = "受講生のCRUDおよび検索・復元操作")
 public class StudentController {
 
-  /**
-   * 受講生サービス
-   */
+  /** 受講生サービス */
   private final StudentService service;
 
-  /**
-   * 受講生コンバーター
-   */
+  /** 受講生コンバーター */
   private final StudentConverter converter;
 
   private final ObjectMapper objectMapper;
@@ -90,18 +89,18 @@ public class StudentController {
       summary = "受講生登録",
       description = "受講生および受講コースを新規登録します。",
       requestBody =
-      @io.swagger.v3.oas.annotations.parameters.RequestBody(
-          description = "登録対象の受講生およびコース情報",
-          required = true),
+          @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              description = "登録対象の受講生およびコース情報",
+              required = true),
       responses = {
-          @ApiResponse(
-              responseCode = "201",
-              description = "登録に成功",
-              content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
-          @ApiResponse(
-              responseCode = "400",
-              description = "バリデーションエラーまたはリクエスト不正",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(
+            responseCode = "201",
+            description = "登録に成功",
+            content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
+        @ApiResponse(
+            responseCode = "400",
+            description = "バリデーションエラーまたはリクエスト不正",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @PostMapping(
       consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -131,47 +130,49 @@ public class StudentController {
   /**
    * 条件付きで受講生一覧を取得します（ふりがな、削除状態）。
    *
-   * @param furigana       ふりがな検索（省略可能）
+   * @param furigana ふりがな検索（省略可能）
    * @param includeDeleted 論理削除済みも含めるか
-   * @param deletedOnly    論理削除された学生のみ取得するか
+   * @param deletedOnly 論理削除された学生のみ取得するか
+   * @param applicationStatus コースの申し込み状況で絞り込み
    * @return 条件に一致する受講生詳細DTOリスト
    */
   @Operation(
       summary = "受講生一覧検索",
       description = "受講生の一覧をふりがな検索・削除状態を条件に取得します。（該当者なしの場合は空配列を返します）",
       parameters = {
-          @Parameter(name = "furigana", description = "ふりがなで部分一致検索（任意）"),
-          @Parameter(name = "includeDeleted", description = "論理削除済みも含める（デフォルト: false)"),
-          @Parameter(name = "deletedOnly", description = "論理削除された受講生のみ取得（デフォルト: false)")
+        @Parameter(name = "furigana", description = "ふりがなで部分一致検索（任意）"),
+        @Parameter(name = "includeDeleted", description = "論理削除済みも含める（デフォルト: false)"),
+        @Parameter(name = "deletedOnly", description = "論理削除された受講生のみ取得（デフォルト: false)"),
+        @Parameter(
+            name = "applicationStatus",
+            description =
+                "申込状況で絞り込み"
+                    + "（例: IN_PROGRESS(受講中) / COMPLETED(受講終了) / PROVISIONAL(仮申込) / FORMAL(本申込)）")
       },
       responses = {
-          @ApiResponse(
-              responseCode = "200",
-              description = "一覧取得成功",
-              content = @Content(
-                  array = @io.swagger.v3.oas.annotations.media.ArraySchema(
-                      schema = @Schema(implementation = StudentDetailDto.class)
-
-                  ))),
-          @ApiResponse(
-              responseCode = "400",
-              description = "クエリパラメータ形式不正（boolean として解釈できない値、"
-                  + "または includeDeleted と deletedOnly の同時指定など）",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(
+            responseCode = "200",
+            description = "一覧取得成功",
+            content =
+                @Content(
+                    array =
+                        @io.swagger.v3.oas.annotations.media.ArraySchema(
+                            schema = @Schema(implementation = StudentDetailDto.class)))),
+        @ApiResponse(
+            responseCode = "400",
+            description =
+                "クエリパラメータ形式不正（boolean として解釈できない値、" + "または includeDeleted と deletedOnly の同時指定など）",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @GetMapping
   public ResponseEntity<List<StudentDetailDto>> getStudentList(
       @RequestParam(required = false) String furigana,
       @RequestParam(required = false, defaultValue = "false") boolean includeDeleted,
-      @RequestParam(required = false, defaultValue = "false") boolean deletedOnly) {
+      @RequestParam(required = false, defaultValue = "false") boolean deletedOnly,
+      @RequestParam(required = false) ApplicationStatus applicationStatus) {
 
-    log.debug(
-        "GET - Fetching students list. furigana={}, includeDeleted={}, deletedOnly={}",
-        furigana,
-        includeDeleted,
-        deletedOnly);
-
-    List<StudentDetailDto> students = service.getStudentList(furigana, includeDeleted, deletedOnly);
+    List<StudentDetailDto> students =
+        service.getStudentList(furigana, includeDeleted, deletedOnly, applicationStatus);
 
     return ResponseEntity.ok(students);
   }
@@ -186,26 +187,25 @@ public class StudentController {
       summary = "受講生詳細取得",
       description = "指定された受講生IDに対応する詳細情報（基本＋コース）を取得します。",
       parameters =
-      @Parameter(
-          name = "studentId",
-          description = "受講生ID（UUID形式）",
-          example = "123e4567-e89b-12d3-a456-426614174000",
-          schema = @Schema(type = "string", format = "uuid"),
-          required = true
-      ),
+          @Parameter(
+              name = "studentId",
+              description = "受講生ID（UUID形式）",
+              example = "123e4567-e89b-12d3-a456-426614174000",
+              schema = @Schema(type = "string", format = "uuid"),
+              required = true),
       responses = {
-          @ApiResponse(
-              responseCode = "200",
-              description = "詳細取得成功",
-              content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
-          @ApiResponse(
-              responseCode = "400",
-              description = "ID形式不正（UUIDとして不正など）",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-          @ApiResponse(
-              responseCode = "404",
-              description = "該当する受講生が存在しない",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(
+            responseCode = "200",
+            description = "詳細取得成功",
+            content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
+        @ApiResponse(
+            responseCode = "400",
+            description = "ID形式不正（UUIDとして不正など）",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(
+            responseCode = "404",
+            description = "該当する受講生が存在しない",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @GetMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> getStudentDetail(@PathVariable String studentId) {
@@ -220,8 +220,7 @@ public class StudentController {
   /**
    * 受講生情報を全体的に更新します。
    *
-   * <p>UUID 文字列表現の受講生 ID（UUID/BINARY(16) 由来）に対応するレコードを、
-   * リクエストボディの内容で全体更新します。
+   * <p>UUID 文字列表現の受講生 ID（UUID/BINARY(16) 由来）に対応するレコードを、 リクエストボディの内容で全体更新します。
    *
    * @param studentId UUID文字列表現の受講生 ID（例: {@code 123e4567-e89b-12d3-a456-426614174000}）
    */
@@ -229,36 +228,35 @@ public class StudentController {
       summary = "受講生情報更新（全体）",
       description = "受講生情報とコース情報を全て更新します。",
       parameters =
-      @Parameter(
-          name = "studentId",
-          description = "受講生ID（UUID形式）",
-          example = "123e4567-e89b-12d3-a456-426614174000",
-          schema = @Schema(type = "string", format = "uuid"),
-          required = true
-      ),
+          @Parameter(
+              name = "studentId",
+              description = "受講生ID（UUID形式）",
+              example = "123e4567-e89b-12d3-a456-426614174000",
+              schema = @Schema(type = "string", format = "uuid"),
+              required = true),
       requestBody =
-      @io.swagger.v3.oas.annotations.parameters.RequestBody(
-          description = "更新内容（受講生情報＋コース）",
-          required = true),
+          @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              description = "更新内容（受講生情報＋コース）",
+              required = true),
       responses = {
-          @ApiResponse(
-              responseCode = "200",
-              description = "更新成功",
-              content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
-          @ApiResponse(
-              responseCode = "400",
-              description = "バリデーションエラー",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-          @ApiResponse(
-              responseCode = "404",
-              description = "該当する受講生が存在しない",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(
+            responseCode = "200",
+            description = "更新成功",
+            content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
+        @ApiResponse(
+            responseCode = "400",
+            description = "バリデーションエラー",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(
+            responseCode = "404",
+            description = "該当する受講生が存在しない",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @PutMapping("/{studentId}")
   public ResponseEntity<StudentDetailDto> updateStudent(
       @PathVariable("studentId") String studentId,
       @Valid @RequestBody(required = false) StudentRegistrationRequest req // ← required=false
-  ) {
+      ) {
     // ★ 0) リクエストボディの存在／中身チェック
     if (req == null) {
       throw new MissingParameterException("リクエストボディが必要です"); // → E003
@@ -294,44 +292,52 @@ public class StudentController {
   /**
    * 受講生情報を部分的に更新します。
    *
-   * <p>UUID 文字列表現の受講生IDに紐づくレコードへ、指定されたフィールドのみ反映します。
-   * コース更新は append/replace を内容に応じて振り分け、最終状態を再取得して返します。
+   * <p>UUID 文字列表現の受講生IDに紐づくレコードへ、指定されたフィールドのみ反映します。 コース更新は append/replace
+   * を内容に応じて振り分け、最終状態を再取得して返します。
    *
-   * @param studentId      部分更新対象の受講生ID（UUID文字列表現）
-   * @param body           更新対象のフィールド（null/実質空はE003）
+   * @param studentId 部分更新対象の受講生ID（UUID文字列表現の文字列）
+   * @param body 更新対象のフィールド（null/実質空はE003）
    * @param servletRequest 生リクエストボディの状態確認に利用するHTTPリクエスト
    * @return 更新後の受講生詳細情報
-   * @throws EmptyObjectException      更新対象が実質空の場合（E003）
+   * @throws EmptyObjectException 更新対象が実質空の場合（E003）
    * @throws ResourceNotFoundException 対象IDが存在しない場合（E404）
    */
   @Operation(
       summary = "受講生情報更新（部分）",
-      description = "指定項目のみ受講生情報を部分的に更新します。appendCourses=trueの場合はコース追加。",
+      description =
+          """
+          PATCH は部分更新です（未指定フィールドは変更しません）。
+          courses は未指定と空配列で意味が異なります。
+          - courses 未指定（キーなし / null）: コース更新なし
+          - courses 配列指定: appendCourses に従い更新
+          - appendCourses 省略時は true（追加/更新のみ）
+            - append=true かつ courses=[] は no-op
+            - append=false かつ courses=[] は全削除（差し替え）
+          実質空更新（studentに変更がなく、かつ courses に変更意図がない場合）は 400（E003）を返します。
+          """,
       parameters =
-      @Parameter(
-          name = "studentId",
-          description = "部分更新対象の受講生ID（UUID形式）",
-          example = "123e4567-e89b-12d3-a456-426614174000",
-          schema = @Schema(type = "string", format = "uuid"),
-          required = true
-      ),
+          @Parameter(
+              name = "studentId",
+              description = "部分更新対象の受講生ID（UUID形式）",
+              example = "123e4567-e89b-12d3-a456-426614174000",
+              schema = @Schema(type = "string", format = "uuid"),
+              required = true),
       requestBody =
-      @io.swagger.v3.oas.annotations.parameters.RequestBody(
-          description = "部分更新する受講生情報＋（オプション）コース情報",
-          required = true),
+          @io.swagger.v3.oas.annotations.parameters.RequestBody(
+              description = "部分更新する受講生情報＋（オプション）コース情報"),
       responses = {
-          @ApiResponse(
-              responseCode = "200",
-              description = "部分更新成功",
-              content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
-          @ApiResponse(
-              responseCode = "400",
-              description = "バリデーションエラー、リクエストボディ不足、空オブジェクト、ID形式不正など",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-          @ApiResponse(
-              responseCode = "404",
-              description = "該当する受講生が存在しない",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(
+            responseCode = "200",
+            description = "部分更新成功",
+            content = @Content(schema = @Schema(implementation = StudentDetailDto.class))),
+        @ApiResponse(
+            responseCode = "400",
+            description = "バリデーションエラー、リクエストボディ不足、空オブジェクト、ID形式不正など",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(
+            responseCode = "404",
+            description = "該当する受講生が存在しない",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @PatchMapping(
       value = "/{studentId}",
@@ -350,8 +356,7 @@ public class StudentController {
     if (state != null) {
       switch (state) {
         case NONE -> throw new MissingParameterException("リクエストボディは必須です。"); // E003
-        case EMPTY_OBJECT ->
-            throw new EmptyObjectException("更新対象のフィールドがありません"); // E003
+        case EMPTY_OBJECT -> throw new EmptyObjectException("更新対象のフィールドがありません"); // E003
         case NON_EMPTY -> {
           /* 続行 */
         }
@@ -390,50 +395,28 @@ public class StudentController {
       throw new BindException(br); // → 400 E001
     }
 
-    // 2) UUID文字列 → BINARY(16)
-    final UUID studentUuid = converter.decodeUuidStringOrThrow(studentId);
-
-    // 3) Map → DTO
+    // 2) Map → DTO
     final StudentRegistrationRequest req =
         objectMapper.convertValue(body, StudentRegistrationRequest.class);
 
-    // 4) 実質空更新（すべて空/未指定）→ E003
+    // 3) 実質空更新（すべて空/未指定）→ E003
     if (req == null || req.isPatchEmpty()) {
       throw new EmptyObjectException("更新対象のフィールドがありません");
     }
 
-    // 5) 既存取得＆マージ（基本情報のみのときはここで更新）
-    final Student existing = service.findStudentById(studentUuid);
-    final Student update = converter.toEntity(req.getStudent());
-    converter.mergeStudent(existing, update);
+    // 4) UUID文字列 → BINARY(16)
+    final UUID studentUuid = converter.decodeUuidStringOrThrow(studentId);
 
-    // 6) コース情報の処理
-    final boolean hasCourses = (req.getCourses() != null && !req.getCourses().isEmpty());
-    if (hasCourses) {
-      final boolean append = Boolean.TRUE.equals(req.getAppendCourses());
-      final List<StudentCourse> newCourses = converter.toEntityList(req.getCourses(),
-          studentUuid);
-      if (append) {
-        service.appendCourses(studentUuid, newCourses);
-      } else {
-        service.replaceCourses(studentUuid, newCourses);
-      }
-    }
-    // 7) 基本情報の更新は1回だけ（重複呼出しを避ける）
-    service.updateStudentInfoOnly(existing);
-
-    // 8) 常に最新をDBから取り直してDTO化（空レス回避）
-    final Student latest = service.findStudentById(studentUuid);
-    final List<StudentCourse> latestCourses = service.searchCoursesByStudentId(studentUuid);
-    final StudentDetailDto dto = converter.toDetailDto(latest, latestCourses, studentId);
+    // 5) service
+    StudentDetailDto dto = service.patchStudent(studentUuid, req, studentId); // 例：dto返す
     return ResponseEntity.ok(dto);
   }
 
   /**
    * 受講生情報を論理削除します。
    *
-   * <p>UUID文字列表現の受講生 ID を アプリ内部で扱う UUID/BINARY(16)（byte[16]）にデコードし、
-   * 対応するレコードの is_deleted フラグと deleted_at を更新します。
+   * <p>UUID文字列表現の受講生 ID を アプリ内部で扱う UUID/BINARY(16)（byte[16]）にデコードし、 対応するレコードの is_deleted フラグと
+   * deleted_at を更新します。
    *
    * @param studentId 論理削除対象の受講生ID（UUID文字列表現）
    */
@@ -441,31 +424,27 @@ public class StudentController {
       summary = "受講生論理削除",
       description = "指定された受講生を論理削除(is_deleted=true,deleted_at更新)します。",
       parameters =
-      @Parameter(
-          name = "studentId",
-          description = "論理削除対象の受講生ID（UUID形式）",
-          example = "123e4567-e89b-12d3-a456-426614174000",
-          schema = @Schema(type = "string", format = "uuid"),
-          required = true
-      ),
+          @Parameter(
+              name = "studentId",
+              description = "論理削除対象の受講生ID（UUID形式）",
+              example = "123e4567-e89b-12d3-a456-426614174000",
+              schema = @Schema(type = "string", format = "uuid"),
+              required = true),
       responses = {
-          @ApiResponse(
-              responseCode = "204",
-              description = "削除成功"),
-          @ApiResponse(
-              responseCode = "400",
-              description = "ID形式不正（UUIDとして不正など）",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-          @ApiResponse(
-              responseCode = "404",
-              description = "対象受講生が存在しない",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(responseCode = "204", description = "削除成功"),
+        @ApiResponse(
+            responseCode = "400",
+            description = "ID形式不正（UUIDとして不正など）",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(
+            responseCode = "404",
+            description = "対象受講生が存在しない",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @DeleteMapping("/{studentId}")
   public ResponseEntity<Void> deleteStudent(@PathVariable String studentId) {
     log.debug("DELETE - Logically deleting student: {}", studentId);
-    UUID studentUuid = converter.decodeUuidStringOrThrow(
-        studentId); // ← UUID文字列から byte[16] へ変換
+    UUID studentUuid = converter.decodeUuidStringOrThrow(studentId); // ← UUID文字列から byte[16] へ変換
     service.softDeleteStudent(studentUuid);
     return ResponseEntity.noContent().build();
   }
@@ -480,25 +459,22 @@ public class StudentController {
       summary = "論理削除からの復元",
       description = "論理削除された受講生を復元します。",
       parameters =
-      @Parameter(
-          name = "studentId",
-          description = "復元対象の受講生ID（UUID形式）",
-          example = "123e4567-e89b-12d3-a456-426614174000",
-          schema = @Schema(type = "string", format = "uuid"),
-          required = true
-      ),
+          @Parameter(
+              name = "studentId",
+              description = "復元対象の受講生ID（UUID形式）",
+              example = "123e4567-e89b-12d3-a456-426614174000",
+              schema = @Schema(type = "string", format = "uuid"),
+              required = true),
       responses = {
-          @ApiResponse(
-              responseCode = "204",
-              description = "復元成功"),
-          @ApiResponse(
-              responseCode = "400",
-              description = "ID形式不正（UUIDとして不正など）",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-          @ApiResponse(
-              responseCode = "404",
-              description = "対象受講生が存在しない、または未削除",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(responseCode = "204", description = "復元成功"),
+        @ApiResponse(
+            responseCode = "400",
+            description = "ID形式不正（UUIDとして不正など）",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+        @ApiResponse(
+            responseCode = "404",
+            description = "対象受講生が存在しない、または未削除",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @PatchMapping("/{studentId}/restore")
   public ResponseEntity<Void> restoreStudent(@PathVariable String studentId) {
@@ -512,32 +488,26 @@ public class StudentController {
   // ▼ 以下：テスト用エンドポイント
   // ------------------------
 
-  /**
-   * 【テスト用】MissingServletRequestParameterException 発生確認用。 keywordパラメータをあえて必須にし、 未指定時に例外を投げる。
-   */
+  /** 【テスト用】MissingServletRequestParameterException 発生確認用。 keywordパラメータをあえて必須にし、 未指定時に例外を投げる。 */
   @Tag(name = "テスト用API")
   @Hidden
   @Operation(
       summary = "［テスト］パラメーター不足エラー",
-      description = "keywordパラメータが未指定の場合、MissingServletRequestParameterException "
-          + "を発生させます。",
+      description = "keywordパラメータが未指定の場合、MissingServletRequestParameterException " + "を発生させます。",
       parameters = @Parameter(name = "keyword", description = "必須のキーワード", required = true),
       responses = {
-          @ApiResponse(responseCode = "200", description = "正常時"),
-          @ApiResponse(
-              responseCode = "400",
-              description = "keywordが未指定",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(responseCode = "200", description = "正常時"),
+        @ApiResponse(
+            responseCode = "400",
+            description = "keywordが未指定",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @GetMapping("/test-missing-param")
-  public ResponseEntity<String> testMissing(
-      @RequestParam(name = "keyword") String keyword) {
+  public ResponseEntity<String> testMissing(@RequestParam(name = "keyword") String keyword) {
     return ResponseEntity.ok("受け取った keyword: " + keyword);
   }
 
-  /**
-   * 【テスト用】MethodArgumentTypeMismatchException 発生確認用。 idパラメータに文字列を渡すと、 int型変換に失敗して例外が発生する。
-   */
+  /** 【テスト用】MethodArgumentTypeMismatchException 発生確認用。 idパラメータに文字列を渡すと、 int型変換に失敗して例外が発生する。 */
   @Tag(name = "テスト用API")
   @Hidden
   @Operation(
@@ -545,11 +515,11 @@ public class StudentController {
       description = "int型のidに対して文字列を渡すと型変換エラーになります。",
       parameters = @Parameter(name = "id", description = "整数である必要があります", required = true),
       responses = {
-          @ApiResponse(responseCode = "200", description = "正常時"),
-          @ApiResponse(
-              responseCode = "400",
-              description = "型変換エラー発生",
-              content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+        @ApiResponse(responseCode = "200", description = "正常時"),
+        @ApiResponse(
+            responseCode = "400",
+            description = "型変換エラー発生",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
       })
   @GetMapping("/test-type")
   public ResponseEntity<String> testTypeMismatch(@RequestParam Integer id) {

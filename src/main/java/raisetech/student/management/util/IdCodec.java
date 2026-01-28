@@ -6,28 +6,25 @@ import java.util.UUID;
  * UUID/BINARY(16) ベースの ID を UUID 文字列表現と相互変換するためのユーティリティ契約インターフェース。
  *
  * <p>契約:
+ *
  * <ul>
  *   <li>{@code decodeUuidOrThrow} / {@code decodeUuidBytesOrThrow}:
- *     <ul>
- *       <li>入力は標準的な UUID 文字列表現（例: {@code 123e4567-e89b-12d3-a456-426614174000}）を前提とする</li>
- *       <li>UUID 文字列として不正な場合は {@link IllegalArgumentException} をスローする</li>
- *     </ul>
- *   </li>
+ *       <ul>
+ *         <li>入力は標準的な UUID 文字列表現（例: {@code 123e4567-e89b-12d3-a456-426614174000}）を前提とする
+ *         <li>UUID 文字列として不正な場合は {@link IllegalArgumentException} をスローする
+ *       </ul>
  *   <li>{@code encodeId}:
- *     <ul>
- *       <li>引数は UUID/BINARY(16) の 16 バイト配列を前提とする</li>
- *       <li>16 バイト以外が渡された場合は {@link IllegalArgumentException} をスローする</li>
- *     </ul>
- *   </li>
+ *       <ul>
+ *         <li>引数は UUID/BINARY(16) の 16 バイト配列を前提とする
+ *         <li>16 バイト以外が渡された場合は {@link IllegalArgumentException} をスローする
+ *       </ul>
  *   <li>{@code generateNewIdBytes}:
- *     <ul>
- *       <li>{@link UUID#randomUUID()} 相当のランダム UUID を元にした 16 バイト配列を返す</li>
- *     </ul>
- *   </li>
+ *       <ul>
+ *         <li>{@link UUID#randomUUID()} 相当のランダム UUID を元にした 16 バイト配列を返す
+ *       </ul>
  * </ul>
  *
- * <p>ドメイン層では、必要に応じてこれらの例外を {@code InvalidIdFormatException}
- * などにラップして利用します。
+ * <p>ドメイン層では、必要に応じてこれらの例外を {@code InvalidIdFormatException} などにラップして利用します。
  */
 public interface IdCodec {
 
@@ -56,8 +53,8 @@ public interface IdCodec {
   /**
    * UUID 由来の 16 バイト配列を UUID 文字列表現にエンコードします。
    *
-   * <p>引数が {@code null} の場合は {@code null} を返します。
-   * それ以外で 16 バイト以外の長さの配列が渡された場合は {@link IllegalArgumentException} をスローします。
+   * <p>引数が {@code null} の場合は {@code null} を返します。 それ以外で 16 バイト以外の長さの配列が渡された場合は {@link
+   * IllegalArgumentException} をスローします。
    *
    * @param id UUID を表す 16 バイト配列、null や 16 バイト以外は許可しない。
    * @return UUID 文字列表現

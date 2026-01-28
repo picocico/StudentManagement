@@ -6,9 +6,8 @@ import java.util.UUID;
 /**
  * UUID と byte[16] の相互変換を提供するユーティリティクラス。
  *
- * <p>DB では UUID を BINARY(16)（{@code byte[16]}）として保持し、
- * * アプリケーションや API では UUID 文字列表現（例: {@code 123e4567-e89b-12d3-a456-426614174000}） *
- * を扱うため、その橋渡しとして利用します。
+ * <p>DB では UUID を BINARY(16)（{@code byte[16]}）として保持し、 * アプリケーションや API では UUID 文字列表現（例: {@code
+ * 123e4567-e89b-12d3-a456-426614174000}） * を扱うため、その橋渡しとして利用します。
  */
 public class UUIDUtil {
 

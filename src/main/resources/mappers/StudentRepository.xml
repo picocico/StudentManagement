@@ -22,13 +22,26 @@
     <result property="deleted" column="is_deleted"/>
   </resultMap>
 
-  <!-- 動的検索 -->
+  <!-- 動的検索（status対応） -->
   <select id="searchStudents" resultMap="StudentResultMap">
     SELECT * FROM students
     WHERE 1=1
     <if test="furigana != null and furigana != ''">
       AND furigana LIKE CONCAT('%', #{furigana}, '%')
     </if>
+
+    <!-- ★追加：申込状況で絞る（重複回避のため EXISTS 方式） -->
+    <if test="applicationStatus != null and applicationStatus != ''">
+      AND EXISTS (
+      SELECT 1
+      FROM student_courses sc
+      INNER JOIN student_courses_application_status scas
+      ON scas.course_id = sc.course_id
+      WHERE sc.student_id = students.student_id
+      AND scas.status = #{applicationStatus}
+      )
+    </if>
+
     <choose>
       <when test="deletedOnly">
         AND is_deleted = true
@@ -57,7 +70,7 @@
     now(), #{deleted})
   </insert>
 
-  <!-- 更新 -->
+  <!-- PUT/全体更新 -->
   <update id="updateStudent" parameterType="raisetech.student.management.data.Student">
     UPDATE students SET
     full_name = #{fullName},
@@ -70,6 +83,27 @@
     remarks = #{remarks},
     is_deleted = #{deleted},
     deleted_at = #{deletedAt}
+    WHERE student_id = #{studentId, jdbcType=BINARY,
+    typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
+  </update>
+
+  <!-- PATCH/差分更新 （nullは更新しない）-->
+  <update id="updateStudentSelective" parameterType="raisetech.student.management.data.Student">
+    UPDATE students
+    <set>
+      <if test="fullName != null">full_name = #{fullName},</if>
+      <if test="furigana != null">furigana = #{furigana},</if>
+      <if test="nickname != null">nickname = #{nickname},</if>
+      <if test="email != null">email = #{email},</if>
+      <if test="location != null">location = #{location},</if>
+      <if test="age != null">age = #{age},</if>
+      <if test="gender != null">gender = #{gender},</if>
+      <if test="remarks != null">remarks = #{remarks},</if>
+
+      <!-- deleted系をPATCHで触る設計なら -->
+      <if test="deleted != null">is_deleted = #{deleted},</if>
+      <if test="deletedAt != null">deleted_at = #{deletedAt},</if>
+    </set>
     WHERE student_id = #{studentId, jdbcType=BINARY,
     typeHandler=raisetech.student.management.config.typehandler.UUIDTypeHandler}
   </update>
